@@ -1,0 +1,3 @@
+#define JITIFY_OPTIONS  \
+-I${CMAKE_SOURCE_DIR}/include \
+-I${TORCH_INCLUDE_DIRS}
