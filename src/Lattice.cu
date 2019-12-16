@@ -5,6 +5,7 @@
 
 #include "EasyPytorch/UtilsPytorch.h" //contains torch so it has to be added BEFORE any other include because the other ones might include loguru which gets screwed up if torch was included before it
 #include "EasyCuda/UtilsCuda.h"
+#include "string_utils.h"
 
 //my stuff
 #include "lattice_net/HashTable.cuh"
@@ -121,7 +122,7 @@ void Lattice::init_params(const std::string config_file){
     for (int i=0; i < nr_sigmas; i++) {
         std::string param_name="sigma_"+std::to_string(i);
         std::string sigma_val_and_extent = (std::string)lattice_config[param_name];
-        std::vector<std::string> tokenized = er::utils::split(sigma_val_and_extent, " ");
+        std::vector<std::string> tokenized = split(sigma_val_and_extent, " ");
         CHECK(tokenized.size()==2) << "For each sigma we must define its value and the extent(nr of dimensions it affects) in space separated string. So the nr of tokens split string should have would be 1. However the nr of tokens we have is" << tokenized.size();
         std::pair<float, int> sigma_params = std::make_pair<float,int> (  std::stof(tokenized[0]), std::stof(tokenized[1]) );
         m_sigmas_val_and_extent.push_back(sigma_params);

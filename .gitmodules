@@ -7,3 +7,6 @@
 [submodule "deps/EasyCuda"]
 	path = deps/EasyCuda
 	url = https://github.com/RaduAlexandru/EasyCuda.git
+[submodule "deps/jitify"]
+	path = deps/jitify
+	url = https://github.com/RaduAlexandru/jitify
