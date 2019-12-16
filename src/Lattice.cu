@@ -33,6 +33,10 @@ using namespace configuru;
 #define ENABLE_CUDA_PROFILING 1
 #include "Profiler.h" 
 
+//boost
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
+
 //jitify
 using jitify::reflection::type_of;
 
@@ -114,7 +118,14 @@ Lattice::~Lattice(){
 }
 
 void Lattice::init_params(const std::string config_file){
-    Config cfg = configuru::parse_file(std::string(CMAKE_SOURCE_DIR)+"/config/"+config_file, CFG);
+    // Config cfg = configuru::parse_file(std::string(CMAKE_SOURCE_DIR)+"/config/"+config_file, CFG);
+    std::string config_file_abs;
+    if (fs::path(config_file).is_relative()){
+        config_file_abs=(fs::path(PROJECT_SOURCE_DIR) / config_file).string();
+    }else{
+        config_file_abs=config_file;
+    }
+    Config cfg = configuru::parse_file(config_file_abs, CFG);
     Config lattice_config=cfg["lattice_gpu"];
     m_hash_table_capacity = lattice_config["hash_table_capacity"];
 

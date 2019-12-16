@@ -5,7 +5,6 @@ import numpy as np
 import sys
 from easypbr  import *
 from dataloaders import *
-np.set_printoptions(threshold=sys.maxsize)
 
 config_file="test_loader.cfg"
 
