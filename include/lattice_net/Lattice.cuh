@@ -8,6 +8,7 @@
 // #include <cuda_runtime_api.h>
 // #include "device_launch_parameters.h" //needed for threadIdx and blockDim 
 // #include <device_functions.h> //for __syncthreads
+// #include <curand_kernel.h> //for curand_uniform https://gist.github.com/NicholasShatokhin/3769635
 
 
 #include "torch/torch.h"
@@ -48,6 +49,7 @@ public:
     void splat_standalone(torch::Tensor& positions_raw, torch::Tensor& values, const bool with_homogeneous_coord); 
     void just_create_verts(torch::Tensor& positions_raw, const bool with_homogeneous_coord); 
     void distribute(torch::Tensor& positions_raw, torch::Tensor& values); 
+    torch::Tensor create_splatting_mask(const torch::Tensor& nr_points_per_simplex, const int nr_positions, const int max_nr_points);
     // void blur_standalone(torch::Tensor& positions_raw, torch::Tensor& values); 
     std::shared_ptr<Lattice> blur_standalone(); 
     torch::Tensor slice_standalone_no_precomputation(torch::Tensor& positions_raw, const bool with_homogeneous_coord); //slice at the position and don't use the m_matrix, but rather query the simplex and get the barycentric coordinates and all that. This is useful for when we slice at a different position than the one used for splatting
@@ -100,6 +102,7 @@ public:
     void set_val_dim(const int);
     void set_val_full_dim(const int);
     void set_sigma(const float);
+    void set_nr_lattice_vertices(const int nr_verts);
 
 
     std::vector< std::pair<float, int> > m_sigmas_val_and_extent; //for each sigma we store here the value and the number of dimensions it affect. In the Gui we modify this one
@@ -149,6 +152,8 @@ private:
     // float* m_new_values;
     torch::Tensor m_tmp_blurred_values_tensor; //intermediate tensor use to store the values after bluring in each axis. It swaps repedetly with hash_table.m_values
     //TODO it would be a lot faster to have both the indices and the weights adjacent in memory by maybe conserding he index as a float too and rounding it to the nearest integer in the kernel
+    // curandState* m_devStates; //states for random nr generation
+    // int m_nr_states; //nr of states we have in m_devStates
 
     // //cuda things 
     // jitify::JitCache m_kernel_cache;

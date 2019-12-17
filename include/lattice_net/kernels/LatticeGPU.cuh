@@ -14,6 +14,7 @@
 #include <cuda_runtime_api.h>
 #include "device_launch_parameters.h" //needed for threadIdx and blockDim 
 #include <device_functions.h> //for __syncthreads
+// #include <curand_kernel.h> //for curand_uniform https://gist.github.com/NicholasShatokhin/3769635
 
 #ifndef __CUDACC_RTC__ 
 //Add this header after we add all cuda stuff because we need the profiler to have cudaDeviceSyncronize defined
@@ -200,6 +201,31 @@ public:
             // VLOG(1) << "after splatting nr_verts is " << nr_lattice_vertices();
         
 
+        }
+
+        // void setup_seeds(curandState* globalState, const int nr_states ){
+  
+        //     dim3 blocks(( nr_states - 1) / 512 + 1, 1, 1);
+        //     dim3 blockSize(512, 1, 1);
+        //     m_lattice_program.kernel("setup_seeds")
+        //                 .instantiate(nr_states)
+        //                 .configure(blocks, blockSize)
+        //                 .launch( globalState);
+        //     CUDA_CHECK_ERROR();
+        // }
+
+        //assumes we have enough stats in curand stat for each nr_position*(m_pos_dim+1)
+        // void create_splatting_mask(bool* mask,  const int* splatting_indices, const int* nr_points_per_simplex, const int max_nr_points, const int nr_positions, const int pos_dim, curandState* globalState ){
+        void create_splatting_mask(bool* mask,  const int* splatting_indices, const int* nr_points_per_simplex, const int max_nr_points, const int nr_positions, const int pos_dim){
+  
+            int size_of_indices_vector=nr_positions*(pos_dim+1);
+            dim3 blocks(( nr_positions*(pos_dim+1) - 1) / 512 + 1, 1, 1);
+            dim3 blockSize(512, 1, 1);
+            m_lattice_program.kernel("create_splatting_mask")
+                        .instantiate(pos_dim)
+                        .configure(blocks, blockSize)
+                        .launch( mask, splatting_indices, nr_points_per_simplex, max_nr_points, size_of_indices_vector);
+            CUDA_CHECK_ERROR();
         }
 
 
@@ -699,6 +725,88 @@ __global__ void distribute(float* positions, float* values, const int nr_positio
 
 
 
+
+}
+
+
+// int size_of_indices_vector=nr_positions*(pos_dim+1);
+// dim3 blocks(( nr_positions*(pos_dim+1) - 1) / 512 + 1, 1, 1);
+// dim3 blockSize(512, 1, 1);
+// m_lattice_program.kernel("create_splatting_mask")
+//             .instantiate(pos_dim)
+//             .configure(blocks, blockSize)
+//             .launch( mask, nr_points_per_simplex, max_nr_points, size_of_indices_vector  );
+// CUDA_CHECK_ERROR();
+//
+
+// template<int nr_states>
+// __global__ void setup_seeds(curandState* globalState){
+
+//     // determine where in the thread grid we are
+//     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with an edge going form a point towards a lattice vertex
+//     if(idx>=nr_states){ //don't go out of bounds
+//         return;
+//     } 
+
+//     unsigned long seed = 0;
+//     curand_init ( seed, idx, 0, &globalState[idx] );
+
+// }
+
+//https://stackoverflow.com/a/12230158
+__device__ unsigned int RNG(int thread_idx){   
+    // unsigned int m_w = 150;
+    unsigned int m_w = thread_idx;
+    unsigned int m_z = 40;
+
+    m_z = 36969 * (m_z & 65535) + (m_z >> 16);
+    m_w = 18000 * (m_w & 65535) + (m_w >> 16);
+
+        // cout <<(m_z << 16) + m_w << endl;  /* 32-bit result */
+    unsigned int res=(m_z << 16) + m_w;
+
+    return res;
+
+}
+
+template<int pos_dim>
+// __global__ void create_splatting_mask(bool* mask, const int* splatting_indices,  const int* nr_points_per_simplex, const int max_nr_points, const int size_of_indices_vector, curandState* globalState){
+__global__ void create_splatting_mask(bool* mask, const int* splatting_indices,  const int* nr_points_per_simplex, const int max_nr_points, const int size_of_indices_vector){
+
+    // determine where in the thread grid we are
+    int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with an edge going form a point towards a lattice vertex
+    if(idx>=size_of_indices_vector){ //don't go out of bounds
+        return;
+    } 
+
+    //
+    int lattice_vertex_idx=splatting_indices[idx];
+    if(lattice_vertex_idx<0){ //if the point didnt splat, then we have a -1 and we don't care about that
+        return;
+    }
+    int nr_points=nr_points_per_simplex[lattice_vertex_idx];
+    if(nr_points>max_nr_points){
+        //roll a dice and write a True if we keep the edge(the contributuon from the point to the vertex) and a False if we dont
+        // curandState localState = globalState[idx];
+        // float random = curand_uniform( &localState ); //uniform between 0.0 and 1.0
+        unsigned int r_int=RNG(idx);
+        r_int=r_int%10000;
+        float r_float=r_int/10000.0;
+        // printf("%f\n", r_float);
+
+
+        float overfill=nr_points/max_nr_points; //by how much we verfilled out cap
+        //imagine we overifll by a factor of 100
+        if (r_float < 1.0/overfill){
+            mask[idx]=true; //keep 
+        }else{
+            mask[idx]=false; //kill
+        }
+
+        // globalState[idx] = localState;
+    }else{
+        mask[idx]=true; //we keep this edge(this contribution)
+    }
 
 }
 

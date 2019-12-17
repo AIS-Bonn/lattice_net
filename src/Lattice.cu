@@ -77,6 +77,13 @@ Lattice::Lattice(const std::string config_file, const std::string name):
     {
 
     init_params(config_file);
+
+    // //random states
+    // m_nr_states=1000000;
+    // cudaMalloc ( &m_devStates, m_nr_states*sizeof( curandState ) );
+    // // setup seeds
+    // m_impl->setup_seeds(m_devStates, m_nr_states);
+
     VLOG(1) << "Creating lattice: " <<name;
 
 }
@@ -110,6 +117,7 @@ Lattice::Lattice(Lattice* other):
         m_hash_table->m_entries_tensor=other->m_hash_table->m_entries_tensor;
         m_hash_table->m_nr_filled_tensor=other->m_hash_table->m_nr_filled_tensor.clone();
         m_hash_table->update_impl();
+        // m_devStates=other->m_devStates;
 
 }
 
@@ -401,6 +409,20 @@ void Lattice::distribute(torch::Tensor& positions_raw, torch::Tensor& values){
   
 }
 
+        // void create_splatting_mask(bool* mask,  const int* splatting_indices, const int* nr_points_per_simplex, const int nr_positions, const int pos_dim, curandState* globalState ){
+Tensor Lattice::create_splatting_mask(const torch::Tensor& nr_points_per_simplex, const int nr_positions, const int max_nr_points){
+    // if(nr_positions*(m_pos_dim+1)>m_nr_states){
+        // LOG(FATAL) << "We don't have enough random states to for each thread. Increase the nr of states";
+    // }
+
+    Tensor mask = torch::zeros({nr_positions*(m_pos_dim+1)}, torch::dtype(torch::kBool).device(torch::kCUDA, 0)  );
+
+    // m_impl->create_splatting_mask(mask.data<bool>(), m_splatting_indices_tensor.data<int>(), nr_points_per_simplex.data<int>(), max_nr_points, nr_positions, m_pos_dim, m_devStates); 
+    m_impl->create_splatting_mask(mask.data<bool>(), m_splatting_indices_tensor.data<int>(), nr_points_per_simplex.data<int>(), max_nr_points, nr_positions, m_pos_dim); 
+
+    return mask;
+}
+
 
 
 
@@ -467,6 +489,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     VLOG(4) <<"starting convolved im2row_standlaone. The current lattice has nr_vertices_lattices" << nr_lattice_vertices();
     CHECK(nr_lattice_vertices()!=0) << "Why does this current lattice have zero nr_filled?";
     int nr_vertices=nr_lattice_vertices();
+    // VLOG(1)
 
     std::shared_ptr<Lattice> convolved_lattice=create(this); //create a lattice with no config but takes the config from this one
     convolved_lattice->m_name="convolved_lattice";
@@ -1596,6 +1619,29 @@ int Lattice::nr_lattice_vertices(){
     CHECK(nr_verts<1e+8) << "nr vertices cannot be that high. However it is ", nr_verts;
     return nr_verts;
 }
+
+void Lattice::set_nr_lattice_vertices(const int nr_verts){
+    // cudaDeviceSynchronize();
+    // int nr_verts[1];
+    // cudaMemcpy(nr_verts, m_hash_table.m_filled, sizeof(int), cudaMemcpyDeviceToHost);    
+    // return nr_verts[0];
+
+    // torch::Tensor nr_filled_cpu=m_hash_table->m_nr_filled_tensor.clone();
+    // nr_filled_cpu.to("cpu");
+    // return nr_filled_cpu.item<int>();
+
+    //attempt 2 at making it faster
+    m_impl->wait_to_create_vertices(); //we synchronize the event and wait until whatever kernel was launched to create vertices has also finished
+    // int nr_verts=0;
+    // cudaMemcpy ( (void*)&nr_verts,  m_hash_table->m_nr_filled_tensor.data<int>(), sizeof(int), cudaMemcpyHostToDevice );
+    cudaMemcpy( m_hash_table->m_nr_filled_tensor.data<int>(), &nr_verts, sizeof(int), cudaMemcpyHostToDevice);
+    // cudaMemcpy ( &nr_verts,  m_hash_table->m_impl->m_nr_filled, sizeof(int), cudaMemcpyDeviceToHost );
+    // VLOG(1) << "nr of verts is " << m_hash_table->m_nr_filled_tensor;
+    CHECK(nr_verts>=0) << "nr vertices cannot be negative. However it is ", nr_verts;
+    CHECK(nr_verts<1e+8) << "nr vertices cannot be that high. However it is ", nr_verts;
+    // return nr_verts;
+}
+
 
 int Lattice::get_filter_extent(const int neighborhood_size) {
     // return std::pow(neighborhood_size + 1, pos_dim + 1) - std::pow(neighborhood_size, pos_dim + 1);

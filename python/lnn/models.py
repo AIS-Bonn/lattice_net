@@ -978,6 +978,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         self.with_error_checking=with_error_checking
 
         self.distribute=DistributeLatticeModule(self.with_debug_output, self.with_error_checking) 
+        self.distribute_cap=DistributeCapLatticeModule() 
         #self.distributed_transform=DistributedTransform( [32], self.with_debug_output, self.with_error_checking)  
         self.start_nr_filters=model_params.pointnet_start_nr_channels()
         self.point_net=PointNetModule( [16,32,64], self.start_nr_filters, self.with_debug_output, self.with_error_checking)  
@@ -1135,6 +1136,11 @@ class LNN_skippy_efficient(torch.nn.Module):
         # TIME_START("distribute_py")
         distributed, indices=self.distribute(ls, positions, values)
         # TIME_END("distribute_py")
+
+        print("distributed has shape", distributed.shape)
+        print("indices has shape", indices.shape)
+        #remove some rows of the distribured and indices depending if the corresponding lattice vertex has to many incident points
+        distributed, indices,ls=self.distribute_cap(distributed, positions.size(1), ls, cap=20)
 
         #transform
         TIME_START("distribute_transform")

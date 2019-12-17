@@ -73,6 +73,62 @@ class DistributeLatticeModule(torch.nn.Module):
         # return DistributeLattice.apply(lattice_py, positions, values, self.dummy_weight)
         return DistributeLattice.apply(lattice_py, positions, values, self.with_debug_output, self.with_error_checking)
 
+class DistributeCapLatticeModule(torch.nn.Module):
+    def __init__(self,):
+        super(DistributeCapLatticeModule, self).__init__()
+    def forward(self, distributed, nr_positions, ls, cap):
+        indices=ls.splatting_indices()
+        weights=ls.splatting_weights()
+        indices_long=indices.long()
+        #some indices may be -1 because they were not inserted into the hashmap, this will cause an error for scatter_max so we just set them to 0
+        indices_long[indices_long<0]=0
+
+        ones=torch.ones(indices.shape[0]).to("cuda")
+
+
+        nr_points_per_simplex = torch_scatter.scatter_add(ones, indices_long)
+        nr_points_per_simplex=nr_points_per_simplex[1:] #the invalid simplex is at zero, the one in which we accumulate or the splatting indices that are -1
+
+        # mask = indices.ge(0.5).to("cuda")
+        # mask=torch.cuda.FloatTensor(indices.size(0)).uniform_() > 0.995
+        # mask=mask.unsqueeze(1)
+
+        # nr_positions= distributed.size(0)/(ls.pos_dim() +1  )
+        mask=ls.lattice.create_splatting_mask(nr_points_per_simplex.int(), int(nr_positions), cap )
+
+        # indices=indices.unsqueeze(1)
+        print("distributed ", distributed.shape)
+        print("indices ", indices.shape)
+        print("weights ", weights.shape)
+        print("mask ", mask.shape)
+
+        #print the tensors
+        print("mask is ", mask)
+        print("indices is ", indices)
+        print("weights is ", weights)
+        print("distributed is ", distributed)
+
+        capped_indices=torch.masked_select(indices, mask )
+        capped_weights=torch.masked_select(weights, mask )
+        capped_distributed=torch.masked_select(distributed, mask.unsqueeze(1))
+        capped_distributed=capped_distributed.view(-1,distributed.size(1))
+
+        print("capped_indices ", capped_indices.shape)
+        print("capped_distributed ", capped_distributed.shape)
+
+        # print("capped_indices is ", capped_indices)
+        # print("capped_weights is ", capped_weights)
+        # print("capped_distributed is ", capped_distributed)
+
+        ls.set_splatting_indices(capped_indices)
+        ls.set_splatting_weights(capped_weights)
+
+
+
+        return capped_distributed, capped_indices, ls
+
+
+
 
 
 class ConvLatticeModule(torch.nn.Module):
@@ -656,7 +712,7 @@ class SliceDeformLatticeModule(torch.nn.Module):
         # sliced_rowified_bn=self.bottleneck_deltaW(sliced_rowified)
         sliced_rowified_bn=sliced_rowified
         if self.gn_calc_deltaW is None:
-            self.gn_calc_deltaW=torch.nn.GroupNorm(sliced_rowified_bn.shape[2],sliced_rowified_bn.shape[2]).to("cuda")
+            self.gn_calc_deltaW=torch.nn.GroupNorm(slice_rowified.shape[2],sliced_rowified_bn.shape[2]).to("cuda")
             # self.gn_calc_deltaW=torch.nn.GroupNorm(1, sliced_rowified_bn.shape[2]).to("cuda")
         print("sliced_rowified_bn has shape ", sliced_rowified_bn.shape)
         #grouo norm want N,C,L but we have slice_rowified as 1 x L x C
@@ -1157,7 +1213,7 @@ class SliceClassifyLatticeModule(torch.nn.Module):
         # need to get from each position a berycentric offest of size m_pos_dim+1
         # linear layers on the sliced rowified get us to a tensor of 1 x nr_positions x (m_pos_dim+1), this will be the weights offsets for eahc positions into the 4 lattice vertices
         if self.linear_deltaW is None:
-            self.gn = torch.nn.GroupNorm(1, logits_rowified.shape[2]).to("cuda")
+            self.gn = torch.nn.GroupNorm(logits_rowified.shape[2], logits_rowified.shape[2]).to("cuda")
             self.linear_deltaW=torch.nn.Linear(logits_rowified.shape[2], pos_dim+1, bias=True).to("cuda") 
             with torch.no_grad():
                 self.linear_deltaW.weight.fill_(0.0) #we set the weights so that the initial deltaW are zero
@@ -1465,7 +1521,7 @@ class GroupNormLatticeModule(torch.nn.Module):
     def __init__(self, nr_params, affine=True):
         super(GroupNormLatticeModule, self).__init__()
         # self.gn = torch.nn.GroupNorm(nr_params, nr_params).to("cuda")
-        self.gn = torch.nn.GroupNorm(1, nr_params).to("cuda")
+        self.gn = torch.nn.GroupNorm(nr_params, nr_params).to("cuda")
     def forward(self,lattice_values, lattice_py):
 
         #group norm which only does group norm over the whole values, of course this only work when they are not the same size as the capacity
@@ -1721,6 +1777,12 @@ class PointNetModule(torch.nn.Module):
         #or we can use the this to set to zero the vertices that have less than 3 points
         print("nr points per simplex has shape ", nr_points_per_simplex.shape)
 
+        #is we use distribute_cap we may accidentally remove some lattice vectors and therefore distributed.size(0) may not coindice with hash_table.nr_filled. must be updated
+        # print("waddwa", torch.tensor(nr_points_per_simplex.size(0)).int())
+        # sys.exit("debug")
+        # lattice_py.lattice.m_hash_table.m_nr_filled_tensor=torch.tensor(nr_points_per_simplex.size(0)).int()
+        # lattice_py.lattice.set_nr_lattice_vertices( int(nr_points_per_simplex.size(0))  )
+
 
         #calculate also how many points we have per simplex #DOESNT REALLY HELP and actually it seems to make things worse
         # ones=torch.zeros(distributed.shape[0], 1, device="cuda")
@@ -1743,7 +1805,11 @@ class PointNetModule(torch.nn.Module):
 
 
         #attempt 3 just by concatenating the barycentric coords
-        barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
+        argmax_flatened=argmax.flatten()
+        argmax_positive=argmax_flatened.clone()
+        argmax_positive[argmax_flatened<0]=0
+        # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
+        barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax_positive ) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
         barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
         distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced),1)
         # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced, nr_points_per_simplex),1)
@@ -1793,6 +1859,8 @@ class PointNetModule(torch.nn.Module):
 
         # return lattice_reduced
         return distributed_reduced, lattice_py
+
+
 
 class PointNetDenseModule(torch.nn.Module):
     def __init__(self, growth_rate, nr_layers, nr_outputs_last_layer, with_debug_output, with_error_checking):
@@ -2226,7 +2294,9 @@ class GnReluConv(torch.nn.Module):
         if self.with_dropout:
             lv = self.drop(lv)
         ls.set_values(lv)
+        print("print before conv lv is", lv.shape)
         lv_1, ls_1 = self.conv(lv, ls)
+        print("print after conv lv is", lv_1.shape)
         if skip_connection is not None:
             lv_1+=skip_connection
         ls_1.set_values(lv_1)
@@ -2949,11 +3019,14 @@ class ResnetBlock(torch.nn.Module):
 
         #bn-relu-conv
         identity=lv
+        print("identity has shape ", lv.shape)
         lv, ls=self.conv1(lv,ls)
+        print("after c1 lv has shape ", lv.shape)
         # if self.drop is not None:
             # lv=self.drop(lv)
             # lv = F.dropout(lv, p=0.2, training=self.training)
         lv, ls=self.conv2(lv,ls)
+        print("after c2 lv has shape ", lv.shape)
         # lv=lv*self.residual_gate
         # if(lv.shape[1]==identity.shape[1]):
         lv+=identity

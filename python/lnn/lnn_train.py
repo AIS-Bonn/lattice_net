@@ -303,7 +303,7 @@ def run():
 
             if with_viewer:
                 cloud.m_vis.m_point_size=4
-                Scene.show(cloud,"cloud")
+                # Scene.show(cloud,"cloud")
 
             #set the lattice sigmas on shapenet depending on the object 
             if isinstance(loader, DataLoaderShapeNetPartSeg):
@@ -335,11 +335,11 @@ def run():
 
             positions, values, target = model_ctx.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
             pred_softmax, pred_raw, delta_weight_error_sum=model_ctx.forward(lattice_to_splat, positions, values, mode, cloud.m_label_mngr.nr_classes(), loader_train.nr_samples() )
-            Profiler.print_all_stats()
+            # Profiler.print_all_stats()
             if with_viewer:
                 show_predicted_cloud(pred_softmax, cloud)
-                show_difference_cloud(pred_softmax, cloud)
-                show_confidence_cloud(pred_softmax, cloud)
+                # show_difference_cloud(pred_softmax, cloud)
+                # show_confidence_cloud(pred_softmax, cloud)
                 # show_pca_of_features_cloud(model_ctx.per_point_features(), cloud)
             if(mode=="train"):
                 loss_per_batch, finished_batch=model_ctx.backward(pred_softmax, pred_raw, target, delta_weight_error_sum, cloud.m_label_mngr.get_idx_unlabeled(), cloud.m_label_mngr.class_frequencies(),  samples_training_processed )
