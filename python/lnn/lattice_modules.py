@@ -1088,7 +1088,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
                 # self.linear_deltaW.bias.fill_(0.0)
                 # self.linear_deltaW.weight.uniform_(-0.01,0.01) #we set the weights so that the initial deltaW are zero
                 # self.linear_deltaW.bias.uniform_(-0.01, 0.01)
-                torch.nn.init.kaiming_uniform_(self.linear_deltaW.weight, mode='fan_out', nonlinearity='tanh') 
+                torch.nn.init.kaiming_uniform_(self.linear_deltaW.weight, mode='fan_in', nonlinearity='tanh') 
                 self.linear_deltaW.weight*=0.1 #make it smaller so that we start with delta weight that are close to zero
                 torch.nn.init.zeros_(self.linear_deltaW.bias) 
         # sliced_bottleneck_rowified=self.relu(sliced_bottleneck_rowified) #shape 1 x nr_positions x (pos_dim+1)
@@ -1699,7 +1699,7 @@ class PointNetModule(torch.nn.Module):
                     print("is last layer is", is_last_layer)
                     self.layers.append( torch.nn.Linear(nr_input_channels, nr_output_channels, bias=is_last_layer).to("cuda")  )
                     with torch.no_grad():
-                        torch.nn.init.kaiming_normal_(self.layers[-1].weight, mode='fan_out', nonlinearity='relu')
+                        torch.nn.init.kaiming_normal_(self.layers[-1].weight, mode='fan_in', nonlinearity='relu')
                     self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
                     nr_input_channels=nr_output_channels
                     nr_layers=nr_layers+1
@@ -1711,7 +1711,7 @@ class PointNetModule(torch.nn.Module):
                     self.last_norm=GroupNormLatticeModule(nr_params=nr_input_channels, affine=True)
                     self.last_linear=torch.nn.Linear(nr_input_channels, self.nr_outputs_last_layer, bias=False).to("cuda") 
                     with torch.no_grad():
-                        torch.nn.init.kaiming_normal_(self.last_linear.weight, mode='fan_out', nonlinearity='relu')
+                        torch.nn.init.kaiming_normal_(self.last_linear.weight, mode='fan_in', nonlinearity='relu')
                         if self.last_linear.bias is not None:
                             fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.last_linear,weight)
                             bound = 1 / math.sqrt(fan_in)
@@ -2204,11 +2204,12 @@ class GnRelu1x1(torch.nn.Module):
             self.norm = GroupNormLatticeModule(lv.shape[1])
             self.linear= torch.nn.Linear(lv.shape[1], self.out_channels, bias=self.use_bias).to("cuda") 
             with torch.no_grad():
-                # torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_out', nonlinearity='relu')
-                n = 1*self.out_channels
-                self.linear.weight.data.normal_(0, np.sqrt(2. / n))
-                if self.linear.bias is not None:
-                    torch.nn.init.zeros_(self.linear.bias)
+                #https://towardsdatascience.com/understand-kaiming-initialization-and-implementation-detail-in-pytorch-f7aa967e9138
+                torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_in', nonlinearity='relu')
+                # n = 1*self.out_channels
+                # self.linear.weight.data.normal_(0, np.sqrt(2. / n))
+                # if self.linear.bias is not None:
+                #     torch.nn.init.zeros_(self.linear.bias)
         lv, ls=self.norm(lv,ls)
         lv=self.relu(lv)
         ls.set_values(lv)
@@ -2232,11 +2233,11 @@ class GnGelu1x1(torch.nn.Module):
             self.norm = GroupNormLatticeModule(lv.shape[1])
             self.linear= torch.nn.Linear(lv.shape[1], self.out_channels, bias=self.use_bias).to("cuda") 
             with torch.no_grad():
-                # torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_out', nonlinearity='relu')
-                n = 1*self.out_channels
-                self.linear.weight.data.normal_(0, np.sqrt(2. / n))
-                if self.linear.bias is not None:
-                    torch.nn.init.zeros_(self.linear.bias)
+                torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_in', nonlinearity='relu')
+                # n = 1*self.out_channels
+                # self.linear.weight.data.normal_(0, np.sqrt(2. / n))
+                # if self.linear.bias is not None:
+                #     torch.nn.init.zeros_(self.linear.bias)
         lv, ls=self.norm(lv,ls)
         # lv=self.relu(lv)
         lv=gelu(lv)
@@ -2260,11 +2261,11 @@ class Gn1x1(torch.nn.Module):
             self.norm = GroupNormLatticeModule(lv.shape[1])
             self.linear= torch.nn.Linear(lv.shape[1], self.out_channels, bias=self.use_bias).to("cuda") 
             with torch.no_grad():
-                # torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_out', nonlinearity='relu')
-                n = 1*self.out_channels
-                self.linear.weight.data.normal_(0, np.sqrt(2. / n))
-                if self.linear.bias is not None:
-                    torch.nn.init.zeros_(self.linear.bias)
+                torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_in', nonlinearity='relu')
+                # n = 1*self.out_channels
+                # self.linear.weight.data.normal_(0, np.sqrt(2. / n))
+                # if self.linear.bias is not None:
+                    # torch.nn.init.zeros_(self.linear.bias)
         lv, ls=self.norm(lv,ls)
         ls.set_values(lv)
         lv = self.linear(lv)
@@ -2297,11 +2298,11 @@ class Conv1x1(torch.nn.Module):
         if self.linear is None:
             self.linear= torch.nn.Linear(lv.shape[1], self.out_channels, bias=self.use_bias).to("cuda") 
             with torch.no_grad():
-                # torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_out', nonlinearity='relu')
-                n = 1*self.out_channels
-                self.linear.weight.data.normal_(0, np.sqrt(2. / n))
-                if self.linear.bias is not None:
-                    torch.nn.init.zeros_(self.linear.bias)
+                torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_in', nonlinearity='relu')
+                # n = 1*self.out_channels
+                # self.linear.weight.data.normal_(0, np.sqrt(2. / n))
+                # if self.linear.bias is not None:
+                #     torch.nn.init.zeros_(self.linear.bias)
         ls.set_values(lv)
         lv = self.linear(lv)
         ls.set_values(lv)
