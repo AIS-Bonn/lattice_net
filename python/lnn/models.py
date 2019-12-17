@@ -985,6 +985,8 @@ class LNN_skippy_efficient(torch.nn.Module):
         # self.start_nr_filters=model_params.pointnet_start_nr_channels()
         # self.point_net=PointNetDenseModule( growth_rate=16, nr_layers=2, nr_outputs_last_layer=self.start_nr_filters, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking) 
 
+        # self.first_conv=ConvLatticeModule(nr_filters=self.start_nr_filters, neighbourhood_size=1, dilation=1, bias=True, with_homogeneous_coord=False, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
+
 
         #a bit more control
         self.nr_downsamples=model_params.nr_downsamples()
@@ -1152,6 +1154,8 @@ class LNN_skippy_efficient(torch.nn.Module):
         TIME_END("pointnet+bn")
 
         # print("lv after pointnet has shape ", lv.shape)
+
+        # lv, ls = self.first_conv(lv, ls)
 
         # ls.compute_nr_points_per_lattice_vertex()
 

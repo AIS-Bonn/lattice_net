@@ -1727,6 +1727,8 @@ class PointNetModule(torch.nn.Module):
                             # torch.nn.init.zeros_(self.last_linear.bias)
                         print("filter weight is ", self.last_linear.weight )
 
+                self.last_conv=ConvLatticeModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=True, with_homogeneous_coord=False, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
+
         print("pointnet distributed at the beggining is ", distributed.shape)
 
         # initial_distributed=distributed
@@ -1749,6 +1751,7 @@ class PointNetModule(torch.nn.Module):
                 #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
                 distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
                 distributed=self.relu(distributed) 
+                # distributed=gelu(distributed) 
 
 
         # distributed=torch.cat((initial_distributed,distributed),1)
@@ -1840,12 +1843,18 @@ class PointNetModule(torch.nn.Module):
         distributed_reduced[0,:]=0 #the first layers corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
 
 
+        lattice_py.set_values(distributed_reduced)
+        lattice_py.set_val_dim(distributed_reduced.shape[1])
+        lattice_py.set_val_full_dim(distributed_reduced.shape[1])
+
        # #bn-relu-conv
-        if distributed_reduced.shape[1] is not self.nr_outputs_last_layer:
-            distributed_reduced, lattice_py= self.last_norm(distributed_reduced, lattice_py)
+        # if distributed_reduced.shape[1] is not self.nr_outputs_last_layer:
+            # distributed_reduced, lattice_py= self.last_norm(distributed_reduced, lattice_py)
             # distributed_reduced=self.relu(distributed_reduced)
-            distributed_reduced=gelu(distributed_reduced)
-            distributed_reduced=self.last_linear(distributed_reduced)
+            # distributed_reduced=gelu(distributed_reduced)
+            # distributed_reduced=self.last_linear(distributed_reduced)
+        distributed_reduced, lattice_py=self.last_conv(distributed_reduced, lattice_py)
+        distributed_reduced=gelu(distributed_reduced)
 
         # ones=torch.zeros(distributed.shape[0], 1, device="cuda")
         # nr_points_per_vertex = torch_scatter.scatter_add(ones, indices_long, dim=0)
