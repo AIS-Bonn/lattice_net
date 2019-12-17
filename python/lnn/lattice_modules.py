@@ -1705,7 +1705,8 @@ class PointNetModule(torch.nn.Module):
                     nr_layers=nr_layers+1
 
 
-                nr_input_channels*=2 #we concatenate the barycenric coords of the points that were chose in the max
+                # nr_input_channels*=2 #we concatenate the barycenric coords of the points that were chose in the max
+                nr_input_channels+=1 #we concatenate the nr_points per simplex of the points that were chose in the max
                 # nr_input_channels+=1 # we also add the nr of points that are in each simplex
                 if nr_input_channels is not self.nr_outputs_last_layer:
                     self.last_norm=GroupNormLatticeModule(nr_params=nr_input_channels, affine=True)
@@ -1810,19 +1811,20 @@ class PointNetModule(torch.nn.Module):
 
 
         #attempt 3 just by concatenating the barycentric coords
-        argmax_flatened=argmax.flatten()
-        argmax_positive=argmax_flatened.clone()
-        argmax_positive[argmax_flatened<0]=0
+        # argmax_flatened=argmax.flatten()
+        # argmax_positive=argmax_flatened.clone()
+        # argmax_positive[argmax_flatened<0]=0
         # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
-        barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax_positive ) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
-        barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
-        distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced),1)
+        # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax_positive ) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
+        # barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
+        # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced),1)
         # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced, nr_points_per_simplex),1)
+        distributed_reduced=torch.cat((distributed_reduced, nr_points_per_simplex),1)
 
-        minimum_points_per_simplex=5
-        simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
-        distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
-        print("nr of simeplexes which have very low number of points ", simplexes_with_few_points.sum())
+        # minimum_points_per_simplex=5
+        # simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
+        # distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
+        # print("nr of simeplexes which have very low number of points ", simplexes_with_few_points.sum())
 
         #attempt 4 by multiplying the features with the barycentric coordinates
         # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
