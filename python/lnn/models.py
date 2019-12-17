@@ -1244,6 +1244,8 @@ class LNN_skippy_efficient(torch.nn.Module):
         logsoftmax=self.logsoftmax(sv)
         # logsoftmax=self.logsoftmax(s_final)
 
+        # delta_weight_error_sum=torch.tensor(0).to("cuda")
+
         return logsoftmax, sv, delta_weight_error_sum
         # return logsoftmax, s_final
 

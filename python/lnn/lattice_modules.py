@@ -25,6 +25,9 @@ logger_mean_after= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logg
 logger_var_before= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_var_before'}, port=port, env='train_'+node_name)
 logger_var_after= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_var_after'}, port=port, env='train_'+node_name)
 
+def gelu(x):
+  return 0.5 * x * (1 + torch.tanh(math.sqrt(math.pi / 2) * (x + 0.044715 * x ** 3)))
+
 class DropoutLattice(torch.nn.Module):
     def __init__(self, prob):
         super(DropoutLattice, self).__init__()
@@ -1016,7 +1019,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         self.linear_deltaW=None 
         self.linear_clasify=None
         self.tanh=torch.nn.Tanh()
-        self.relu=torch.nn.ReLU(inplace=True)
+        # self.relu=torch.nn.ReLU(inplace=True)
         self.dropout_prob=dropout_prob
         if(dropout_prob > 0.0):
             self.dropout =DropoutLattice(dropout_prob) 
@@ -1041,9 +1044,9 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
             for i in range(3):
                 if int( val_full_dim/np.power(2,i) )  < self.bottleneck_size:
                     sys.exit("We used to many linear layers an now the values are lower than the bottlenck size. Which means that the bottleneck would actually do an expansion...")
-                self.stepdown.append( GnRelu1x1(int( val_full_dim/np.power(2,i) ), False, self.with_debug_output, self.with_error_checking)  )
+                self.stepdown.append( GnGelu1x1(int( val_full_dim/np.power(2,i) ), False, self.with_debug_output, self.with_error_checking)  )
         if self.bottleneck is None:
-            self.bottleneck=GnRelu1x1(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
+            self.bottleneck=GnGelu1x1(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
         # apply the stepdowns
         for i in range(3):
             if i == 0:
@@ -1060,7 +1063,8 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         if self.norm_pre_gather is None:
             self.norm_pre_gather = GroupNormLatticeModule(lv_bottleneck.shape[1])
         lv_bottleneck, ls_bottleneck=self.norm_pre_gather(lv_bottleneck,ls_bottleneck)
-        lv_bottleneck=self.relu(lv_bottleneck) 
+        # lv_bottleneck=self.relu(lv_bottleneck) 
+        lv_bottleneck=gelu(lv_bottleneck) 
         # lv_bottleneck=self.drop_bottleneck(lv_bottleneck)
 
         sliced_bottleneck_rowified=GatherLattice.apply(lv_bottleneck, ls_bottleneck, positions, self.with_debug_output, self.with_error_checking)
@@ -1837,7 +1841,8 @@ class PointNetModule(torch.nn.Module):
        # #bn-relu-conv
         if distributed_reduced.shape[1] is not self.nr_outputs_last_layer:
             distributed_reduced, lattice_py= self.last_norm(distributed_reduced, lattice_py)
-            distributed_reduced=self.relu(distributed_reduced)
+            # distributed_reduced=self.relu(distributed_reduced)
+            distributed_reduced=gelu(distributed_reduced)
             distributed_reduced=self.last_linear(distributed_reduced)
 
         # ones=torch.zeros(distributed.shape[0], 1, device="cuda")
@@ -2211,6 +2216,35 @@ class GnRelu1x1(torch.nn.Module):
         ls.set_values(lv)
         return lv, ls
 
+class GnGelu1x1(torch.nn.Module):
+    def __init__(self, out_channels, bias, with_debug_output, with_error_checking):
+        super(GnGelu1x1, self).__init__()
+        self.out_channels=out_channels
+        # self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.norm= None
+        self.relu = torch.nn.ReLU(inplace=True)
+        self.linear=None
+        self.use_bias=bias
+    def forward(self, lv, ls):
+
+        #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv.shape[1])
+            self.linear= torch.nn.Linear(lv.shape[1], self.out_channels, bias=self.use_bias).to("cuda") 
+            with torch.no_grad():
+                # torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_out', nonlinearity='relu')
+                n = 1*self.out_channels
+                self.linear.weight.data.normal_(0, np.sqrt(2. / n))
+                if self.linear.bias is not None:
+                    torch.nn.init.zeros_(self.linear.bias)
+        lv, ls=self.norm(lv,ls)
+        # lv=self.relu(lv)
+        lv=gelu(lv)
+        ls.set_values(lv)
+        lv = self.linear(lv)
+        ls.set_values(lv)
+        return lv, ls
+
 class Gn1x1(torch.nn.Module):
     def __init__(self, out_channels, bias, with_debug_output, with_error_checking):
         super(Gn1x1, self).__init__()
@@ -2273,8 +2307,6 @@ class Conv1x1(torch.nn.Module):
         ls.set_values(lv)
         return lv, ls
 
-def gelu(x):
-  return 0.5 * x * (1 + torch.tanh(math.sqrt(math.pi / 2) * (x + 0.044715 * x ** 3)))
 
 class GnReluConv(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_dropout, with_debug_output, with_error_checking):
@@ -2295,6 +2327,34 @@ class GnReluConv(torch.nn.Module):
         lv, ls=self.norm(lv,ls)
         lv=self.relu(lv)
         # lv=gelu(lv)
+        if self.with_dropout:
+            lv = self.drop(lv)
+        ls.set_values(lv)
+        # print("print before conv lv is", lv.shape)
+        lv_1, ls_1 = self.conv(lv, ls)
+        # print("print after conv lv is", lv_1.shape)
+        if skip_connection is not None:
+            lv_1+=skip_connection
+        ls_1.set_values(lv_1)
+
+        return lv_1, ls_1
+
+class GnGeluConv(torch.nn.Module):
+    def __init__(self, nr_filters, dilation, bias, with_dropout, with_debug_output, with_error_checking):
+        super(GnGeluConv, self).__init__()
+        self.nr_filters=nr_filters
+        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.norm= None
+        self.with_dropout=with_dropout
+        if with_dropout:
+            self.drop=DropoutLattice(0.2)
+    def forward(self, lv, ls, skip_connection=None):
+
+        #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv.shape[1])
+        lv, ls=self.norm(lv,ls)
+        lv=gelu(lv)
         if self.with_dropout:
             lv = self.drop(lv)
         ls.set_values(lv)
@@ -2408,6 +2468,31 @@ class GnReluCoarsen(torch.nn.Module):
             self.norm = GroupNormLatticeModule(lv.shape[1])
         lv, ls=self.norm(lv,ls)
         lv=self.relu(lv)
+        # lv=self.drop(lv)
+        ls.set_values(lv)
+        lv_1, ls_1 = self.coarse(lv, ls)
+        ls_1.set_values(lv_1)
+
+        if concat_connection is not None:
+            lv_1=torch.cat((lv_1, concat_connection),1)
+            ls_1.set_values(lv_1)
+
+
+        return lv_1, ls_1
+
+class GnGeluCoarsen(torch.nn.Module):
+    def __init__(self, nr_filters, with_debug_output, with_error_checking):
+        super(GnReluCoarsen, self).__init__()
+        self.nr_filters=nr_filters
+        self.coarse=CoarsenLatticeModule(nr_filters=nr_filters, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.norm= None
+    def forward(self, lv, ls, concat_connection=None):
+
+        #similar to densenet and resnet: bn, relu, conv
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv.shape[1])
+        lv, ls=self.norm(lv,ls)
+        lv=gelu(lv)
         # lv=self.drop(lv)
         ls.set_values(lv)
         lv_1, ls_1 = self.coarse(lv, ls)
@@ -2945,8 +3030,8 @@ class ResnetBlock(torch.nn.Module):
         # torch.nn.Linear(nr_input_channels, nr_output_channels, bias=True).to("cuda") 
 
         #again with bn-relu-conv
-        self.conv1=GnReluConv(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        self.conv2=GnReluConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv1=GnGeluConv(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv2=GnGeluConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         # self.gate  = torch.nn.Parameter( torch.ones( 1, nr_filters ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1,1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 
@@ -3044,9 +3129,9 @@ class BottleneckBlock(torch.nn.Module):
     def __init__(self, out_channels, biases, with_debug_output, with_error_checking):
         super(BottleneckBlock, self).__init__()
         self.downsample = 4
-        self.contract=GnRelu1x1(int(out_channels/self.downsample), biases[0], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        self.conv=GnReluConv(int(out_channels/self.downsample), 1, biases[1], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        self.expand=GnRelu1x1(out_channels, biases[2], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.contract=GnGelu1x1(int(out_channels/self.downsample), biases[0], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv=GnGeluConv(int(out_channels/self.downsample), 1, biases[1], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.expand=GnGelu1x1(out_channels, biases[2], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1,1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 
     def forward(self, lv, ls):
