@@ -190,7 +190,7 @@ class ConvIm2RowLattice(Function):
         if(lattice_neighbours_structure is not None):
             lattice_neighbours_structure.set_values(lattice_neighbours_values)
 
-        print("inside ConvIm2RowLattice input lattice values is ", lattice_values.shape)
+        # print("inside ConvIm2RowLattice input lattice values is ", lattice_values.shape)
         TIME_START("convolution_itself")
         convolved_lattice_py=lattice_py.convolve_im2row_standalone(filter_bank, dilation, with_homogeneous_coord, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours)
         TIME_END("convolution_itself")
@@ -206,7 +206,7 @@ class ConvIm2RowLattice(Function):
                 sys.exit("Why are they vertices that have no neigbhours")
 
         values=convolved_lattice_py.values()
-        print("inside ConvIm2RowLattice output lattice values is ", values.shape)
+        # print("inside ConvIm2RowLattice output lattice values is ", values.shape)
         # values+=bias
         convolved_lattice_py.set_values(values)
 

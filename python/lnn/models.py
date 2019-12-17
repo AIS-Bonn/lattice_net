@@ -1140,7 +1140,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         print("distributed has shape", distributed.shape)
         print("indices has shape", indices.shape)
         #remove some rows of the distribured and indices depending if the corresponding lattice vertex has to many incident points
-        distributed, indices,ls=self.distribute_cap(distributed, positions.size(1), ls, cap=20)
+        # distributed, indices,ls=self.distribute_cap(distributed, positions.size(1), ls, cap=20)
 
         #transform
         TIME_START("distribute_transform")

@@ -1521,7 +1521,8 @@ class GroupNormLatticeModule(torch.nn.Module):
     def __init__(self, nr_params, affine=True):
         super(GroupNormLatticeModule, self).__init__()
         # self.gn = torch.nn.GroupNorm(nr_params, nr_params).to("cuda")
-        self.gn = torch.nn.GroupNorm(nr_params, nr_params).to("cuda")
+        self.gn = torch.nn.GroupNorm(nr_params, nr_params).to("cuda") #having eacu cjannel in its own group is equivalent to IN and that is the best https://arxiv.org/pdf/1803.08494.pdf and here  https://arxiv.org/pdf/1809.03783.pdf
+        # self.gn = torch.nn.InstanceNorm1d(nr_params, affine=affine).to("cuda")
     def forward(self,lattice_values, lattice_py):
 
         #group norm which only does group norm over the whole values, of course this only work when they are not the same size as the capacity
@@ -2272,6 +2273,8 @@ class Conv1x1(torch.nn.Module):
         ls.set_values(lv)
         return lv, ls
 
+def gelu(x):
+  return 0.5 * x * (1 + torch.tanh(math.sqrt(math.pi / 2) * (x + 0.044715 * x ** 3)))
 
 class GnReluConv(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_dropout, with_debug_output, with_error_checking):
@@ -2291,12 +2294,13 @@ class GnReluConv(torch.nn.Module):
             self.norm = GroupNormLatticeModule(lv.shape[1])
         lv, ls=self.norm(lv,ls)
         lv=self.relu(lv)
+        # lv=gelu(lv)
         if self.with_dropout:
             lv = self.drop(lv)
         ls.set_values(lv)
-        print("print before conv lv is", lv.shape)
+        # print("print before conv lv is", lv.shape)
         lv_1, ls_1 = self.conv(lv, ls)
-        print("print after conv lv is", lv_1.shape)
+        # print("print after conv lv is", lv_1.shape)
         if skip_connection is not None:
             lv_1+=skip_connection
         ls_1.set_values(lv_1)
@@ -3019,14 +3023,14 @@ class ResnetBlock(torch.nn.Module):
 
         #bn-relu-conv
         identity=lv
-        print("identity has shape ", lv.shape)
+        # print("identity has shape ", lv.shape)
         lv, ls=self.conv1(lv,ls)
-        print("after c1 lv has shape ", lv.shape)
+        # print("after c1 lv has shape ", lv.shape)
         # if self.drop is not None:
             # lv=self.drop(lv)
             # lv = F.dropout(lv, p=0.2, training=self.training)
         lv, ls=self.conv2(lv,ls)
-        print("after c2 lv has shape ", lv.shape)
+        # print("after c2 lv has shape ", lv.shape)
         # lv=lv*self.residual_gate
         # if(lv.shape[1]==identity.shape[1]):
         lv+=identity

@@ -754,20 +754,20 @@ __global__ void distribute(float* positions, float* values, const int nr_positio
 // }
 
 //https://stackoverflow.com/a/12230158
-__device__ unsigned int RNG(int thread_idx){   
-    // unsigned int m_w = 150;
-    unsigned int m_w = thread_idx;
-    unsigned int m_z = 40;
+// __device__ unsigned int RNG(int thread_idx){   
+//     // unsigned int m_w = 150;
+//     unsigned int m_w = thread_idx;
+//     unsigned int m_z = 40;
 
-    m_z = 36969 * (m_z & 65535) + (m_z >> 16);
-    m_w = 18000 * (m_w & 65535) + (m_w >> 16);
+//     m_z = 36969 * (m_z & 65535) + (m_z >> 16);
+//     m_w = 18000 * (m_w & 65535) + (m_w >> 16);
 
-        // cout <<(m_z << 16) + m_w << endl;  /* 32-bit result */
-    unsigned int res=(m_z << 16) + m_w;
+//         // cout <<(m_z << 16) + m_w << endl;  /* 32-bit result */
+//     unsigned int res=(m_z << 16) + m_w;
 
-    return res;
+//     return res;
 
-}
+// }
 
 template<int pos_dim>
 // __global__ void create_splatting_mask(bool* mask, const int* splatting_indices,  const int* nr_points_per_simplex, const int max_nr_points, const int size_of_indices_vector, curandState* globalState){
@@ -778,6 +778,7 @@ __global__ void create_splatting_mask(bool* mask, const int* splatting_indices, 
     if(idx>=size_of_indices_vector){ //don't go out of bounds
         return;
     } 
+    // printf("lol\n");
 
     //
     int lattice_vertex_idx=splatting_indices[idx];
@@ -789,9 +790,21 @@ __global__ void create_splatting_mask(bool* mask, const int* splatting_indices, 
         //roll a dice and write a True if we keep the edge(the contributuon from the point to the vertex) and a False if we dont
         // curandState localState = globalState[idx];
         // float random = curand_uniform( &localState ); //uniform between 0.0 and 1.0
-        unsigned int r_int=RNG(idx);
-        r_int=r_int%10000;
-        float r_float=r_int/10000.0;
+        // unsigned int r_int=RNG(idx);
+
+        //https://stackoverflow.com/a/12230158
+        unsigned int m_w = idx;
+        unsigned int m_z = size_of_indices_vector;
+        m_z = 36969 * (m_z & 65535) + (m_z >> 16);
+        m_w = 18000 * (m_w & 65535) + (m_w >> 16);
+        unsigned int r_int=(m_z << 16) + m_w;
+
+
+
+        // r_int=r_int%100000000;
+        // float r_float=r_int/100000000.0;
+        r_int=r_int%429496729;
+        float r_float=r_int/429496729.0;
         // printf("%f\n", r_float);
 
 
