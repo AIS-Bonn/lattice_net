@@ -33,6 +33,9 @@ from vis import Vis
 from models import *
 from functools import reduce
 from torch.nn.modules.module import _addindent
+from dice import *
+from jaccard import *
+from lovasz import *
 
 
 class ModelCtx():
@@ -179,6 +182,9 @@ class ModelCtx():
             # self.loss_fn=torch.nn.NLLLoss(ignore_index=background_idx) #takes about 2ms for calculating the loss
             # self.loss_fn=GeneralizedSoftDiceLoss(ignore_index=background_idx, weight=class_weights_tensor) #TODO make it dynamic depending on the labelmngr.get_background_idx
             self.loss_fn=GeneralizedSoftDiceLoss(ignore_index=background_idx) #takes about 20ms for calculating the loss...
+            # self.loss_fn=DiceLoss(mode="multiclass", smooth=0.0) #takes about 20ms for calculating the loss...
+            # self.loss_fn=JaccardLoss(mode="multiclass", smooth=1.0) #works best by itself
+            # self.loss_fn=LovaszLoss(ignore=background_id)
             # self.loss_fn=FocalLoss(gamma=2.0, ignore_index=background_idx, weight=class_weights_tensor) 
             # self.loss_fn=FocalLoss(gamma=2.0, ignore_index=background_idx) 
 
@@ -188,6 +194,16 @@ class ModelCtx():
         if isinstance(self.loss_fn, FocalLoss):
             loss = self.loss_fn(pred_raw, target) #acts as a cross entropy loss so we need the raw prediction
         else:
+            # print("pred_softmax has shape ", pred_softmax.shape)
+            # print("target has shape ", target.shape)
+            # sys.exit("deug")
+
+            #for dice loss, jacard and lovasz we need to rehsape
+            # :param y_pred: NxCxHxW
+            # :param y_true: NxHxW 
+            # pred_softmax=pred_softmax.unsqueeze(2).unsqueeze(3)
+            # target=target.unsqueeze(1).unsqueeze(2)
+
             loss = self.loss_fn(pred_softmax, target)
             print("loss dice is", loss.item() )
             loss += self.secondary_fn(pred_softmax, target)
@@ -245,6 +261,8 @@ class ModelCtx():
         if isinstance(self.loss_fn, FocalLoss):
             loss = self.loss_fn(pred_raw, target) #acts as a cross entropy loss so we need the raw prediction
         else:
+            # pred_softmax=pred_softmax.unsqueeze(2).unsqueeze(3)
+            # target=target.unsqueeze(1).unsqueeze(2)
             loss = self.loss_fn(pred_softmax, target)
             # loss += self.secondary_fn(pred_softmax, target)
         loss/=self.batch_size

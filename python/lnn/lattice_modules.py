@@ -1699,7 +1699,8 @@ class PointNetModule(torch.nn.Module):
                 self.first_time=False
 
                 #get the nr of channels of the distributed tensor
-                nr_input_channels=distributed.shape[1] - 1
+                # nr_input_channels=distributed.shape[1] - 1
+                nr_input_channels=distributed.shape[1] 
                 initial_nr_channels=distributed.shape[1]
 
                 nr_layers=0
@@ -1747,8 +1748,8 @@ class PointNetModule(torch.nn.Module):
 
         # initial_distributed=distributed
 
-        barycentric_weights=distributed[:,-1]
-        distributed=distributed[:, :distributed.shape[1]-1] #IGNORE the barycentric weights for the moment and lift the coordinates of only the xyz and values
+        # barycentric_weights=distributed[:,-1]
+        # distributed=distributed[:, :distributed.shape[1]-1] #IGNORE the barycentric weights for the moment and lift the coordinates of only the xyz and values
         # print("distriuted is ", distributed)
         # print("barycentric weights is ", barycentric_weights)
 
