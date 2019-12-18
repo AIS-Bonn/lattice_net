@@ -1016,6 +1016,8 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         self.stepdown=torch.nn.ModuleList([])
         self.bottleneck_size=8
         self.norm_pre_gather=None
+        self.linear_pre_deltaW=None 
+        self.gn_middle = torch.nn.GroupNorm( self.bottleneck_size*4+4,  self.bottleneck_size*4+4).to("cuda")
         self.linear_deltaW=None 
         self.linear_clasify=None
         self.tanh=torch.nn.Tanh()
@@ -1042,10 +1044,13 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         #slowly reduce the features 
         if len(self.stepdown) is 0:
             for i in range(3):
-                if int( val_full_dim/np.power(2,i) )  < self.bottleneck_size:
+                nr_channels_out= int( val_full_dim/np.power(2,i) ) 
+                if nr_channels_out  < self.bottleneck_size:
                     sys.exit("We used to many linear layers an now the values are lower than the bottlenck size. Which means that the bottleneck would actually do an expansion...")
-                self.stepdown.append( GnGelu1x1(int( val_full_dim/np.power(2,i) ), False, self.with_debug_output, self.with_error_checking)  )
+                print("adding stepdown with output of ", nr_channels_out)
+                self.stepdown.append( GnGelu1x1(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
         if self.bottleneck is None:
+            print("adding bottleneck with output of ", self.bottleneck_size)
             self.bottleneck=GnGelu1x1(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
         # apply the stepdowns
         for i in range(3):
@@ -1081,9 +1086,11 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         #from this slice rowified we regress for each position some barycentric offest of size m_pos_dim+1
         # linear layers on the sliced rowified get us to a tensor of 1 x nr_positions x (m_pos_dim+1), this will be the weights offsets for eahc positions into the 4 lattice vertices
         if self.linear_deltaW is None:
+            # self.linear_pre_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], sliced_bottleneck_rowified.shape[2], bias=False).to("cuda") 
             self.linear_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], pos_dim+1, bias=True).to("cuda") 
             # self.gn = torch.nn.GroupNorm(1, sliced_bottleneck_rowified.shape[2]).to("cuda")
             with torch.no_grad():
+                # torch.nn.init.kaiming_uniform_(self.linear_pre_deltaW.weight, mode='fan_in', nonlinearity='relu') 
                 # self.linear_deltaW.weight.fill_(0.0) #we set the weights so that the initial deltaW are zero
                 # self.linear_deltaW.bias.fill_(0.0)
                 # self.linear_deltaW.weight.uniform_(-0.01,0.01) #we set the weights so that the initial deltaW are zero
@@ -1092,7 +1099,14 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
                 self.linear_deltaW.weight*=0.1 #make it smaller so that we start with delta weight that are close to zero
                 torch.nn.init.zeros_(self.linear_deltaW.bias) 
         # sliced_bottleneck_rowified=self.relu(sliced_bottleneck_rowified) #shape 1 x nr_positions x (pos_dim+1)
+        #APPLY
+        # sliced_bottleneck_rowified=self.linear_pre_deltaW(sliced_bottleneck_rowified)
+        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
+        # sliced_bottleneck_rowified=self.gn_middle(sliced_bottleneck_rowified) 
+        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
+        # sliced_bottleneck_rowified=gelu(sliced_bottleneck_rowified) 
         delta_weights=self.linear_deltaW(sliced_bottleneck_rowified)
+        # delta_weights=self.tanh(delta_weights)
 
         # #gn,relu,linear
         # sliced_bottleneck_rowified_gn=sliced_bottleneck_rowified.transpose(1,2)
@@ -1750,7 +1764,7 @@ class PointNetModule(torch.nn.Module):
             if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
                 #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
                 distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
-                distributed=self.relu(distributed) 
+            distributed=self.relu(distributed) 
                 # distributed=gelu(distributed) 
 
 
@@ -1774,8 +1788,8 @@ class PointNetModule(torch.nn.Module):
 
 
 
-        distributed_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
-        #distributed_reduced-= torch_scatter.scatter_mean(distributed, indices_long, dim=0)
+        # distributed_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
+        distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0)
 
         #get also the nr of points in the lattice so the max pooled features can be different if there is 1 point then if there are 100
         ones=torch.ones(indices_long.shape[0]).to("cuda")
@@ -1854,7 +1868,7 @@ class PointNetModule(torch.nn.Module):
             # distributed_reduced=gelu(distributed_reduced)
             # distributed_reduced=self.last_linear(distributed_reduced)
         distributed_reduced, lattice_py=self.last_conv(distributed_reduced, lattice_py)
-        distributed_reduced=gelu(distributed_reduced)
+        # distributed_reduced=gelu(distributed_reduced)
 
         # ones=torch.zeros(distributed.shape[0], 1, device="cuda")
         # nr_points_per_vertex = torch_scatter.scatter_add(ones, indices_long, dim=0)
@@ -2494,7 +2508,7 @@ class GnReluCoarsen(torch.nn.Module):
 
 class GnGeluCoarsen(torch.nn.Module):
     def __init__(self, nr_filters, with_debug_output, with_error_checking):
-        super(GnReluCoarsen, self).__init__()
+        super(GnGeluCoarsen, self).__init__()
         self.nr_filters=nr_filters
         self.coarse=CoarsenLatticeModule(nr_filters=nr_filters, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         self.norm= None
@@ -2604,6 +2618,27 @@ class GnReluFinefy(torch.nn.Module):
             self.norm = GroupNormLatticeModule(lv_coarse.shape[1])
         lv_coarse, ls_coarse=self.norm(lv_coarse,ls_coarse)
         lv_coarse=self.relu(lv_coarse)
+        ls_coarse.set_values(lv_coarse)
+        lv_1, ls_1 = self.fine(lv_coarse, ls_coarse, ls_fine)
+        ls_1.set_values(lv_1)
+
+        return lv_1, ls_1
+
+class GnGeluFinefy(torch.nn.Module):
+    def __init__(self, nr_filters, with_debug_output, with_error_checking):
+        super(GnGeluFinefy, self).__init__()
+        self.nr_filters=nr_filters
+        self.fine=FinefyLatticeModule(nr_filters=nr_filters, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.norm= None
+        # self.relu = torch.nn.ReLU(inplace=True)
+    def forward(self, lv_coarse, ls_coarse, ls_fine):
+
+        #similar to densenet and resnet: bn, relu, conv
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv_coarse.shape[1])
+        lv_coarse, ls_coarse=self.norm(lv_coarse,ls_coarse)
+        # lv_coarse=self.relu(lv_coarse)
+        lv_coarse=gelu(lv_coarse)
         ls_coarse.set_values(lv_coarse)
         lv_1, ls_1 = self.fine(lv_coarse, ls_coarse, ls_fine)
         ls_1.set_values(lv_1)
