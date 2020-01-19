@@ -18,6 +18,8 @@ from lr_finder import LRFinder
 from scores import Scores
 from model_ctx import ModelCtx
 from vis import Vis
+from callback import *
+from viewer_callback import *
 
 # np.set_printoptions(threshold=np.inf)
 # torch.set_printoptions(threshold=50000)
@@ -195,6 +197,10 @@ def set_appropriate_sigma(lattice_to_splat, object_name):
 
 
 
+
+
+
+
 def run():
     config_path=os.path.join( os.path.dirname( os.path.realpath(__file__) ) , '../../config', config_file)
     if with_viewer:
@@ -237,7 +243,9 @@ def run():
     shapenet_objects=["airplane", "bag", "cap", "car", "chair", "earphone", "guitar", "knife", "lamp", "laptop", "motorbike", "mug", "pistol", "rocket", "skateboard", "table"]
     shapenet_curent_object_idx=0
 
-   
+    cb = CallbacksGroup([
+        ViewerCallback()
+    ])
 
     while True:
         if with_viewer:
@@ -259,10 +267,11 @@ def run():
 
             positions, values, target = model_ctx.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
             pred_softmax, pred_raw, delta_weight_error_sum=model_ctx.forward(lattice_to_splat, positions, values, mode, cloud.m_label_mngr.nr_classes(), loader_train.nr_samples() )
+            cb.after_forward_pass( pred_softmax=pred_softmax, cloud=cloud )
             # Profiler.print_all_stats()
-            if with_viewer:
-                show_predicted_cloud(pred_softmax, cloud)
-                show_difference_cloud(pred_softmax, cloud)
+            # if with_viewer:
+                # show_predicted_cloud(pred_softmax, cloud)
+                # show_difference_cloud(pred_softmax, cloud)
                 # show_confidence_cloud(pred_softmax, cloud)
                 # show_pca_of_features_cloud(model_ctx.per_point_features(), cloud)
             if(mode=="train"):
