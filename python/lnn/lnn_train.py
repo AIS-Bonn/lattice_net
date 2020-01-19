@@ -22,6 +22,7 @@ from diceloss import GeneralizedSoftDiceLoss
 
 from callback import *
 from viewer_callback import *
+from scores_callback import *
 from phase import *
 from models import *
 
@@ -68,7 +69,8 @@ def run():
 
     cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
-        ViewerCallback()
+        ViewerCallback(),
+        ScoresCallback()
     ])
     #create loaders
     loader_train=create_loader(train_params.dataset_name(), config_path)
@@ -105,12 +107,12 @@ def run():
                 cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
                 positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
                 pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
-                cb.after_forward_pass(pred_softmax=pred_softmax, cloud=cloud) #visualizes the prediction 
-                # loss = loss_fn(out, y) #TODO
                 loss = loss_fn(pred_softmax, target)
                 loss += secondary_fn(pred_softmax, target)
                 loss += 0.1*delta_weight_error_sum
-                # loss /=train_params.batch_size()
+                phase.iter_nr+=1
+                cb.after_forward_pass(pred_softmax=pred_softmax, cloud=cloud, loss=loss, phase=phase) #visualizes the prediction 
+                # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
 
                 #if its the first time we do a forward on the model we need to create here the optimizer because only now are all the tensors in the model instantiated
                 if first_time:
@@ -128,6 +130,7 @@ def run():
         if phase.loader.is_finished():
             cb.phase_ended() 
             #Changes the phase. Changes the model to train or to eval mode. Resets the loader that just finished
+            phase.epoch_nr+=1
             phase.loader.reset()
             phase_idx=(phase_idx+1)%len(phases)
             phase=phases[phase_idx]

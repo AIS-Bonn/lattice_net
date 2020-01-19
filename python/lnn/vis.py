@@ -8,9 +8,9 @@ port=8097
 
 
 class Vis():
-    def __init__(self):
-        self.port=8097
-        self.env="train_lnn"
+    def __init__(self, env, port):
+        self.port=port
+        self.env=env
 
         self.name_dict=dict()
         self.logger_dict=dict()
@@ -35,5 +35,5 @@ class Vis():
 
     def log(self, x_axis, val, name_window, name_plot, smooth):
         new_val=self.update_val(val,name_plot, smooth)
-        self.update_logger(x_axis, val, name_window, name_plot)
+        self.update_logger(x_axis, new_val, name_window, name_plot)
 

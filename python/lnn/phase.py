@@ -13,10 +13,12 @@ class Phase:
         self.name = name
         self.loader = loader
         self.grad = grad
-        self.batch_loss = None
-        self.batch_index = 0
-        self.rolling_loss = 0
-        self.losses = []
+        self.iter_nr = 0
+        self.epoch_nr = 0
+        # self.batch_loss = None
+        # self.batch_index = 0
+        # self.rolling_loss = 0
+        # self.losses = []
         # self.metrics = OrderedDict()
 
     # @property
@@ -39,7 +41,7 @@ class Phase:
     #     return metrics
 
     # def update(self, loss):
-    #     self.losses.append(loss)
+        # self.losses.append(loss)
 
     # def update_metric(self, name, value):
     #     if name not in self.metrics:
