@@ -1064,12 +1064,13 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
      
 
 
+        ##SEEMS TO OVERFIT FASTER without this
         #after gathering we would like to do another bn relu conv but maybe the fastest option would be to apply the bn here because gathering doesnt change the statistics of the tensor too much
-        if self.norm_pre_gather is None:
-            self.norm_pre_gather = GroupNormLatticeModule(lv_bottleneck.shape[1])
-        lv_bottleneck, ls_bottleneck=self.norm_pre_gather(lv_bottleneck,ls_bottleneck)
+        # if self.norm_pre_gather is None:
+            # self.norm_pre_gather = GroupNormLatticeModule(lv_bottleneck.shape[1])
+        # lv_bottleneck, ls_bottleneck=self.norm_pre_gather(lv_bottleneck,ls_bottleneck)
         # lv_bottleneck=self.relu(lv_bottleneck) 
-        lv_bottleneck=gelu(lv_bottleneck) 
+        # lv_bottleneck=gelu(lv_bottleneck) 
         # lv_bottleneck=self.drop_bottleneck(lv_bottleneck)
 
         sliced_bottleneck_rowified=GatherLattice.apply(lv_bottleneck, ls_bottleneck, positions, self.with_debug_output, self.with_error_checking)
@@ -1839,9 +1840,9 @@ class PointNetModule(torch.nn.Module):
         # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced, nr_points_per_simplex),1)
         distributed_reduced=torch.cat((distributed_reduced, nr_points_per_simplex),1)
 
-        # minimum_points_per_simplex=5
-        # simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
-        # distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
+        minimum_points_per_simplex=4
+        simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
+        distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
         # print("nr of simeplexes which have very low number of points ", simplexes_with_few_points.sum())
 
         #attempt 4 by multiplying the features with the barycentric coordinates
@@ -2478,6 +2479,33 @@ class ConvReluBn(torch.nn.Module):
 
         return lv_1, ls_1
 
+
+
+class GnCoarsen(torch.nn.Module):
+    def __init__(self, nr_filters, with_debug_output, with_error_checking):
+        super(GnCoarsen, self).__init__()
+        self.nr_filters=nr_filters
+        self.coarse=CoarsenLatticeModule(nr_filters=nr_filters, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.norm= None
+        # self.leaky= torch.nn.LeakyReLU(negative_slope=0.2)
+        # self.drop=DropoutLattice(0.2)
+    def forward(self, lv, ls, concat_connection=None):
+
+        #similar to densenet and resnet: bn, relu, conv
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv.shape[1])
+        lv, ls=self.norm(lv,ls)
+        # lv=self.drop(lv)
+        ls.set_values(lv)
+        lv_1, ls_1 = self.coarse(lv, ls)
+        ls_1.set_values(lv_1)
+
+        if concat_connection is not None:
+            lv_1=torch.cat((lv_1, concat_connection),1)
+            ls_1.set_values(lv_1)
+
+
+        return lv_1, ls_1
 
 class GnReluCoarsen(torch.nn.Module):
     def __init__(self, nr_filters, with_debug_output, with_error_checking):

@@ -12,6 +12,8 @@ set(PYTORCH_PATH "/opt/pytorch")
 set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${PYTORCH_PATH}")
 set(CMAKE_CXX_STANDARD 11) 
 
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
 
 add_subdirectory( ${CMAKE_SOURCE_DIR}/deps/pybind11)
 
@@ -29,8 +31,8 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 # find_package(OpenCV REQUIRED)
 find_package(EasyPBR REQUIRED)
 find_package(DataLoaders REQUIRED)
-find_package(CUDA REQUIRED)
 find_package(Torch REQUIRED)
+find_package(CUDA REQUIRED)
 # add_subdirectory(${PROJECT_SOURCE_DIR}/deps/pybind11)
 # find_package(catkin REQUIRED COMPONENTS roscpp std_msgs cv_bridge pcl_ros image_transport )
 

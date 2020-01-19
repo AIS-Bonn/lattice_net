@@ -116,7 +116,7 @@ def show_difference_cloud(pred_softmax, cloud):
     mesh_pred.m_vis.m_point_size=4
     mesh_pred.m_vis.set_color_pervertcolor()
     # mesh_pred.move_in_z(-cloud.get_scale()) #good for shapenetpartseg
-    # mesh_pred.move_in_z(-2.0) #good for shapenetpartseg
+    mesh_pred.translate_model_matrix([0.0, 0.0, -2.0]) #good for shapenetpartseg
     Scene.show(mesh_pred, "mesh_diff")
 
 def show_confidence_cloud(pred_softmax, cloud):
@@ -338,7 +338,7 @@ def run():
             # Profiler.print_all_stats()
             if with_viewer:
                 show_predicted_cloud(pred_softmax, cloud)
-                # show_difference_cloud(pred_softmax, cloud)
+                show_difference_cloud(pred_softmax, cloud)
                 # show_confidence_cloud(pred_softmax, cloud)
                 # show_pca_of_features_cloud(model_ctx.per_point_features(), cloud)
             if(mode=="train"):
