@@ -162,8 +162,8 @@ class ModelCtx():
             TIME_START("forward")
             pred_softmax, pred_raw, delta_weight_error_sum=self.model(lattice_to_splat, positions, values)
             TIME_END("forward")
-        pred_softmax=pred_softmax.squeeze(0)
-        pred_raw=pred_raw.squeeze(0)
+        # pred_softmax=pred_softmax.squeeze(0)
+        # pred_raw=pred_raw.squeeze(0)
 
         return pred_softmax, pred_raw, delta_weight_error_sum
 
