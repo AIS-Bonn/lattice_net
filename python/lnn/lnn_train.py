@@ -7,14 +7,7 @@ from torch import Tensor
 import sys
 import os
 import numpy as np
-# http://wiki.ros.org/Packages#Client_Library_Support
-# import rospkg
-# rospack = rospkg.RosPack()
-# sf_src_path=rospack.get_path('surfel_renderer')
-# sf_build_path=os.path.abspath(sf_src_path + "/../../build/surfel_renderer")
-# sys.path.append(sf_build_path) #contains the modules of pycom
 
-# from DataLoaderTest  import *
 from easypbr  import *
 from dataloaders import *
 from lattice_py import LatticePy
@@ -46,12 +39,7 @@ torch.manual_seed(0)
 
 
 node_name="train_lnn"
-vis = visdom.Visdom()
 port=8097
-logger_loss_acumm = torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_loss_acumm'}, port=port, env=node_name)
-logger_train_loss = torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_train_loss'}, port=port, env=node_name)
-logger_test_loss = torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_test_loss'}, port=port, env=node_name)
-logger_lr = torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_lr'}, port=port, env=node_name)
 
 #initialize the parameters used for training
 train_params=TrainParams.create(config_file)    
@@ -67,11 +55,6 @@ weight_decay=train_params.weight_decay()
 nr_epochs_per_half_cycle=train_params.nr_epochs_per_half_cycle()
 exponential_gamma=train_params.exponential_gamma()
 max_training_epochs=train_params.max_training_epochs()
-# jitter_xyz=train_params.jitter_xyz()
-# jitter_rotation=train_params.jitter_rotation()
-# jitter_stretch=train_params.jitter_stretch()
-# random_subsample_percentage=train_params.random_subsample_percentage()
-# random_noise_stddev=train_params.random_noise_stddev()
 save_chekpoint=train_params.save_checkpoint()
 checkpoint_path=train_params.checkpoint_path() #where to save models after each epoch if their avg iou is the best until now
 
@@ -79,17 +62,6 @@ checkpoint_path=train_params.checkpoint_path() #where to save models after each 
 model_params=ModelParams.create(config_file)    
 
 
-
-
-#applies some random translations, rotations and scaling to the cloud
-# def jitter(cloud):
-#     #the order of this operations matter
-#     cloud.random_subsample(random_subsample_percentage)
-#     cloud.random_stretch(jitter_stretch)
-#     cloud.random_noise(random_noise_stddev)
-#     cloud.random_rotation(jitter_rotation)
-#     cloud.random_translation(jitter_xyz)
-#     return cloud
 
 
 def show_predicted_cloud(pred_softmax, cloud):
@@ -254,7 +226,6 @@ def run():
     loss_acum_per_epoch = 0.0
 
     #torch stuff 
-    loss_fn = torch.nn.NLLLoss(ignore_index=0) #TODO make it dynamic depending on the labelmngr.get_background_idx
     lattice_to_splat=LatticePy()
     lattice_to_splat.create(config_path, "splated_lattice")
     model_ctx=ModelCtx(base_lr, learning_rate, weight_decay, batch_size, nr_epochs_per_half_cycle, exponential_gamma, model_params, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
@@ -266,72 +237,25 @@ def run():
     shapenet_objects=["airplane", "bag", "cap", "car", "chair", "earphone", "guitar", "knife", "lamp", "laptop", "motorbike", "mug", "pistol", "rocket", "skateboard", "table"]
     shapenet_curent_object_idx=0
 
-    # lr_finder=LRFinder(model_ctx, loader_train, loader_test, do_eval=True)
-    # lr_finder=LRFinder(model_ctx, loader_train, loader_test, do_eval=False)
-    # lr_finder.range_test(config_file, batch_size, start_lr=0.0001, end_lr=0.01, num_steps=100, smooth_f=0.0, diverge_th=15)
-    # lr_finder.range_test(config_file, batch_size, start_lr=0.002, end_lr=0.4, num_steps=100, smooth_f=0.0, diverge_th=15)
-    #for airplane 1.1e-5 and 0.005
-    # for knife is 1.5e-5 and 0.05
-    # for knife 5u and 0.002
-    # for knife with batch size 8 we ave baselr 2e-6 and max_lr is 0.015
-    # for motorbike with batchsize 8 we have 2e-6 and max lr is 0.003
-    # for rocket with batchzie of 8 we have 2e-6 and max_lr 0.015
-    # for bag with batchsize 8 we have 2e-6 and maxlr 0.02 (with the new resnet block not max_lr should be 0.01)
-    #motobike densenet batsize 2
-    # return
-
-    # nr_cloud=0
-    # max_idx=-1
-    # min_idx=100
+   
 
     while True:
         if with_viewer:
             view.update()
 
-        # if(nr_cloud>42):
-        # if(nr_cloud>100):
-            # continue
-
-
         if(loader.has_data()): 
             cloud=loader.get_cloud()
             print("\n\n\n")
             print("got cloud")
-            print("label uindx of the cloud is ", cloud.m_label_mngr.get_idx_unlabeled() )
-            # print("scale of the cloud is ", cloud.get_scale())
-
 
             if with_viewer:
                 cloud.m_vis.m_point_size=4
-                # Scene.show(cloud,"cloud")
 
             #set the lattice sigmas on shapenet depending on the object 
             if isinstance(loader, DataLoaderShapeNetPartSeg):
                 set_appropriate_sigma(lattice_to_splat, loader.get_object_name())
 
 
-            # max_idx= np.maximum(max_idx, cloud.L_gt.max())
-            # min_idx= np.minimum(min_idx, cloud.L_gt.min())
-
-            # print("min max idx ", min_idx, max_idx)
-            # print("nr of cloud is ", nr_cloud)
-
-            # #get how many points we have for each label
-            # nr_classes=cloud.m_label_mngr.nr_classes()
-            # if nr_cloud==0:
-            #     points_per_label=[0] * nr_classes
-            # for i in range(nr_classes):
-            #     nr_points_for_class=(cloud.L_gt==i).sum()
-            #     points_per_label[i]+=nr_points_for_class
-
-            # print(points_per_label)
-
-
-            # nr_cloud+=1
-        
-            # print("max index for l_gt is ", cloud.L_gt.max())
-
-            # print("nr classes is ", cloud.m_label_mngr.nr_classes())
 
             positions, values, target = model_ctx.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
             pred_softmax, pred_raw, delta_weight_error_sum=model_ctx.forward(lattice_to_splat, positions, values, mode, cloud.m_label_mngr.nr_classes(), loader_train.nr_samples() )
@@ -346,15 +270,16 @@ def run():
                 samples_training_processed+=1
                 if finished_batch:
                     # logger_train_loss.log(iter_train_nr, loss_per_batch, name='loss_per_batch_train')
-                    vis.log(iter_train_nr, loss_per_batch, "loss_train", "loss_per_batch_train")
-                    logger_lr.log(iter_train_nr, model_ctx.get_lr() , name='lr')
+                    vis.log(iter_train_nr, loss_per_batch, "loss_train", "loss_per_batch_train", smooth=True)
+                    vis.log(iter_train_nr, model_ctx.get_lr(), "lr", "lr", smooth=False)
+                    # logger_lr.log(iter_train_nr, model_ctx.get_lr() , name='lr')
                     loss_acum_per_epoch += loss_per_batch
                     iter_train_nr+=1
             elif(mode=="eval"):
                 loss_per_batch, finished_batch=model_ctx.loss(pred_softmax, pred_raw, target, cloud.m_label_mngr.get_idx_unlabeled(), cloud.m_label_mngr.class_frequencies(), samples_test_processed )
                 samples_test_processed+=1
                 if finished_batch:
-                    vis.log(iter_test_nr, loss_per_batch, "loss_test", "loss_per_batch_test")
+                    vis.log(iter_test_nr, loss_per_batch, "loss_test", "loss_per_batch_test", smooth=True)
                     iter_test_nr+=1
                 scores.accumulate_scores(pred_softmax, target, cloud.m_label_mngr.get_idx_unlabeled() )
 

@@ -4,7 +4,7 @@ import torch
 
 node_name="lnn"
 port=8097
-logger_iou = torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_iou'}, port=port, env='train_'+node_name)
+# logger_iou = torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_iou'}, port=port, env='train_'+node_name)
 
 
 class Vis():
@@ -16,11 +16,14 @@ class Vis():
         self.logger_dict=dict()
         self.exp_alpha=0.03 #the lower the value the smoother the plot is
 
-    def update_val(self, val, name):
+    def update_val(self, val, name, smooth):
         if name not in self.name_dict:
             self.name_dict[name]=val
         else:
-            self.name_dict[name]= self.name_dict[name] + self.exp_alpha*(val-self.name_dict[name])
+            if smooth:
+                self.name_dict[name]= self.name_dict[name] + self.exp_alpha*(val-self.name_dict[name])
+            else: 
+                self.name_dict[name]=val
         
         return self.name_dict[name]
 
@@ -30,7 +33,7 @@ class Vis():
         else:
             self.logger_dict[name_window].log(x_axis, val, name=name_plot)
 
-    def log(self, x_axis, val, name_window, name_plot):
-        smoothed_val=self.update_val(val,name_plot)
-        self.update_logger(x_axis, smoothed_val, name_window, name_plot)
+    def log(self, x_axis, val, name_window, name_plot, smooth):
+        new_val=self.update_val(val,name_plot, smooth)
+        self.update_logger(x_axis, val, name_window, name_plot)
 
