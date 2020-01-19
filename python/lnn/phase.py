@@ -9,7 +9,7 @@ class Phase:
     to subset of data, used during phase.
     """
 
-    def __init__(self, name, loader, grad=True):
+    def __init__(self, name, loader, grad):
         self.name = name
         self.loader = loader
         self.grad = grad

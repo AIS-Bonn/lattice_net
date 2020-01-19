@@ -82,12 +82,14 @@ def run():
         Phase('train', loader_train, grad=True),
         Phase('test', loader_test, grad=False)
     ]
+    phase_idx=0
+    phase=phases[phase_idx]
     #model 
     model=LNN_skippy_efficient(loader_train.label_mngr().nr_classes(), model_params, False, False).to("cuda")
+    model.train(phase.grad) #turns the train on or off depending if hte phase requires gradients or not
     #create loss function
     loss_fn=GeneralizedSoftDiceLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled() ) 
     secondary_fn=torch.nn.NLLLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled())  #combination of nll and dice  https://arxiv.org/pdf/1809.10486.pdf
-    phase=phases[0]
 
     while True:
         if train_params.with_viewer():
@@ -100,15 +102,15 @@ def run():
 
             #forward
             with torch.set_grad_enabled(is_training):
-                cb.before_forward_pass(lattice=lattice, model=model) #initializes the model and sets the appropriate sigma for the lattice
+                cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
                 positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
                 pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
-                cb.after_forward_pass(pred_softmax=pred_softmax, cloud=cloud)
+                cb.after_forward_pass(pred_softmax=pred_softmax, cloud=cloud) #visualizes the prediction 
                 # loss = loss_fn(out, y) #TODO
                 loss = loss_fn(pred_softmax, target)
                 loss += secondary_fn(pred_softmax, target)
-                loss +=0.1*delta_weight_error_sum
-                loss/=train_params.batch_size()
+                loss += 0.1*delta_weight_error_sum
+                # loss /=train_params.batch_size()
 
                 #if its the first time we do a forward on the model we need to create here the optimizer because only now are all the tensors in the model instantiated
                 if first_time:
@@ -124,7 +126,12 @@ def run():
 
 
         if phase.loader.is_finished():
-            cb.phase_ended() #advanced the phase
+            cb.phase_ended() 
+            #Changes the phase. Changes the model to train or to eval mode. Resets the loader that just finished
+            phase.loader.reset()
+            phase_idx=(phase_idx+1)%len(phases)
+            phase=phases[phase_idx]
+            model.train( phase.grad ) #turns training on or off
 
 
 def main():
