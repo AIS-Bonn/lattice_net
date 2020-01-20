@@ -22,7 +22,7 @@ from diceloss import GeneralizedSoftDiceLoss
 
 from callback import *
 from viewer_callback import *
-from scores_callback import *
+from visdom_callback import *
 from state_callback import *
 from phase import *
 from models import *
@@ -71,7 +71,7 @@ def run():
     cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
         ViewerCallback(),
-        ScoresCallback(),
+        VisdomCallback(),
         StateCallback() #changes the iter nr epoch nr,
     ])
     #create loaders
@@ -124,7 +124,7 @@ def run():
                             optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
                             scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 2, 2)
 
-                        cb.after_forward_pass(pred_softmax=pred_softmax, cloud=cloud, loss=loss, phase=phase, lr=scheduler.get_lr()) #visualizes the prediction 
+                        cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=scheduler.get_lr()) #visualizes the prediction 
 
                     #backward
                     if is_training:

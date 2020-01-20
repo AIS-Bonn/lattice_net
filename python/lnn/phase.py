@@ -1,4 +1,7 @@
-#https://github.com/devforfu/pytorch_playground/blob/master/loop.ipynb
+#https://github.com/devforfu/pytorch_playground/blob/master/loop.ipynbA
+
+from scores import *
+
 class Phase:
     """
     Model training loop phase.
@@ -16,6 +19,7 @@ class Phase:
         self.iter_nr = 0
         self.epoch_nr = 0
         self.samples_processed_this_epoch = 0
+        self.scores= Scores()
         # self.batch_loss = None
         # self.batch_index = 0
         # self.rolling_loss = 0

@@ -6,7 +6,7 @@ import csv
 
             
 class Scores():
-    def __init__(self,node_name, port):
+    def __init__(self):
         # self.TPs=None
         # self.FPs=None
         # self.FNs=None
@@ -16,7 +16,7 @@ class Scores():
         self.clear()
 
 
-        self.logger_iou = torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_iou'}, port=port, env=node_name)
+        # self.logger_iou = torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_iou'}, port=port, env=node_name)
 
     #adapted from https://github.com/NVlabs/splatnet/blob/f7e8ca1eb16f6e1d528934c3df660bfaaf2d7f3b/splatnet/semseg3d/eval_seg.py
     def accumulate_scores(self, pred_softmax, gt, unlabeled_idx):
@@ -121,7 +121,7 @@ class Scores():
 
         #the iou per class (only those that have any points in the gt)
         avg_iou=self.avg_class_iou(print_per_class_iou=True)
-        self.logger_iou.log(epoch_nr, avg_iou, name='Avg IoU')
+        # self.logger_iou.log(epoch_nr, avg_iou, name='Avg IoU')
 
 
 
