@@ -1,6 +1,4 @@
 from callback import *
-from easypbr import Scene
-import numpy as np
 from vis import *
 
 class ScoresCallback(Callback):

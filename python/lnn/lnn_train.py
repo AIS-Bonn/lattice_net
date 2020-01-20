@@ -23,6 +23,7 @@ from diceloss import GeneralizedSoftDiceLoss
 from callback import *
 from viewer_callback import *
 from scores_callback import *
+from state_callback import *
 from phase import *
 from models import *
 
@@ -70,7 +71,8 @@ def run():
     cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
         ViewerCallback(),
-        ScoresCallback()
+        ScoresCallback(),
+        StateCallback() #changes the iter nr epoch nr,
     ])
     #create loaders
     loader_train=create_loader(train_params.dataset_name(), config_path)
@@ -110,7 +112,6 @@ def run():
                 loss = loss_fn(pred_softmax, target)
                 loss += secondary_fn(pred_softmax, target)
                 loss += 0.1*delta_weight_error_sum
-                phase.iter_nr+=1
                 cb.after_forward_pass(pred_softmax=pred_softmax, cloud=cloud, loss=loss, phase=phase) #visualizes the prediction 
                 # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
 
@@ -128,9 +129,9 @@ def run():
 
 
         if phase.loader.is_finished():
+            cb.epoch_ended(phase=phase) 
             cb.phase_ended() 
             #Changes the phase. Changes the model to train or to eval mode. Resets the loader that just finished
-            phase.epoch_nr+=1
             phase.loader.reset()
             phase_idx=(phase_idx+1)%len(phases)
             phase=phases[phase_idx]
