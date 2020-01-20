@@ -116,20 +116,25 @@ def run():
                         loss = loss_fn(pred_softmax, target)
                         loss += secondary_fn(pred_softmax, target)
                         loss += 0.1*delta_weight_error_sum
-                        cb.after_forward_pass(pred_softmax=pred_softmax, cloud=cloud, loss=loss, phase=phase) #visualizes the prediction 
                         # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
 
                         #if its the first time we do a forward on the model we need to create here the optimizer because only now are all the tensors in the model instantiated
                         if first_time:
-                            opt=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
+                            first_time=False
+                            optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
+                            scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 2, 2)
+
+                        cb.after_forward_pass(pred_softmax=pred_softmax, cloud=cloud, loss=loss, phase=phase, lr=scheduler.get_lr()) #visualizes the prediction 
 
                     #backward
                     if is_training:
-                        opt.zero_grad()
+                        scheduler.step(phase.epoch_nr + float(phase.samples_processed_this_epoch) / phase.loader.nr_samples() )
+                        optimizer.zero_grad()
                         cb.before_backward_pass()
                         loss.backward()
                         cb.after_backward_pass()
-                        opt.step()
+                        optimizer.step()
+
 
 
                 if phase.loader.is_finished():
