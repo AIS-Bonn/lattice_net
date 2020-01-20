@@ -20,6 +20,7 @@ class Phase:
         self.epoch_nr = 0
         self.samples_processed_this_epoch = 0
         self.scores= Scores()
+        self.loss_acum_per_epoch=0.0
         # self.batch_loss = None
         # self.batch_index = 0
         # self.rolling_loss = 0

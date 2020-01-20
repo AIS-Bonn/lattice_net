@@ -27,6 +27,10 @@ from state_callback import *
 from phase import *
 from models import *
 
+#radam+lookahead
+from over9000.radam import *
+from over9000.lookahead import *
+
 
 config_file="lnn_train_shapenet.cfg"
 
@@ -98,6 +102,7 @@ def run():
     while True:
 
         for phase in phases:
+            cb.epoch_started(phase=phase)
             cb.phase_started(phase=phase)
             model.train(phase.grad)
 
@@ -121,14 +126,18 @@ def run():
                         #if its the first time we do a forward on the model we need to create here the optimizer because only now are all the tensors in the model instantiated
                         if first_time:
                             first_time=False
-                            optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
-                            scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 2, 2)
+                            # optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
+                            optimizer=RAdam(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay())
+                            # optimizer=Lookahead(base_optimizer)
+                            # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 2, 2)
+                            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
 
-                        cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=scheduler.get_lr()) #visualizes the prediction 
+                        # cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=scheduler.get_last_lr()) #visualizes the prediction 
+                        cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
 
                     #backward
                     if is_training:
-                        scheduler.step(phase.epoch_nr + float(phase.samples_processed_this_epoch) / phase.loader.nr_samples() )
+                        # scheduler.step(phase.epoch_nr + float(phase.samples_processed_this_epoch) / phase.loader.nr_samples() )
                         optimizer.zero_grad()
                         cb.before_backward_pass()
                         loss.backward()
@@ -138,6 +147,8 @@ def run():
 
 
                 if phase.loader.is_finished():
+                    if not is_training:
+                        scheduler.step(phase.loss_acum_per_epoch) #for ReduceLROnPlateau
                     cb.epoch_ended(phase=phase) 
                     cb.phase_ended(phase=phase) 
 

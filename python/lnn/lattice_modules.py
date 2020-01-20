@@ -16,6 +16,7 @@ from lattice_py import LatticePy
 from lattice_funcs import *
 import visdom
 import torchnet
+import torch.nn.functional as F
 
 node_name="lnn"
 vis = visdom.Visdom()
@@ -25,8 +26,8 @@ logger_mean_after= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logg
 logger_var_before= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_var_before'}, port=port, env='train_'+node_name)
 logger_var_after= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_var_after'}, port=port, env='train_'+node_name)
 
-def gelu(x):
-  return 0.5 * x * (1 + torch.tanh(math.sqrt(math.pi / 2) * (x + 0.044715 * x ** 3)))
+# def gelu(x):
+#   return 0.5 * x * (1 + torch.tanh(math.sqrt(math.pi / 2) * (x + 0.044715 * x ** 3)))
 
 class DropoutLattice(torch.nn.Module):
     def __init__(self, prob):
@@ -2267,7 +2268,7 @@ class GnGelu1x1(torch.nn.Module):
                 #     torch.nn.init.zeros_(self.linear.bias)
         lv, ls=self.norm(lv,ls)
         # lv=self.relu(lv)
-        lv=gelu(lv)
+        lv=F.gelu(lv)
         ls.set_values(lv)
         lv = self.linear(lv)
         ls.set_values(lv)
@@ -2382,7 +2383,7 @@ class GnGeluConv(torch.nn.Module):
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv.shape[1])
         lv, ls=self.norm(lv,ls)
-        lv=gelu(lv)
+        lv=F.gelu(lv)
         if self.with_dropout:
             lv = self.drop(lv)
         ls.set_values(lv)
@@ -2547,7 +2548,7 @@ class GnGeluCoarsen(torch.nn.Module):
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv.shape[1])
         lv, ls=self.norm(lv,ls)
-        lv=gelu(lv)
+        lv=F.gelu(lv)
         # lv=self.drop(lv)
         ls.set_values(lv)
         lv_1, ls_1 = self.coarse(lv, ls)
@@ -2667,7 +2668,7 @@ class GnGeluFinefy(torch.nn.Module):
             self.norm = GroupNormLatticeModule(lv_coarse.shape[1])
         lv_coarse, ls_coarse=self.norm(lv_coarse,ls_coarse)
         # lv_coarse=self.relu(lv_coarse)
-        lv_coarse=gelu(lv_coarse)
+        lv_coarse=F.gelu(lv_coarse)
         ls_coarse.set_values(lv_coarse)
         lv_1, ls_1 = self.fine(lv_coarse, ls_coarse, ls_fine)
         ls_1.set_values(lv_1)
