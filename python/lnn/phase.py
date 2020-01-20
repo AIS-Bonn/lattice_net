@@ -15,6 +15,7 @@ class Phase:
         self.grad = grad
         self.iter_nr = 0
         self.epoch_nr = 0
+        self.samples_processed_this_epoch = 0
         # self.batch_loss = None
         # self.batch_index = 0
         # self.rolling_loss = 0

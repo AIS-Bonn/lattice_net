@@ -96,46 +96,49 @@ def run():
     secondary_fn=torch.nn.NLLLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled())  #combination of nll and dice  https://arxiv.org/pdf/1809.10486.pdf
 
     while True:
-        if train_params.with_viewer():
-            view.update()
 
-        if(phase.loader.has_data()): 
-            cloud=phase.loader.get_cloud()
+        for phase in phases:
+            cb.phase_started(phase=phase)
+            model.train(phase.grad)
 
-            is_training = phase.grad
+            while ( phase.samples_processed_this_epoch < phase.loader.nr_samples()):
 
-            #forward
-            with torch.set_grad_enabled(is_training):
-                cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
-                positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
-                pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
-                loss = loss_fn(pred_softmax, target)
-                loss += secondary_fn(pred_softmax, target)
-                loss += 0.1*delta_weight_error_sum
-                cb.after_forward_pass(pred_softmax=pred_softmax, cloud=cloud, loss=loss, phase=phase) #visualizes the prediction 
-                # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
+                if(phase.loader.has_data()): 
+                    cloud=phase.loader.get_cloud()
 
-                #if its the first time we do a forward on the model we need to create here the optimizer because only now are all the tensors in the model instantiated
-                if first_time:
-                    opt=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
+                    is_training = phase.grad
 
-            #backward
-            if is_training:
-                opt.zero_grad()
-                cb.before_backward_pass()
-                loss.backward()
-                cb.after_backward_pass()
-                opt.step()
+                    #forward
+                    with torch.set_grad_enabled(is_training):
+                        cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
+                        positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
+                        pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+                        loss = loss_fn(pred_softmax, target)
+                        loss += secondary_fn(pred_softmax, target)
+                        loss += 0.1*delta_weight_error_sum
+                        cb.after_forward_pass(pred_softmax=pred_softmax, cloud=cloud, loss=loss, phase=phase) #visualizes the prediction 
+                        # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
+
+                        #if its the first time we do a forward on the model we need to create here the optimizer because only now are all the tensors in the model instantiated
+                        if first_time:
+                            opt=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
+
+                    #backward
+                    if is_training:
+                        opt.zero_grad()
+                        cb.before_backward_pass()
+                        loss.backward()
+                        cb.after_backward_pass()
+                        opt.step()
 
 
-        if phase.loader.is_finished():
-            cb.epoch_ended(phase=phase) 
-            cb.phase_ended() 
-            #Changes the phase. Changes the model to train or to eval mode. Resets the loader that just finished
-            phase.loader.reset()
-            phase_idx=(phase_idx+1)%len(phases)
-            phase=phases[phase_idx]
-            model.train( phase.grad ) #turns training on or off
+                if phase.loader.is_finished():
+                    cb.epoch_ended(phase=phase) 
+                    cb.phase_ended(phase=phase) 
+
+
+                if train_params.with_viewer():
+                    view.update()
 
 
 def main():
