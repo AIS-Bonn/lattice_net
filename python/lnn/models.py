@@ -1038,7 +1038,8 @@ class LNN_skippy_efficient(torch.nn.Module):
             # self.coarsens_list.append( GnReluExpandMax(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is actually the worse one...
             # self.coarsens_list.append( GnReluExpandAvg(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking))
             # self.coarsens_list.append( GnReluExpandBlur(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) 
-            self.coarsens_list.append( GnGeluCoarsen(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
+            # self.coarsens_list.append( GnGeluCoarsen(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
+            self.coarsens_list.append( GnCoarsenGelu(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             cur_channels_count=nr_channels_after_coarsening
 
         #####################
