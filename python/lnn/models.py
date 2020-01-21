@@ -1040,6 +1040,7 @@ class LNN_skippy_efficient(torch.nn.Module):
             # self.coarsens_list.append( GnReluExpandBlur(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) 
             # self.coarsens_list.append( GnGeluCoarsen(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             self.coarsens_list.append( GnCoarsenGelu(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
+            # self.coarsens_list.append( GeluCorsenGn(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             cur_channels_count=nr_channels_after_coarsening
 
         #####################
@@ -1076,6 +1077,7 @@ class LNN_skippy_efficient(torch.nn.Module):
                 # self.finefy_list.append( GnReluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # seems that the relu in BnReluFinefy stops too much of the gradient from flowing up the network, altought we lose one non-linearity, a BnFinefy seems a lot more eneficial for the general flow of gradients as the network converges a lot faster
                 self.finefy_list.append( GnFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
+                # self.finefy_list.append( GnFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( GnGeluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( FinefyLatticeModule(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
             elif self.upsampling_method=="slice_elevated":

@@ -1712,12 +1712,12 @@ class PointNetModule(torch.nn.Module):
                         print ("in ", nr_input_channels)
                         print ("out ", nr_output_channels)
                     is_last_layer=i==len(self.nr_output_channels_per_layer)-1 #the last layer is folowed by scatter max and not a batch norm therefore it needs a bias
-                    self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_input_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
+                    # self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_input_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
                     print("is last layer is", is_last_layer)
                     self.layers.append( torch.nn.Linear(nr_input_channels, nr_output_channels, bias=is_last_layer).to("cuda")  )
                     with torch.no_grad():
                         torch.nn.init.kaiming_normal_(self.layers[-1].weight, mode='fan_in', nonlinearity='relu')
-                    # self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
+                    self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
                     nr_input_channels=nr_output_channels
                     nr_layers=nr_layers+1
 
@@ -1763,18 +1763,18 @@ class PointNetModule(torch.nn.Module):
             # distributed=self.relu(distributed) 
             # distributed=self.layers[i] (distributed)
 
-            # distributed=self.layers[i] (distributed)
-            # if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
-            #     #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
-            #     distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
-            # distributed=self.relu(distributed) 
-
-            #start with a first conv then does gn conv relu
-            if i!=0:
-                distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
             distributed=self.layers[i] (distributed)
-            if i!=0:
-                distributed=self.relu(distributed) 
+            if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
+                #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
+                distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+            distributed=self.relu(distributed) 
+
+            # #start with a first conv then does gn conv relu
+            # if i!=0:
+            #     distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+            # distributed=self.layers[i] (distributed)
+            # if i!=0:
+            #     distributed=self.relu(distributed) 
 
 
 
@@ -2207,6 +2207,49 @@ class CloneLatticeModule(torch.nn.Module):
 
     def forward(self, lattice_py):
         return CloneLattice.apply(lattice_py, self.weight)
+
+
+class GeluGn(torch.nn.Module):
+    def __init__(self, with_debug_output, with_error_checking):
+        super(GeluGn, self).__init__()
+        self.norm= None
+        self.relu = torch.nn.ReLU(inplace=True)
+    def forward(self, lv, ls):
+
+        #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
+        lv=F.gelu(lv)
+        ls.set_values(lv)
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv.shape[1])
+        lv, ls=self.norm(lv,ls)
+        ls.set_values(lv)
+        return lv, ls
+
+class GeluConvGn(torch.nn.Module):
+    def __init__(self, nr_filters, dilation, bias, with_dropout, with_debug_output, with_error_checking):
+        super(GeluConvGn, self).__init__()
+        self.nr_filters=nr_filters
+        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.norm= None
+        self.with_dropout=with_dropout
+        if with_dropout:
+            self.drop=DropoutLattice(0.2)
+    def forward(self, lv, ls, skip_connection=None):
+
+        #similar to https://bmvc2019.org/wp-content/uploads/papers/0740-paper.pdf
+
+        lv=F.gelu(lv)
+        if self.with_dropout:
+            lv = self.drop(lv)
+        ls.set_values(lv)
+        lv_1, ls_1 = self.conv(lv, ls)
+
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv_1.shape[1])
+        lv_1, ls_1=self.norm(lv_1,ls_1)
+        ls_1.set_values(lv_1)
+        return lv_1, ls_1
+
 
 class GnRelu(torch.nn.Module):
     def __init__(self, with_debug_output, with_error_checking):
@@ -3200,8 +3243,13 @@ class ResnetBlock(torch.nn.Module):
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1,1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 
         #does gn-conv-gelu
-        self.conv1=GnConvGelu(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        self.conv2=GnConvGelu(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        # self.conv1=GnConvGelu(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        # self.conv2=GnConvGelu(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+
+        # does relu-conv-gelu like in https://bmvc2019.org/wp-content/uploads/papers/0740-paper.pdf
+        self.conv1=GeluConvGn(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv2=GeluConvGn(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.skip_func=GeluGn(with_debug_output=with_debug_output, with_error_checking=with_error_checking)
 
         # self.drop=None
         # if with_dropout:
@@ -3286,6 +3334,7 @@ class ResnetBlock(torch.nn.Module):
         # print("after c2 lv has shape ", lv.shape)
         # lv=lv*self.residual_gate
         # if(lv.shape[1]==identity.shape[1]):
+        identity, ls = self.skip_func(identity, ls)
         lv+=identity
         ls.set_values(lv)
         return lv, ls
