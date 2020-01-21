@@ -30,6 +30,7 @@ from models import *
 #radam+lookahead
 from over9000.radam import *
 from over9000.lookahead import *
+from over9000.novograd import *
 
 
 config_file="lnn_train_shapenet.cfg"
@@ -127,17 +128,19 @@ def run():
                         if first_time:
                             first_time=False
                             # optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
+                            # optimizer=Novograd(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
                             optimizer=RAdam(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay())
-                            # optimizer=Lookahead(base_optimizer)
-                            # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 2, 2)
-                            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
+                            # optimizer=Lookahead(optimizer)
+                            scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 30, 1)
+                            # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
 
-                        # cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=scheduler.get_last_lr()) #visualizes the prediction 
+                        # cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=scheduler.get_lr()) #visualizes the prediction 
                         cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
 
                     #backward
                     if is_training:
-                        # scheduler.step(phase.epoch_nr + float(phase.samples_processed_this_epoch) / phase.loader.nr_samples() )
+                        if isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts):
+                            scheduler.step(phase.epoch_nr + float(phase.samples_processed_this_epoch) / phase.loader.nr_samples() )
                         optimizer.zero_grad()
                         cb.before_backward_pass()
                         loss.backward()
@@ -147,8 +150,9 @@ def run():
 
 
                 if phase.loader.is_finished():
-                    if not is_training:
-                        scheduler.step(phase.loss_acum_per_epoch) #for ReduceLROnPlateau
+                    if not is_training: #we reduce the learning rate when the test iou plateus
+                        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                            scheduler.step(phase.loss_acum_per_epoch) #for ReduceLROnPlateau
                     cb.epoch_ended(phase=phase) 
                     cb.phase_ended(phase=phase) 
 

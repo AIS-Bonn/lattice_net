@@ -30,8 +30,8 @@ class Vis():
     def update_logger(self, x_axis, val, name_window, name_plot):
         if name_window not in self.logger_dict:
             self.logger_dict[name_window]=torchnet.logger.VisdomPlotLogger('line', opts={'title': name_window}, port=self.port, env=self.env)
-        else:
-            self.logger_dict[name_window].log(x_axis, val, name=name_plot)
+
+        self.logger_dict[name_window].log(x_axis, val, name=name_plot)
 
     def log(self, x_axis, val, name_window, name_plot, smooth):
         new_val=self.update_val(val,name_plot, smooth)
