@@ -121,18 +121,18 @@ def run():
                         pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
                         loss = loss_fn(pred_softmax, target)
                         loss += secondary_fn(pred_softmax, target)
-                        loss += 0.1*delta_weight_error_sum
+                        # loss += 0.1*delta_weight_error_sum
                         # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
 
                         #if its the first time we do a forward on the model we need to create here the optimizer because only now are all the tensors in the model instantiated
                         if first_time:
                             first_time=False
-                            # optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
+                            optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
                             # optimizer=Novograd(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
-                            optimizer=RAdam(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay())
+                            # optimizer=RAdam(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay())
                             # optimizer=Lookahead(optimizer)
-                            scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 30, 1)
-                            # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
+                            # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 30, 1)
+                            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
 
                         # cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=scheduler.get_lr()) #visualizes the prediction 
                         cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
