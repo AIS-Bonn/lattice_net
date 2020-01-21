@@ -1018,7 +1018,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         self.bottleneck_size=8
         self.norm_pre_gather=None
         self.linear_pre_deltaW=None 
-        self.gn_middle = torch.nn.GroupNorm( self.bottleneck_size*4+4,  self.bottleneck_size*4+4).to("cuda")
+        # self.gn_middle = torch.nn.GroupNorm( self.bottleneck_size*4+4,  self.bottleneck_size*4+4).to("cuda")
         self.linear_deltaW=None 
         self.linear_clasify=None
         self.tanh=torch.nn.Tanh()
@@ -1541,7 +1541,13 @@ class GroupNormLatticeModule(torch.nn.Module):
     def __init__(self, nr_params, affine=True):
         super(GroupNormLatticeModule, self).__init__()
         # self.gn = torch.nn.GroupNorm(nr_params, nr_params).to("cuda")
-        self.gn = torch.nn.GroupNorm(nr_params, nr_params).to("cuda") #having eacu cjannel in its own group is equivalent to IN and that is the best https://arxiv.org/pdf/1803.08494.pdf and here  https://arxiv.org/pdf/1809.03783.pdf
+        nr_groups=32
+        if nr_params<=32:
+            nr_groups=int(nr_params/2)
+
+        #TODO check that nr_params divides nicely by 32 and if not revert to something like nr_groups=nr_params
+
+        self.gn = torch.nn.GroupNorm(nr_groups, nr_params).to("cuda") #having 32 groups is the best as explained in the GroupNormalization paper
         # self.gn = torch.nn.InstanceNorm1d(nr_params, affine=affine).to("cuda")
     def forward(self,lattice_values, lattice_py):
 
@@ -2448,12 +2454,35 @@ class GnConvGelu(torch.nn.Module):
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv.shape[1])
         lv, ls=self.norm(lv,ls)
+        ls.set_values(lv)
+        lv_1, ls_1 = self.conv(lv, ls)
+        lv_1=F.gelu(lv_1)
+
+        if self.with_dropout:
+            lv_1 = self.drop(lv_1)
+        ls_1.set_values(lv_1)
+
+        return lv_1, ls_1
+
+class GnConv(torch.nn.Module):
+    def __init__(self, nr_filters, dilation, bias, with_dropout, with_debug_output, with_error_checking):
+        super(GnConv, self).__init__()
+        self.nr_filters=nr_filters
+        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.norm= None
+        self.with_dropout=with_dropout
+        if with_dropout:
+            self.drop=DropoutLattice(0.2)
+    def forward(self, lv, ls, skip_connection=None):
+
+        #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv.shape[1])
+        lv, ls=self.norm(lv,ls)
         if self.with_dropout:
             lv = self.drop(lv)
         ls.set_values(lv)
         lv_1, ls_1 = self.conv(lv, ls)
-        lv_1=F.gelu(lv_1)
-        ls_1.set_values(lv_1)
 
         return lv_1, ls_1
 
@@ -3287,6 +3316,7 @@ class ResnetBlock(torch.nn.Module):
         # lv=lv*self.residual_gate
         # if(lv.shape[1]==identity.shape[1]):
         lv+=identity
+        # lv = F.gelu(lv)
         ls.set_values(lv)
         return lv, ls
 
@@ -3314,6 +3344,7 @@ class BottleneckBlock(torch.nn.Module):
         lv, ls=self.expand(lv,ls)
         # lv=lv*self.residual_gate
         lv+=identity
+        # lv = F.gelu(lv)
         ls.set_values(lv)
         return lv, ls
       

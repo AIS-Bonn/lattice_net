@@ -121,7 +121,7 @@ def run():
                         pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
                         loss = loss_fn(pred_softmax, target)
                         loss += secondary_fn(pred_softmax, target)
-                        # loss += 0.1*delta_weight_error_sum
+                        # loss += 0.1*delta_weight_error_sum #TODO is not clear how much it improves iou if at all
                         # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
 
                         #if its the first time we do a forward on the model we need to create here the optimizer because only now are all the tensors in the model instantiated
