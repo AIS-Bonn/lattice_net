@@ -2455,9 +2455,9 @@ class GnConvGelu(torch.nn.Module):
             self.norm = GroupNormLatticeModule(lv.shape[1])
         lv, ls=self.norm(lv,ls)
 
-        #drop here so that it doesnt affect the group norm 
-        # if self.with_dropout:
-            # lv = self.drop(lv)
+        drop here so that it doesnt affect the group norm 
+        if self.with_dropout:
+            lv = self.drop(lv)
 
         ls.set_values(lv)
         lv_1, ls_1 = self.conv(lv, ls)
