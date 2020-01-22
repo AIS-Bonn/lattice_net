@@ -1065,8 +1065,8 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
      
 
 
-        ##SEEMS TO OVERFIT FASTER without this
-        #after gathering we would like to do another bn relu conv but maybe the fastest option would be to apply the bn here because gathering doesnt change the statistics of the tensor too much
+        #SEEMS TO OVERFIT FASTER without this
+        # after gathering we would like to do another bn relu conv but maybe the fastest option would be to apply the bn here because gathering doesnt change the statistics of the tensor too much
         # if self.norm_pre_gather is None:
             # self.norm_pre_gather = GroupNormLatticeModule(lv_bottleneck.shape[1])
         # lv_bottleneck, ls_bottleneck=self.norm_pre_gather(lv_bottleneck,ls_bottleneck)
