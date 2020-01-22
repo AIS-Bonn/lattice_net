@@ -1012,6 +1012,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         self.resnet_blocks_per_down_lvl_list=torch.nn.ModuleList([])
         self.coarsens_list=torch.nn.ModuleList([])
         self.maxpool_list=torch.nn.ModuleList([])
+        corsenings_channel_counts = []
         skip_connection_channel_counts = []
         cur_channels_count=self.start_nr_filters
         for i in range(self.nr_downsamples):
@@ -1040,6 +1041,7 @@ class LNN_skippy_efficient(torch.nn.Module):
             # self.coarsens_list.append( GnGeluCoarsen(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             self.coarsens_list.append( GnCoarsenGelu(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             cur_channels_count=nr_channels_after_coarsening
+            corsenings_channel_counts.append(cur_channels_count)
 
         #####################
         #     Bottleneck    #
@@ -1066,16 +1068,21 @@ class LNN_skippy_efficient(torch.nn.Module):
         self.resnet_blocks_per_up_lvl_list=torch.nn.ModuleList([])
         for i in range(self.nr_downsamples):
             nr_chanels_skip_connection=skip_connection_channel_counts.pop()
+            # nr_chanels_end_of_corsening=corsenings_channel_counts.pop()
             print("nr_chanels_skip_connection ", nr_chanels_skip_connection)
+            # print("nr_chanels_end_of_corsening ", nr_chanels_end_of_corsening)
+
+            # if the finefy is the deepest one int the network then it just divides by 2 the nr of channels because we know it didnt get as input two concatet tensors
+            nr_chanels_finefy=int(cur_channels_count/2)
 
             #do it with finefy
             if self.upsampling_method=="finefy":
-                print("adding bnReluFinefy which outputs nr of channels ", nr_chanels_skip_connection )
+                print("adding bnReluFinefy which outputs nr of channels ", nr_chanels_finefy )
                 # self.finefy_list.append( BnReluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( GnReluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # seems that the relu in BnReluFinefy stops too much of the gradient from flowing up the network, altought we lose one non-linearity, a BnFinefy seems a lot more eneficial for the general flow of gradients as the network converges a lot faster
                 # self.finefy_list.append( GnFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
-                self.finefy_list.append( GnFinefyGelu(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
+                self.finefy_list.append( GnFinefyGelu(nr_chanels_finefy, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( GnGeluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( FinefyLatticeModule(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
             elif self.upsampling_method=="slice_elevated":
@@ -1095,7 +1102,7 @@ class LNN_skippy_efficient(torch.nn.Module):
 
             #after finefy we do a concat with the skip connection so the number of channels doubles
             if self.do_concat_for_vertical_connection:
-                cur_channels_count=nr_chanels_skip_connection*2
+                cur_channels_count=nr_chanels_skip_connection+nr_chanels_finefy
             else:
                 cur_channels_count=nr_chanels_skip_connection
 
@@ -1167,7 +1174,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         fine_values_list=[]
         TIME_START("down_path")
         for i in range(self.nr_downsamples):
-            print("DOWNSAPLE ", i, " with lv of shape ", lv.shape)
+            print("DOWNSAPLE ", i, " with input lv of shape ", lv.shape)
 
             #resnet blocks
             for j in range(self.nr_blocks_down_stage[i]):
@@ -1181,6 +1188,7 @@ class LNN_skippy_efficient(torch.nn.Module):
             # print("down input shape ", lv.shape[1])
             # lv, ls =self.maxpool_list[i](lv,ls)
             lv, ls = self.coarsens_list[i] ( lv, ls)
+            print("DOWNSAPLE ", i, " with out lv of shape ", lv.shape)
 
         TIME_END("down_path")
 
