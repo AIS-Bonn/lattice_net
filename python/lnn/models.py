@@ -1024,7 +1024,7 @@ class LNN_skippy_efficient(torch.nn.Module):
                     print("adding down_resnet_block with nr of filters", cur_channels_count )
                     # should_use_dropout= i!=0 #we only use dropout fr the resnet blocks that are not in the first downsample. The first downsample doesnt have many parameters so dropout is not needed
                     # should_use_dropout= False #using dropout in the resnet blocks seems to make it worse. But we keep the dropout in the corsenig because that seems good
-                    print("adding down_resnet_block with dropout", should_use_dropout )
+                    # print("adding down_resnet_block with dropout", should_use_dropout )
                     self.resnet_blocks_per_down_lvl_list[i].append( ResnetBlock(cur_channels_count, [1,1], [False,False], False, self.with_debug_output, self.with_error_checking) )
                 else:
                     print("adding down_bottleneck_block with nr of filters", cur_channels_count )
@@ -1074,7 +1074,8 @@ class LNN_skippy_efficient(torch.nn.Module):
                 # self.finefy_list.append( BnReluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( GnReluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # seems that the relu in BnReluFinefy stops too much of the gradient from flowing up the network, altought we lose one non-linearity, a BnFinefy seems a lot more eneficial for the general flow of gradients as the network converges a lot faster
-                self.finefy_list.append( GnFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
+                # self.finefy_list.append( GnFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
+                self.finefy_list.append( GnFinefyGelu(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( GnGeluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( FinefyLatticeModule(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
             elif self.upsampling_method=="slice_elevated":
