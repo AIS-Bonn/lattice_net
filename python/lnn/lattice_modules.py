@@ -2447,19 +2447,24 @@ class GnConvGelu(torch.nn.Module):
         self.norm= None
         self.with_dropout=with_dropout
         if with_dropout:
-            self.drop=DropoutLattice(0.2)
+            self.drop=DropoutLattice(0.1)
     def forward(self, lv, ls, skip_connection=None):
 
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv.shape[1])
         lv, ls=self.norm(lv,ls)
+
+        #drop here so that it doesnt affect the group norm 
+        # if self.with_dropout:
+            # lv = self.drop(lv)
+
         ls.set_values(lv)
         lv_1, ls_1 = self.conv(lv, ls)
         lv_1=F.gelu(lv_1)
 
-        if self.with_dropout:
-            lv_1 = self.drop(lv_1)
+        # if self.with_dropout:
+        #     lv_1 = self.drop(lv_1)
         ls_1.set_values(lv_1)
 
         return lv_1, ls_1
@@ -2870,6 +2875,25 @@ class GnFinefy(torch.nn.Module):
 
         return lv_1, ls_1
 
+class GnFinefyGelu(torch.nn.Module):
+    def __init__(self, nr_filters, with_debug_output, with_error_checking):
+        super(GnFinefyGelu, self).__init__()
+        self.nr_filters=nr_filters
+        self.fine=FinefyLatticeModule(nr_filters=nr_filters, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.norm= None
+    def forward(self, lv_coarse, ls_coarse, ls_fine):
+
+        #similar to densenet and resnet: bn, relu, conv
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv_coarse.shape[1])
+        lv_coarse, ls_coarse=self.norm(lv_coarse,ls_coarse)
+        ls_coarse.set_values(lv_coarse)
+        lv_1, ls_1 = self.fine(lv_coarse, ls_coarse, ls_fine)
+        lv_1=F.gelu(lv_1)
+        ls_1.set_values(lv_1)
+
+        return lv_1, ls_1
+
 class BnFinefy(torch.nn.Module):
     def __init__(self, nr_filters, with_debug_output, with_error_checking):
         super(BnFinefy, self).__init__()
@@ -3234,7 +3258,7 @@ class ResnetBlock(torch.nn.Module):
 
         # self.drop=None
         # if with_dropout:
-        #     self.drop=DropoutLattice(0.2)
+            # self.drop=DropoutLattice(0.2)
 
     def forward(self, lv, ls):
         # if(self.skip_translation==None and  not lattice_values.shape[1]==self.nr_filters):
@@ -3303,9 +3327,14 @@ class ResnetBlock(torch.nn.Module):
         # print("resiadual_gate is ", self.residual_gate)
         # print("gate has norm ", self.gate.norm())
 
+        # if self.drop is not None:
+            # lv=self.drop(lv)
+
         #bn-relu-conv
         identity=lv
         # print("identity has shape ", lv.shape)
+
+
         lv, ls=self.conv1(lv,ls)
         # print("after c1 lv has shape ", lv.shape)
         # if self.drop is not None:
