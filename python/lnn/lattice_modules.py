@@ -14,17 +14,17 @@ import math
 import torch_scatter
 from lattice_py import LatticePy
 from lattice_funcs import *
-import visdom
-import torchnet
-import torch.nn.functional as F
+# import visdom
+# import torchnet
+# import torch.nn.functional as F
 
-node_name="lnn"
-vis = visdom.Visdom()
-port=8097
-logger_mean_before= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_mean_before'}, port=port, env='train_'+node_name)
-logger_mean_after= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_mean_after'}, port=port, env='train_'+node_name)
-logger_var_before= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_var_before'}, port=port, env='train_'+node_name)
-logger_var_after= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_var_after'}, port=port, env='train_'+node_name)
+# node_name="lnn"
+# vis = visdom.Visdom()
+# port=8097
+# logger_mean_before= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_mean_before'}, port=port, env='train_'+node_name)
+# logger_mean_after= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_mean_after'}, port=port, env='train_'+node_name)
+# logger_var_before= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_var_before'}, port=port, env='train_'+node_name)
+# logger_var_after= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_var_after'}, port=port, env='train_'+node_name)
 
 # def gelu(x):
 #   return 0.5 * x * (1 + torch.tanh(math.sqrt(math.pi / 2) * (x + 0.044715 * x ** 3)))
@@ -1035,7 +1035,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         nr_positions=positions.shape[1]
         pos_dim=positions.shape[2]
         val_full_dim=lv.shape[1]
-        print("SliceFast with nr_positions ", nr_positions, " pos_dim ", pos_dim, "val_full_dim ", val_full_dim)
+        # print("SliceFast with nr_positions ", nr_positions, " pos_dim ", pos_dim, "val_full_dim ", val_full_dim)
 
         # #we want to regress first some weights deltas. For this we bottleneck first the values of the lattice so that the gather operation will be fast
         # if self.bottleneck is None: 
@@ -1750,11 +1750,11 @@ class PointNetModule(torch.nn.Module):
                         # self.last_linear.weight.data.normal_(0, np.sqrt(2. / n))
                         # if self.last_linear.bias is not None:
                             # torch.nn.init.zeros_(self.last_linear.bias)
-                        print("filter weight is ", self.last_linear.weight )
+                        # print("filter weight is ", self.last_linear.weight )
 
                 self.last_conv=ConvLatticeModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=False, with_homogeneous_coord=False, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking) #disable the bias becuse it is followed by a gn
 
-        print("pointnet distributed at the beggining is ", distributed.shape)
+        # print("pointnet distributed at the beggining is ", distributed.shape)
 
         # initial_distributed=distributed
 
@@ -1789,7 +1789,7 @@ class PointNetModule(torch.nn.Module):
         # distributed=torch.cat((initial_distributed,distributed),1)
 
 
-        print("pointnet distributed at the end of all the first batch of linear layers is ", distributed.shape)
+        # print("pointnet distributed at the end of all the first batch of linear layers is ", distributed.shape)
 
         indices_long=indices.long()
 
@@ -1816,7 +1816,7 @@ class PointNetModule(torch.nn.Module):
         #the nr points per simplex is a value between 0 and some arbitrary number, but we want it normalized between 0 and 1 so that the value doesnt change as much from input to input
         # nr_points_per_simplex/=nr_points_per_simplex.max()
         #or we can use the this to set to zero the vertices that have less than 3 points
-        print("nr points per simplex has shape ", nr_points_per_simplex.shape)
+        # print("nr points per simplex has shape ", nr_points_per_simplex.shape)
 
         #is we use distribute_cap we may accidentally remove some lattice vectors and therefore distributed.size(0) may not coindice with hash_table.nr_filled. must be updated
         # print("waddwa", torch.tensor(nr_points_per_simplex.size(0)).int())
@@ -1869,7 +1869,7 @@ class PointNetModule(torch.nn.Module):
 
 
         # distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0 )
-        print("pointnet distributed_reduced has shape ", distributed_reduced.shape)
+        # print("pointnet distributed_reduced has shape ", distributed_reduced.shape)
         if self.with_debug_output:
             print("distributed_reduced before the last layer has shape ", distributed_reduced.shape)
         distributed_reduced[0,:]=0 #the first layers corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
@@ -1939,7 +1939,7 @@ class PointNetDenseModule(torch.nn.Module):
                     print ("in ", nr_input_channels)
                     print ("out ", self.growth_rate)
                 is_last_layer=i==self.nr_layers-1 #the last layer is folowed by scatter max and not a batch norm therefore it needs a bias
-                print("is last layer is", is_last_layer)
+                # print("is last layer is", is_last_layer)
                 # self.norm_layers.append( GroupNormLatticeModule(nr_input_channels)  ) 
                 self.layers.append( torch.nn.Linear(nr_input_channels, self.growth_rate, bias=is_last_layer).to("cuda")  )
                 self.norm_layers.append( GroupNormLatticeModule(self.growth_rate)  ) 
@@ -2092,7 +2092,7 @@ class PointNetTransformModule(torch.nn.Module):
                         self.last_linear.weight[i,:].fill_(0.0)
                         self.last_linear.bias[i].fill_(0.0)
 
-        print("pointnet distributed at the beggining is ", distributed.shape)
+        # print("pointnet distributed at the beggining is ", distributed.shape)
 
 
         # #run the distributed through all the layers

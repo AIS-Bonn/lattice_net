@@ -12,12 +12,6 @@ from easypbr  import *
 from dataloaders import *
 from lattice_py import LatticePy
 from lattice_funcs import * #for the timing macros
-import visdom
-import torchnet
-from lr_finder import LRFinder
-from scores import Scores
-from model_ctx import ModelCtx
-from vis import Vis
 from diceloss import GeneralizedSoftDiceLoss
 
 from callback import *
@@ -76,7 +70,7 @@ def run():
     cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
         ViewerCallback(),
-        VisdomCallback(),
+        # VisdomCallback(),
         StateCallback() #changes the iter nr epoch nr,
     ])
     #create loaders

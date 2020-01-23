@@ -63,7 +63,7 @@ Lattice::Lattice(const std::string config_file):
     {
 
     init_params(config_file);
-    VLOG(1) << "Creating lattice";
+    VLOG(3) << "Creating lattice";
 
 }
 
@@ -84,7 +84,7 @@ Lattice::Lattice(const std::string config_file, const std::string name):
     // // setup seeds
     // m_impl->setup_seeds(m_devStates, m_nr_states);
 
-    VLOG(1) << "Creating lattice: " <<name;
+    VLOG(3) << "Creating lattice: " <<name;
 
 }
 
@@ -287,7 +287,7 @@ void Lattice::splat_standalone(torch::Tensor& positions_raw, torch::Tensor& valu
                             // m_splatting_indices_and_weights_tensor.data<float>(), *(m_hash_table.m_impl) );
     TIME_END("splat");
 
-    VLOG(1) << "after splatting nr_verts is " << nr_lattice_vertices();
+    VLOG(3) << "after splatting nr_verts is " << nr_lattice_vertices();
   
 }
 
@@ -342,7 +342,7 @@ void Lattice::just_create_verts(torch::Tensor& positions_raw, const bool with_ho
                             // m_splatting_indices_and_weights_tensor.data<float>(), *(m_hash_table.m_impl) );
     TIME_END("just_create_verts");
 
-    VLOG(4) << "after just_create_verts nr_verts is " << nr_lattice_vertices();
+    VLOG(3) << "after just_create_verts nr_verts is " << nr_lattice_vertices();
   
 }
 
@@ -405,7 +405,7 @@ void Lattice::distribute(torch::Tensor& positions_raw, torch::Tensor& values){
 
     // VLOG(1) << "m_distributed_tensor is " << m_distributed_tensor;
 
-    VLOG(1) << "after distributing nr_verts is " << nr_lattice_vertices();
+    VLOG(3) << "after distributing nr_verts is " << nr_lattice_vertices();
   
 }
 
@@ -587,7 +587,7 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
 
     CHECK(m_lvl-lattice_neighbours->m_lvl<=1) << "the difference in levels between query and neigbhours lattice should be only 1 or zero, so the query should be corser by 1 level with respect to the neighbours. Or if they are at the same level then nothing needs to be done";
     
-    VLOG(1) <<"starting convolved im2row_standlaone. The current lattice has nr_vertices_lattices" << nr_lattice_vertices();
+    VLOG(3) <<"starting convolved im2row_standlaone. The current lattice has nr_vertices_lattices" << nr_lattice_vertices();
     CHECK(nr_lattice_vertices()!=0) << "Why does this current lattice have zero nr_filled?";
     int nr_vertices=nr_lattice_vertices();
 
@@ -605,7 +605,7 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
         // debug_kernel=true;
     }
 
-    VLOG(1) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
+    VLOG(3) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
     m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
 
     return m_lattice_rowified;
@@ -660,7 +660,7 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts(){
     TIME_END("coarsen");
 
     int nr_vertices=coarse_lattice->nr_lattice_vertices();
-    VLOG(1) << "after coarsening nr_verts of the coarse lattice is " << nr_vertices;
+    VLOG(3) << "after coarsening nr_verts of the coarse lattice is " << nr_vertices;
 
     coarse_lattice->m_hash_table->m_values_tensor=torch::zeros({nr_vertices, m_val_full_dim}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  ); //we create exactly the values required for he vertices that were allocated
     coarse_lattice->m_hash_table->update_impl();
@@ -742,7 +742,7 @@ torch::Tensor Lattice::slice_standalone_no_precomputation(torch::Tensor& positio
     TIME_END("upload_cuda");
 
     TIME_START("scale_by_sigma");
-    VLOG(1) << "slice standalone scaling by a sigma of " << m_sigmas_tensor;
+    VLOG(3) << "slice standalone scaling by a sigma of " << m_sigmas_tensor;
     Tensor positions=positions_raw/m_sigmas_tensor;
     TIME_END("scale_by_sigma")
 
@@ -807,7 +807,7 @@ torch::Tensor Lattice::gather_standalone_no_precomputation(torch::Tensor& positi
     TIME_END("upload_cuda");
 
     TIME_START("scale_by_sigma");
-    VLOG(1) << "gather standalone scaling by a sigma of " << m_sigmas_tensor;
+    VLOG(3) << "gather standalone scaling by a sigma of " << m_sigmas_tensor;
     Tensor positions=positions_raw/m_sigmas_tensor;
     TIME_END("scale_by_sigma")
 
@@ -912,7 +912,7 @@ std::shared_ptr<Lattice> Lattice::slice_elevated_verts(const std::shared_ptr<Lat
 
 
     TIME_START("slice_elev");
-    VLOG(1)<< "calling sliced_elevated verts with sliced_lattice values tensor "<< sliced_lattice->m_hash_table->m_values_tensor.sizes() << "the val_full dim is " << val_full_dim_slice_from << "nr filled of " << m_hash_table->m_nr_filled_tensor;
+    VLOG(3)<< "calling sliced_elevated verts with sliced_lattice values tensor "<< sliced_lattice->m_hash_table->m_values_tensor.sizes() << "the val_full dim is " << val_full_dim_slice_from << "nr filled of " << m_hash_table->m_nr_filled_tensor;
     m_impl->slice_elevated_verts(m_hash_table_capacity, sliced_lattice->m_hash_table->m_values_tensor.data<float>(), pos_dim_slice_from, val_full_dim_slice_from, 
                                 sliced_lattice->m_splatting_indices_tensor.data<int>(), sliced_lattice->m_splatting_weights_tensor.data<float>(),
                                 *(lattice_to_slice_from->m_hash_table->m_impl), *(sliced_lattice->m_hash_table->m_impl) ,
@@ -945,7 +945,7 @@ torch::Tensor Lattice::slice_classify_no_precomputation(torch::Tensor& positions
     TIME_END("upload_cuda");
 
     TIME_START("scale_by_sigma");
-    VLOG(1) << "slice standalone scaling by a sigma of " << m_sigmas_tensor;
+    VLOG(3) << "slice standalone scaling by a sigma of " << m_sigmas_tensor;
     Tensor positions=positions_raw/m_sigmas_tensor;
     TIME_END("scale_by_sigma")
 
@@ -1037,7 +1037,7 @@ void Lattice::slice_backwards_standalone_with_precomputation_no_homogeneous(torc
 
     //no need to reallocate the values, we just need to check that they have the correct size
     if(m_hash_table->m_values_tensor.size(0) != nr_lattice_vertices() || m_hash_table->m_values_tensor.size(1)!=grad_sliced_values.size(2) ){
-        LOG(WARNING) << "Reallocating the values tensor which might be quite slow.";
+        // LOG(WARNING) << "Reallocating the values tensor which might be quite slow.";
         m_hash_table->m_values_tensor=torch::zeros({nr_lattice_vertices(), grad_sliced_values.size(2)},  torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  );
     }else{
         m_hash_table->m_values_tensor.fill_(0);
@@ -1142,7 +1142,7 @@ void Lattice::gather_backwards_standalone_with_precomputation(const torch::Tenso
 
     //no need to reallocate the values, we just need to check that they have the correct size
     if(m_hash_table->m_values_tensor.size(0) != nr_lattice_vertices() || m_hash_table->m_values_tensor.size(1)!=m_val_full_dim ){
-        LOG(WARNING) << "Reallocating the values tensor which might be quite slow.";
+        // LOG(WARNING) << "Reallocating the values tensor which might be quite slow.";
         m_hash_table->m_values_tensor=torch::zeros({nr_lattice_vertices(), m_val_full_dim },  torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  );
     }else{
         m_hash_table->m_values_tensor.fill_(0);

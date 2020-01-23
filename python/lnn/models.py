@@ -1070,7 +1070,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         for i in range(self.nr_downsamples):
             nr_chanels_skip_connection=skip_connection_channel_counts.pop()
             # nr_chanels_end_of_corsening=corsenings_channel_counts.pop()
-            print("nr_chanels_skip_connection ", nr_chanels_skip_connection)
+            # print("nr_chanels_skip_connection ", nr_chanels_skip_connection)
             # print("nr_chanels_end_of_corsening ", nr_chanels_end_of_corsening)
 
             # if the finefy is the deepest one int the network then it just divides by 2 the nr of channels because we know it didnt get as input two concatet tensors
@@ -1151,8 +1151,8 @@ class LNN_skippy_efficient(torch.nn.Module):
         distributed, indices=self.distribute(ls, positions, values)
         # TIME_END("distribute_py")
 
-        print("distributed has shape", distributed.shape)
-        print("indices has shape", indices.shape)
+        # print("distributed has shape", distributed.shape)
+        # print("indices has shape", indices.shape)
         #remove some rows of the distribured and indices depending if the corresponding lattice vertex has to many incident points
         # distributed, indices,ls=self.distribute_cap(distributed, positions.size(1), ls, cap=20)
 
@@ -1176,7 +1176,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         fine_values_list=[]
         TIME_START("down_path")
         for i in range(self.nr_downsamples):
-            print("DOWNSAPLE ", i, " with input lv of shape ", lv.shape)
+            # print("DOWNSAPLE ", i, " with input lv of shape ", lv.shape)
 
             #resnet blocks
             for j in range(self.nr_blocks_down_stage[i]):
@@ -1190,7 +1190,7 @@ class LNN_skippy_efficient(torch.nn.Module):
             # print("down input shape ", lv.shape[1])
             # lv, ls =self.maxpool_list[i](lv,ls)
             lv, ls = self.coarsens_list[i] ( lv, ls)
-            print("DOWNSAPLE ", i, " with out lv of shape ", lv.shape)
+            # print("DOWNSAPLE ", i, " with out lv of shape ", lv.shape)
 
         TIME_END("down_path")
 
@@ -1212,9 +1212,9 @@ class LNN_skippy_efficient(torch.nn.Module):
                 # lv, ls = self.up_activation_list[i](lv, ls) 
 
             #finefy
-            print("finefy input shape", lv.shape)
+            # print("finefy input shape", lv.shape)
             lv, ls = self.finefy_list[i] ( lv, ls, fine_structure  )
-            print("after finefy lv is " , lv.shape)
+            # print("after finefy lv is " , lv.shape)
 
 
             if self.upsampling_method=="slice_elevated" or self.upsampling_method=="slice_elevated_deform": #if we are not using finefy, we are just slicing, so now we have to reduce the nr of channels
