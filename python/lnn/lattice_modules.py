@@ -1049,10 +1049,12 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
                 if nr_channels_out  < self.bottleneck_size:
                     sys.exit("We used to many linear layers an now the values are lower than the bottlenck size. Which means that the bottleneck would actually do an expansion...")
                 print("adding stepdown with output of ", nr_channels_out)
-                self.stepdown.append( Gn1x1Gelu(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
+                self.stepdown.append( GnGelu1x1(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
+                # self.stepdown.append( Gn1x1Gelu(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
         if self.bottleneck is None:
             print("adding bottleneck with output of ", self.bottleneck_size)
-            self.bottleneck=Gn1x1Gelu(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
+            self.bottleneck=GnGelu1x1(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
+            # self.bottleneck=Gn1x1Gelu(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
         # apply the stepdowns
         for i in range(3):
             if i == 0:
@@ -1718,12 +1720,12 @@ class PointNetModule(torch.nn.Module):
                         print ("in ", nr_input_channels)
                         print ("out ", nr_output_channels)
                     is_last_layer=i==len(self.nr_output_channels_per_layer)-1 #the last layer is folowed by scatter max and not a batch norm therefore it needs a bias
-                    self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_input_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
+                    # self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_input_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
                     print("is last layer is", is_last_layer)
                     self.layers.append( torch.nn.Linear(nr_input_channels, nr_output_channels, bias=is_last_layer).to("cuda")  )
                     with torch.no_grad():
                         torch.nn.init.kaiming_normal_(self.layers[-1].weight, mode='fan_in', nonlinearity='relu')
-                    # self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
+                    self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
                     nr_input_channels=nr_output_channels
                     nr_layers=nr_layers+1
 
@@ -1769,18 +1771,18 @@ class PointNetModule(torch.nn.Module):
             # distributed=self.relu(distributed) 
             # distributed=self.layers[i] (distributed)
 
-            # distributed=self.layers[i] (distributed)
-            # if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
-            #     #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
-            #     distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
-            # distributed=self.relu(distributed) 
-
-            #start with a first conv then does gn conv relu
-            if i!=0:
-                distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
             distributed=self.layers[i] (distributed)
-            if i!=0:
-                distributed=self.relu(distributed) 
+            if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
+                #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
+                distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+            distributed=self.relu(distributed) 
+
+            # #start with a first conv then does gn conv relu
+            # if i!=0:
+            #     distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+            # distributed=self.layers[i] (distributed)
+            # if i!=0:
+            #     distributed=self.relu(distributed) 
 
 
 
@@ -3251,14 +3253,14 @@ class ResnetBlock(torch.nn.Module):
         # torch.nn.Linear(nr_input_channels, nr_output_channels, bias=True).to("cuda") 
 
         #again with bn-relu-conv
-        # self.conv1=GnGeluConv(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        # self.conv2=GnGeluConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv1=GnGeluConv(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv2=GnGeluConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         # self.gate  = torch.nn.Parameter( torch.ones( 1, nr_filters ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1,1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 
         #does gn-conv-gelu
-        self.conv1=GnConvGelu(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        self.conv2=GnConvGelu(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        # self.conv1=GnConvGelu(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        # self.conv2=GnConvGelu(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
 
         # self.drop=None
         # if with_dropout:
@@ -3360,15 +3362,15 @@ class BottleneckBlock(torch.nn.Module):
     def __init__(self, out_channels, biases, with_debug_output, with_error_checking):
         super(BottleneckBlock, self).__init__()
         self.downsample = 4
-        # self.contract=GnGelu1x1(int(out_channels/self.downsample), biases[0], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        # self.conv=GnGeluConv(int(out_channels/self.downsample), 1, biases[1], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        # self.expand=GnGelu1x1(out_channels, biases[2], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.contract=GnGelu1x1(int(out_channels/self.downsample), biases[0], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv=GnGeluConv(int(out_channels/self.downsample), 1, biases[1], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.expand=GnGelu1x1(out_channels, biases[2], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1,1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 
-        #does gn-conv-gelu
-        self.contract=Gn1x1Gelu(int(out_channels/self.downsample), biases[0], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        self.conv=GnConvGelu(int(out_channels/self.downsample), 1, biases[1], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        self.expand=Gn1x1Gelu(out_channels, biases[2], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        # #does gn-conv-gelu
+        # self.contract=Gn1x1Gelu(int(out_channels/self.downsample), biases[0], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        # self.conv=GnConvGelu(int(out_channels/self.downsample), 1, biases[1], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        # self.expand=Gn1x1Gelu(out_channels, biases[2], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
 
     def forward(self, lv, ls):
         identity=lv
