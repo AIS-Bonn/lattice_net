@@ -2447,7 +2447,7 @@ class GnConvGelu(torch.nn.Module):
         self.norm= None
         self.with_dropout=with_dropout
         if with_dropout:
-            self.drop=DropoutLattice(0.1)
+            self.drop=DropoutLattice(0.2)
     def forward(self, lv, ls, skip_connection=None):
 
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
@@ -2461,6 +2461,10 @@ class GnConvGelu(torch.nn.Module):
 
         ls.set_values(lv)
         lv_1, ls_1 = self.conv(lv, ls)
+
+        # if self.with_dropout:
+        #     lv_1 = self.drop(lv_1)
+
         lv_1=F.gelu(lv_1)
 
         # if self.with_dropout:
