@@ -1751,6 +1751,7 @@ class PointNetModule(torch.nn.Module):
         experiment_that_imply_no_elevation=["pointnet_no_elevate", "pointnet_no_elevate_no_local_mean", "splat"]
         if self.experiment in experiment_that_imply_no_elevation:
             # print("not performing elevation by pointnet as the experiment is", self.experiment)
+            pass
         else:
             for i in range(len(self.layers)): 
 
