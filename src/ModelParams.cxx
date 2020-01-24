@@ -37,6 +37,7 @@ void ModelParams::init_params(const std::string config_file){
     m_nr_levels_up_with_normal_resnet=train_config["nr_levels_up_with_normal_resnet"];
     m_compression_factor=train_config["compression_factor"];
     m_dropout_last_layer=train_config["dropout_last_layer"];
+    m_experiment=(std::string)train_config["experiment"];
 
 }
 
@@ -72,6 +73,9 @@ float ModelParams::compression_factor(){
 }
 float ModelParams::dropout_last_layer(){
     return m_dropout_last_layer;
+}
+std::string ModelParams::experiment(){
+    return m_experiment;
 }
 
 

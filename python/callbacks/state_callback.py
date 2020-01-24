@@ -16,14 +16,26 @@ class StateCallback(Callback):
         phase.loss_acum_per_epoch=0.0
         phase.scores.start_fresh_eval()
 
-    def epoch_ended(self, phase, **kwargs):
+    def epoch_ended(self, phase, model, save_checkpoint, **kwargs):
         phase.scores.update_best()
 
         #for evaluation phase print the iou
         if not phase.grad:
             mean_iou=phase.scores.avg_class_iou(print_per_class_iou=False)
             best_iou=phase.scores.best_iou
-            print("iou for phase_", phase.name , " at epoch ", phase.epoch_nr , " is ", mean_iou, " best mean iou is ", best_iou)
+            best_iou_dict=phase.scores.best_iou_dict
+            print("iou for phase_", phase.name , " at epoch ", phase.epoch_nr , " is ", mean_iou, " best mean iou is ", best_iou, "  with ious per classes \n" , best_iou_dict )
+
+        #save the checkpoint of the model if we are in testing mode
+        if not phase.grad:
+            if save_checkpoint and model is not None:
+                model_name="model_e_"+str(phase.epoch_nr)+"_"+str( mean_iou )+".pt"
+                info_txt_name="model_e_"+str(phase.epoch_nr)+"_info"+".csv"
+                out_model_path=os.path.join(checkpoint_path, model_name)
+                out_info_path=os.path.join(checkpoint_path, info_txt_name)
+                torch.save(model.state_dict(), out_model_path)
+                phase.scores.write_iou_to_csv(out_info_path)
+        
 
         phase.epoch_nr+=1
 

@@ -132,7 +132,6 @@ PYBIND11_MODULE(latticenet, m) {
     .def("max_training_epochs",  &TrainParams::max_training_epochs )
     .def("save_checkpoint",  &TrainParams::save_checkpoint )
     .def("checkpoint_path",  &TrainParams::checkpoint_path )
-    .def("experiment",  &TrainParams::experiment )
     ;
 
     // //EvalParams
@@ -160,6 +159,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def("nr_levels_up_with_normal_resnet",  &ModelParams::nr_levels_up_with_normal_resnet )
     .def("compression_factor",  &ModelParams::compression_factor )
     .def("dropout_last_layer",  &ModelParams::dropout_last_layer )
+    .def("experiment",  &ModelParams::experiment )
     ;
 
 
