@@ -16,7 +16,7 @@ class StateCallback(Callback):
         phase.loss_acum_per_epoch=0.0
         phase.scores.start_fresh_eval()
 
-    def epoch_ended(self, phase, model, save_checkpoint, **kwargs):
+    def epoch_ended(self, phase, model, save_checkpoint, checkpoint_path, **kwargs):
         phase.scores.update_best()
 
         #for evaluation phase print the iou
