@@ -31,10 +31,7 @@ void TrainParams::init_params(const std::string config_file){
     m_with_error_checking = train_config["with_error_checking"];
     m_batch_size = train_config["batch_size"];
     m_lr = train_config["lr"];
-    m_base_lr = train_config["base_lr"];
     m_weight_decay = train_config["weight_decay"];
-    m_nr_epochs_per_half_cycle = train_config["nr_epochs_per_half_cycle"];
-    m_exponential_gamma = train_config["exponential_gamma"];
     m_max_training_epochs = train_config["max_training_epochs"];
     m_save_checkpoint=train_config["save_checkpoint"];
     m_checkpoint_path=(std::string)train_config["checkpoint_path"];
@@ -63,17 +60,8 @@ int TrainParams::batch_size(){
 float TrainParams::lr(){
     return m_lr;
 }
-float TrainParams::base_lr(){
-    return m_base_lr;
-}
 float TrainParams::weight_decay(){
     return m_weight_decay;
-}
-float TrainParams::nr_epochs_per_half_cycle(){
-    return m_nr_epochs_per_half_cycle;
-}
-float TrainParams::exponential_gamma(){
-    return m_exponential_gamma;
 }
 int TrainParams::max_training_epochs(){
     return m_max_training_epochs;
@@ -81,7 +69,6 @@ int TrainParams::max_training_epochs(){
 bool TrainParams::save_checkpoint(){
     return m_save_checkpoint;
 }
-
 std::string TrainParams::checkpoint_path(){
     return m_checkpoint_path;
 }

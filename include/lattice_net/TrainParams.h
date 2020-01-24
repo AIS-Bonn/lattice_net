@@ -19,10 +19,7 @@ public:
     std::string dataset_name();
     int batch_size();
     float lr();
-    float base_lr();
     float weight_decay();
-    float nr_epochs_per_half_cycle();
-    float exponential_gamma();
     int max_training_epochs();
     bool save_checkpoint();
     std::string checkpoint_path();
@@ -38,10 +35,7 @@ private:
     bool m_with_error_checking; //weather the training script should check for erronoues things like how many positions we sliced correctly
     int m_batch_size;
     float m_lr; 
-    float m_base_lr;
     float m_weight_decay;
-    float m_nr_epochs_per_half_cycle; //for cyclic learning a half_cycle is the process of going from base_lr to max_lr or viceverse. This is how many epochs it takes to do a half_cycle Leslie paper recomend a value between 2 and 10
-    float m_exponential_gamma; //the max_lr in cycle learning gets multiplied by epoch^exponential_gamma after every epoch
     int m_max_training_epochs;
     bool m_save_checkpoint;
     std::string m_checkpoint_path;
