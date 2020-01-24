@@ -70,7 +70,7 @@ def run():
     cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
         ViewerCallback(),
-        # VisdomCallback(),
+        VisdomCallback(),
         StateCallback() #changes the iter nr epoch nr,
     ])
     #create loaders

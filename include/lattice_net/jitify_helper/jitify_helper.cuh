@@ -25,7 +25,8 @@ static jitify::Program create_jitify_program(const std::string file, const std::
 
     // std::vector<std::string> options = {"-std=c++11", "--generate-line-info", "-ftz=true", "-prec-div=false", "-prec-sqrt=false"};
     // std::vector<std::string> options = {"-std=c++11", "--generate-line-info"}; //https://stackoverflow.com/questions/41672506/how-do-i-direct-all-accesses-to-global-memory-in-cuda
-    std::vector<std::string> options = {"-std=c++11", "-ftz=true", "-prec-div=false", "-prec-sqrt=false"};
+    //-use_fast_math) implies  --ftz=true --prec-div=false --prec-sqrt=false --fmad=true. 
+    std::vector<std::string> options = {"-std=c++11", "--use_fast_math"};
 
 //   options.push_back(std::string("-G"));
 

@@ -1147,9 +1147,10 @@ class LNN_skippy_efficient(torch.nn.Module):
         # TIME_END("create_verts")
 
         #with coarsening block--------------------------------------------------
-        # TIME_START("distribute_py")
-        distributed, indices=self.distribute(ls, positions, values)
-        # TIME_END("distribute_py")
+        TIME_START("distribute_py")
+        with torch.set_grad_enabled(False):
+            distributed, indices=self.distribute(ls, positions, values)
+        TIME_END("distribute_py")
 
         # print("distributed has shape", distributed.shape)
         # print("indices has shape", indices.shape)
@@ -1157,9 +1158,9 @@ class LNN_skippy_efficient(torch.nn.Module):
         # distributed, indices,ls=self.distribute_cap(distributed, positions.size(1), ls, cap=20)
 
         #transform
-        TIME_START("distribute_transform")
+        # TIME_START("distribute_transform")
         # distributed, ls= self.distributed_transform(ls, distributed, indices)
-        TIME_END("distribute_transform")
+        # TIME_END("distribute_transform")
 
         TIME_START("pointnet+bn")
         lv, ls=self.point_net(ls, distributed, indices)
@@ -1283,50 +1284,51 @@ class LNN_skippy_efficient(torch.nn.Module):
 
         #use height above groundonly (still not super good for the bike but good for the knife)
         # values_tensor=positions_tensor[:,:, 1].clone().unsqueeze(2) #just the height (so the y coordinate) #not this is shape. 1xnr_pointsx1
+        with torch.set_grad_enabled(False):
 
-        if self.model_params.positions_mode()=="xyz":
-            positions_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
-        elif self.model_params.positions_mode()=="xyz+rgb":
-            xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
-            rgb_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
-            positions_tensor=torch.cat((xyz_tensor,rgb_tensor),2)
-        elif self.model_params.positions_mode()=="xyz+intensity":
-            xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
-            intensity_tensor=torch.from_numpy(cloud.I).unsqueeze(0).float().to("cuda")
-            positions_tensor=torch.cat((xyz_tensor,intensity_tensor),2)
-        else:
-            err="positions mode of ", self.model_params.positions_mode() , " not implemented"
-            sys.exit(err)
-
-
-        if self.model_params.values_mode()=="none":
-            values_tensor=torch.zeros(1, positions_tensor.shape[1], 1) #not really necessary but at the moment I have no way of passing an empty value array
-        elif self.model_params.values_mode()=="intensity":
-            values_tensor=torch.from_numpy(cloud.I).unsqueeze(0).float().to("cuda")
-        elif self.model_params.values_mode()=="rgb":
-            values_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
-        elif self.model_params.values_mode()=="rgb+height":
-            rgb_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
-            height_tensor=torch.from_numpy(cloud.V[:,1]).unsqueeze(0).unsqueeze(2).float().to("cuda")
-            values_tensor=torch.cat((rgb_tensor,height_tensor),2)
-        elif self.model_params.values_mode()=="rgb+xyz":
-            rgb_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
-            xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
-            values_tensor=torch.cat((rgb_tensor,xyz_tensor),2)
-        elif self.model_params.values_mode()=="height":
-            height_tensor=torch.from_numpy(cloud.V[:,1]).unsqueeze(0).unsqueeze(2).float().to("cuda")
-            values_tensor=height_tensor
-        elif self.model_params.values_mode()=="xyz":
-            xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
-            values_tensor=xyz_tensor
-        else:
-            err="values mode of ", self.model_params.values_mode() , " not implemented"
-            sys.exit(err)
+            if self.model_params.positions_mode()=="xyz":
+                positions_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
+            elif self.model_params.positions_mode()=="xyz+rgb":
+                xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
+                rgb_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
+                positions_tensor=torch.cat((xyz_tensor,rgb_tensor),2)
+            elif self.model_params.positions_mode()=="xyz+intensity":
+                xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
+                intensity_tensor=torch.from_numpy(cloud.I).unsqueeze(0).float().to("cuda")
+                positions_tensor=torch.cat((xyz_tensor,intensity_tensor),2)
+            else:
+                err="positions mode of ", self.model_params.positions_mode() , " not implemented"
+                sys.exit(err)
 
 
+            if self.model_params.values_mode()=="none":
+                values_tensor=torch.zeros(1, positions_tensor.shape[1], 1) #not really necessary but at the moment I have no way of passing an empty value array
+            elif self.model_params.values_mode()=="intensity":
+                values_tensor=torch.from_numpy(cloud.I).unsqueeze(0).float().to("cuda")
+            elif self.model_params.values_mode()=="rgb":
+                values_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
+            elif self.model_params.values_mode()=="rgb+height":
+                rgb_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
+                height_tensor=torch.from_numpy(cloud.V[:,1]).unsqueeze(0).unsqueeze(2).float().to("cuda")
+                values_tensor=torch.cat((rgb_tensor,height_tensor),2)
+            elif self.model_params.values_mode()=="rgb+xyz":
+                rgb_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
+                xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
+                values_tensor=torch.cat((rgb_tensor,xyz_tensor),2)
+            elif self.model_params.values_mode()=="height":
+                height_tensor=torch.from_numpy(cloud.V[:,1]).unsqueeze(0).unsqueeze(2).float().to("cuda")
+                values_tensor=height_tensor
+            elif self.model_params.values_mode()=="xyz":
+                xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
+                values_tensor=xyz_tensor
+            else:
+                err="values mode of ", self.model_params.values_mode() , " not implemented"
+                sys.exit(err)
 
-        target=cloud.L_gt
-        target_tensor=torch.from_numpy(target).long().squeeze(1).to("cuda").squeeze(0)
+
+
+            target=cloud.L_gt
+            target_tensor=torch.from_numpy(target).long().squeeze(1).to("cuda").squeeze(0)
         # print("maximum class idx is ", target_tensor.max() )
         # TIME_END("prepare")
 

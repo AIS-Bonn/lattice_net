@@ -573,8 +573,8 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     // VLOG(1) << "this lattice has lattice rowified of norm " <<m_lattice_rowified.norm();
 
     //FOR DEBUG assign the lattice rowified also the the convolve lattice so that we can query it afterwards and debug why there are vertices that don't have any neighbours
-    convolved_lattice->m_lattice_rowified=m_lattice_rowified.clone(); //IMPORTANT at the moment. Do not comment out
-    // convolved_lattice->m_lattice_rowified=m_lattice_rowified.clone();
+    // convolved_lattice->m_lattice_rowified=m_lattice_rowified.clone(); //IMPORTANT at the moment. Do not comment out
+    convolved_lattice->m_lattice_rowified=m_lattice_rowified;
 
     return convolved_lattice;
 
@@ -1118,7 +1118,7 @@ void Lattice::slice_classify_backwards_with_precomputation(const torch::Tensor& 
      *(m_hash_table->m_impl) );
     TIME_END("slice_clasify_back");
 
-} 
+}
 
 void Lattice::gather_backwards_standalone_with_precomputation(const torch::Tensor& positions_raw, const Tensor& grad_sliced_values){
 

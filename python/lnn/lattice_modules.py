@@ -1730,28 +1730,6 @@ class PointNetModule(torch.nn.Module):
                     nr_layers=nr_layers+1
 
 
-                # nr_input_channels*=2 #we concatenate the barycenric coords of the points that were chose in the max
-                nr_input_channels+=1 #we concatenate the nr_points per simplex of the points that were chose in the max
-                # nr_input_channels+=1 # we also add the nr of points that are in each simplex
-                if nr_input_channels is not self.nr_outputs_last_layer:
-                    self.last_norm=GroupNormLatticeModule(nr_params=nr_input_channels, affine=True)
-                    self.last_linear=torch.nn.Linear(nr_input_channels, self.nr_outputs_last_layer, bias=False).to("cuda") 
-                    with torch.no_grad():
-                        torch.nn.init.kaiming_normal_(self.last_linear.weight, mode='fan_in', nonlinearity='relu')
-                        if self.last_linear.bias is not None:
-                            fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.last_linear,weight)
-                            bound = 1 / math.sqrt(fan_in)
-                            torch.nn.init.uniform_(self.last_linear.bias, -bound, bound)
-                        #the last linear will convolve also over the barycentric weights, but we want those filter weights to start off at zero
-                        #linear layer stores the eight as a out_channel x in_channels tensor. Set last nr_input_channels/2 columns to zero
-                        # self.last_linear.weight[:,-int(nr_input_channels/2):].fill_(0)
-
-                        # n = 1*self.nr_outputs_last_layer
-                        # self.last_linear.weight.data.normal_(0, np.sqrt(2. / n))
-                        # if self.last_linear.bias is not None:
-                            # torch.nn.init.zeros_(self.last_linear.bias)
-                        # print("filter weight is ", self.last_linear.weight )
-
                 self.last_conv=ConvLatticeModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=False, with_homogeneous_coord=False, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking) #disable the bias becuse it is followed by a gn
 
         # print("pointnet distributed at the beggining is ", distributed.shape)
@@ -1810,7 +1788,8 @@ class PointNetModule(torch.nn.Module):
         # distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0)
 
         #get also the nr of points in the lattice so the max pooled features can be different if there is 1 point then if there are 100
-        ones=torch.ones(indices_long.shape[0]).to("cuda")
+        # ones=torch.ones(indices_long.shape[0]).to("cuda")
+        ones=torch.cuda.FloatTensor( indices_long.shape[0] ).fill_(1.0)
         nr_points_per_simplex = torch_scatter.scatter_add(ones, indices_long)
         nr_points_per_simplex=nr_points_per_simplex.unsqueeze(1)
         #the nr points per simplex is a value between 0 and some arbitrary number, but we want it normalized between 0 and 1 so that the value doesnt change as much from input to input

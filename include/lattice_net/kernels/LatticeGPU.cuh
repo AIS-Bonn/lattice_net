@@ -1588,9 +1588,15 @@ __global__ void im2row(int nr_vertices, float* im2row_out, int filter_extent, in
             }
             
 
+            int offNp =-1;
+            int offNm =-1;
 
-            int offNp = hash_table_neighbours.retrieve(np);
-            int offNm = hash_table_neighbours.retrieve(nm);
+            if (np_coords_integer){
+                offNp = hash_table_neighbours.retrieve(np);
+            }
+            if (nm_coords_integer){
+                offNm = hash_table_neighbours.retrieve(nm);
+            }
 
             //in case neighbours don't exist (lattice edges) offNp and offNm are -1
             float *valNp = zeros; //or valMe? for edges?

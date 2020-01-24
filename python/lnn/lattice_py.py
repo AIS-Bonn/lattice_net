@@ -185,7 +185,8 @@ class LatticePy(torch.Tensor):
         self.lattice.set_val_full_dim(val_dim)
     def set_values(self, new_values):
         # self.lattice.m_hash_table.set_values(new_values)
-        new_values=new_values.contiguous()
+        if not new_values.is_contiguous():
+            new_values=new_values.contiguous()
         self.lattice.m_hash_table.m_values_tensor=new_values
         self.set_val_full_dim(new_values.shape[1])
         self.lattice.m_hash_table.update_impl()
