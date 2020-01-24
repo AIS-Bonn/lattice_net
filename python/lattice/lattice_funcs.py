@@ -126,7 +126,8 @@ class DistributeLattice(Function):
         indices_long[indices_long<0]=0
 
         if experiment in experiments_that_imply_no_mean_substraction:
-            print("not performing mean substraction as the experiment is ", experiment)
+            # print("not performing mean substraction as the experiment is ", experiment)
+            pass
         else:
             mean_positions = torch_scatter.scatter_mean(distributed_positions, indices_long, dim=0 )
             mean_positions[0,:]=0 #the first lattice vertex corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
