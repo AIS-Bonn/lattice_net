@@ -1,8 +1,6 @@
 #!/usr/bin/env python3.6
 
 import torch
-from torch.autograd import Function
-from torch import Tensor
 
 import sys
 import os
@@ -20,10 +18,7 @@ from callbacks.visdom_callback import *
 from callbacks.state_callback import *
 from callbacks.phase import *
 
-#radam+lookahead
 from optimizers.over9000.radam import *
-from optimizers.over9000.lookahead import *
-from optimizers.over9000.novograd import *
 
 
 config_file="lnn_train_shapenet.cfg"
@@ -36,21 +31,15 @@ model_params=ModelParams.create(config_file)
 
 
 def create_loader(dataset_name, config_file):
-    # if(dataset_name=="semantickitti"):
-    #     loader=DataLoaderSemanticKitti(config_file)
-    # elif dataset_name=="shapenet":
-    #     loader=DataLoaderShapeNetPartSeg(config_file)
-    # elif dataset_name=="toyexample":
-    #     loader=DataLoaderToyExample(config_file)
-    # elif dataset_name=="stanford":
-    #     loader=DataLoaderStanfordIndoor(config_file)
-    # elif dataset_name=="scannet":
-    #     loader=DataLoaderScanNet(config_file)
-    # else:
-    #     err="Datset name not recognized. It is " + dataset_name
-    #     sys.exit(err)
-
-    loader=DataLoaderShapeNetPartSeg(config_file)
+    if(dataset_name=="semantickitti"):
+        loader=DataLoaderSemanticKitti(config_file)
+    elif dataset_name=="shapenet":
+        loader=DataLoaderShapeNetPartSeg(config_file)
+    elif dataset_name=="scannet":
+        loader=DataLoaderScanNet(config_file)
+    else:
+        err="Datset name not recognized. It is " + dataset_name
+        sys.exit(err)
 
     return loader
 
@@ -84,11 +73,8 @@ def run():
         Phase('train', loader_train, grad=True),
         Phase('test', loader_test, grad=False)
     ]
-    phase_idx=0
-    phase=phases[phase_idx]
     #model 
     model=LNN_skippy_efficient(loader_train.label_mngr().nr_classes(), model_params, False, False).to("cuda")
-    model.train(phase.grad) #turns the train on or off depending if hte phase requires gradients or not
     #create loss function
     loss_fn=GeneralizedSoftDiceLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled() ) 
     secondary_fn=torch.nn.NLLLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled())  #combination of nll and dice  https://arxiv.org/pdf/1809.10486.pdf
@@ -121,13 +107,9 @@ def run():
                         if first_time:
                             first_time=False
                             # optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
-                            # optimizer=Novograd(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
                             optimizer=RAdam(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay())
-                            # optimizer=Lookahead(optimizer)
-                            # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 30, 1)
                             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
 
-                        # cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=scheduler.get_lr()) #visualizes the prediction 
                         cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
 
                     #backward
