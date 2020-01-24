@@ -24,7 +24,8 @@ class StateCallback(Callback):
             mean_iou=phase.scores.avg_class_iou(print_per_class_iou=False)
             best_iou=phase.scores.best_iou
             best_iou_dict=phase.scores.best_iou_dict
-            print("iou for phase_", phase.name , " at epoch ", phase.epoch_nr , " is ", mean_iou, " best mean iou is ", best_iou, "  with ious per classes \n" , best_iou_dict )
+            # print("iou for phase_", phase.name , " at epoch ", phase.epoch_nr , " is ", mean_iou, " best mean iou is ", best_iou, "  with ious per classes \n" , best_iou_dict )
+            print("iou for phase_", phase.name , " at epoch ", phase.epoch_nr , " is ", mean_iou, " best mean iou is ", best_iou )
 
         #save the checkpoint of the model if we are in testing mode
         if not phase.grad:

@@ -4,7 +4,8 @@ from torch import Tensor
 
 import sys
 import os
-import warnings
+# import warnings
+from termcolor import colored
 # http://wiki.ros.org/Packages#Client_Library_Support
 # import rospkg
 # rospack = rospkg.RosPack()
@@ -996,7 +997,10 @@ class LNN_skippy_efficient(torch.nn.Module):
             sys.exit(err)
         if experiment!="none":
             warn="USING EXPERIMENT " + experiment
-            warning.warn(warn)
+            # warnings.warn(warn)
+            print(colored("-------------------------------", 'yellow'))
+            print(colored(warn, 'yellow'))
+            print(colored("-------------------------------", 'yellow'))
 
 
 

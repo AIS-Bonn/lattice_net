@@ -1028,7 +1028,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         if(dropout_prob > 0.0):
             self.dropout =DropoutLattice(dropout_prob) 
         # self.drop_bottleneck =DropoutLattice(0.2) 
-        self.experiement=experiment
+        self.experiment=experiment
     def forward(self, lv, ls, positions):
 
         # original_lv=lv.clone()
@@ -1128,7 +1128,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # print("delta weights has shape ", delta_weights.shape)
         # sys.exit("what")
         if self.experiment=="slice_no_deform":
-            print("Using slice with no deform as the experiment is ", experiment)
+            print("Using slice with no deform as the experiment is ", self.experiment)
             delta_weights*=0
 
 
@@ -1750,7 +1750,7 @@ class PointNetModule(torch.nn.Module):
         # #run the distributed through all the layers
         experiment_that_imply_no_elevation=["pointnet_no_elevate", "pointnet_no_elevate_no_local_mean", "splat"]
         if self.experiment in experiment_that_imply_no_elevation:
-            print("not performing elevation by pointnet as the experiment is", experiement)
+            print("not performing elevation by pointnet as the experiment is", self.experiment)
         else:
             for i in range(len(self.layers)): 
 
@@ -1787,8 +1787,8 @@ class PointNetModule(torch.nn.Module):
 
 
 
-        if self.experiement=="splat":
-            print("performing splatting since the experiment is ", experiement)
+        if self.experiment=="splat":
+            print("performing splatting since the experiment is ", self.experiment)
             distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0)
         else:
             distributed_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
