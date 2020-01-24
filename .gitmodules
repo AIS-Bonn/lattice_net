@@ -10,3 +10,6 @@
 [submodule "deps/jitify"]
 	path = deps/jitify
 	url = https://github.com/RaduAlexandru/jitify
+[submodule "python/optimizers/over9000"]
+	path = python/optimizers/over9000
+	url = https://github.com/mgrankin/over9000
