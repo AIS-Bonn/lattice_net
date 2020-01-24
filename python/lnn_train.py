@@ -5,6 +5,7 @@ import torch
 import sys
 import os
 import numpy as np
+from tqdm import tqdm
 
 from easypbr  import *
 from dataloaders import *
@@ -21,7 +22,8 @@ from callbacks.phase import *
 from optimizers.over9000.radam import *
 
 
-config_file="lnn_train_shapenet.cfg"
+# config_file="lnn_train_shapenet.cfg"
+config_file="lnn_train_semantic_kitti.cfg"
 
 torch.manual_seed(0)
 
@@ -58,7 +60,7 @@ def run():
     cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
         ViewerCallback(),
-        VisdomCallback(),
+        # VisdomCallback(),
         StateCallback() #changes the iter nr epoch nr,
     ])
     #create loaders
@@ -67,6 +69,8 @@ def run():
     loader_train.start()
     loader_test=create_loader(train_params.dataset_name(), config_path)
     loader_test.set_mode_test()
+    if isinstance(loader_test, DataLoaderSemanticKitti):
+        loader_test.set_sequence("all") #for smenantic kitti in case the train one only trains on only one sequence we still want to test on all
     loader_test.start()
     #create phases
     phases= [
@@ -86,8 +90,9 @@ def run():
             cb.phase_started(phase=phase)
             model.train(phase.grad)
 
+            pbar = tqdm(total=phase.loader.nr_samples())
             while ( phase.samples_processed_this_epoch < phase.loader.nr_samples()):
-
+                
                 if(phase.loader.has_data()): 
                     cloud=phase.loader.get_cloud()
 
@@ -111,6 +116,7 @@ def run():
                             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
 
                         cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
+                        pbar.update(1)
 
                     #backward
                     if is_training:

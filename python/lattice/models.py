@@ -995,12 +995,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         if experiment not in valid_experiment:
             err = "Experiment " + experiment + " is not valid"
             sys.exit(err)
-        if experiment!="none":
-            warn="USING EXPERIMENT " + experiment
-            # warnings.warn(warn)
-            print(colored("-------------------------------", 'yellow'))
-            print(colored(warn, 'yellow'))
-            print(colored("-------------------------------", 'yellow'))
+
 
 
 
@@ -1155,7 +1150,14 @@ class LNN_skippy_efficient(torch.nn.Module):
         # self.stepdown = StepDownModuleDensenetNoBottleneck(16, 3, nr_classes, self.with_debug_output, self.with_error_checking)
        
         self.logsoftmax=torch.nn.LogSoftmax(dim=2)
-        
+
+
+        if experiment!="none":
+            warn="USING EXPERIMENT " + experiment
+            # warnings.warn(warn)
+            print(colored("-------------------------------", 'yellow'))
+            print(colored(warn, 'yellow'))
+            print(colored("-------------------------------", 'yellow'))
 
     def forward(self, ls, positions, values):
 
@@ -1170,6 +1172,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         with torch.set_grad_enabled(False):
             distributed, indices=self.distribute(ls, positions, values)
         TIME_END("distribute_py")
+        # ls.compute_nr_points_per_lattice_vertex()
 
         # print("distributed has shape", distributed.shape)
         # print("indices has shape", indices.shape)
