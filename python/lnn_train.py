@@ -22,8 +22,8 @@ from callbacks.phase import *
 from optimizers.over9000.radam import *
 
 
-# config_file="lnn_train_shapenet.cfg"
-config_file="lnn_train_semantic_kitti.cfg"
+config_file="lnn_train_shapenet.cfg"
+# config_file="lnn_train_semantic_kitti.cfg"
 
 torch.manual_seed(0)
 
@@ -131,6 +131,7 @@ def run():
 
 
                 if phase.loader.is_finished():
+                    pbar.close()
                     if not is_training: #we reduce the learning rate when the test iou plateus
                         if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                             scheduler.step(phase.loss_acum_per_epoch) #for ReduceLROnPlateau
