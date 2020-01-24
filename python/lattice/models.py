@@ -4,6 +4,7 @@ from torch import Tensor
 
 import sys
 import os
+import warnings
 # http://wiki.ros.org/Packages#Client_Library_Support
 # import rospkg
 # rospack = rospkg.RosPack()
@@ -977,17 +978,6 @@ class LNN_skippy_efficient(torch.nn.Module):
         self.with_debug_output=with_debug_output
         self.with_error_checking=with_error_checking
 
-        self.distribute=DistributeLatticeModule(self.with_debug_output, self.with_error_checking) 
-        self.distribute_cap=DistributeCapLatticeModule() 
-        #self.distributed_transform=DistributedTransform( [32], self.with_debug_output, self.with_error_checking)  
-        self.start_nr_filters=model_params.pointnet_start_nr_channels()
-        self.point_net=PointNetModule( [16,32,64], self.start_nr_filters, self.with_debug_output, self.with_error_checking)  
-        # self.start_nr_filters=model_params.pointnet_start_nr_channels()
-        # self.point_net=PointNetDenseModule( growth_rate=16, nr_layers=2, nr_outputs_last_layer=self.start_nr_filters, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking) 
-
-        # self.first_conv=ConvLatticeModule(nr_filters=self.start_nr_filters, neighbourhood_size=1, dilation=1, bias=True, with_homogeneous_coord=False, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
-
-
         #a bit more control
         self.model_params=model_params
         self.nr_downsamples=model_params.nr_downsamples()
@@ -998,6 +988,31 @@ class LNN_skippy_efficient(torch.nn.Module):
         self.nr_levels_up_with_normal_resnet=model_params.nr_levels_up_with_normal_resnet()
         compression_factor=model_params.compression_factor()
         dropout_last_layer=model_params.dropout_last_layer()
+        experiment=model_params.experiment()
+        #check that the experiment has a valid string
+        valid_experiment=["none", "slice_no_deform", "pointnet_no_elevate", "pointnet_no_local_mean", "pointnet_no_elevate_no_local_mean", "splat"]
+        if experiment not in valid_experiment:
+            err = "Experiment " + experiment + " is not valid"
+            sys.exit(err)
+        if experiment!="none":
+            warn="USING EXPERIMENT " + experiment
+            warning.warn(warn)
+
+
+
+
+        self.distribute=DistributeLatticeModule(experiment, self.with_debug_output, self.with_error_checking) 
+        self.distribute_cap=DistributeCapLatticeModule() 
+        #self.distributed_transform=DistributedTransform( [32], self.with_debug_output, self.with_error_checking)  
+        self.start_nr_filters=model_params.pointnet_start_nr_channels()
+        self.point_net=PointNetModule( [16,32,64], self.start_nr_filters, experiment, self.with_debug_output, self.with_error_checking)  
+        # self.start_nr_filters=model_params.pointnet_start_nr_channels()
+        # self.point_net=PointNetDenseModule( growth_rate=16, nr_layers=2, nr_outputs_last_layer=self.start_nr_filters, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking) 
+
+        # self.first_conv=ConvLatticeModule(nr_filters=self.start_nr_filters, neighbourhood_size=1, dilation=1, bias=True, with_homogeneous_coord=False, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
+
+
+
 
         #just pointnet
         # self.nr_downsamples=0
@@ -1129,7 +1144,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         # self.slice_deform_full=SliceDeformFullLatticeModule(nr_classes=nr_classes, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
         # self.slice_fast_pytorch=SliceFastPytorchLatticeModule(nr_classes=nr_classes, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
         # self.slice_fast_bottleneck_pytorch=SliceFastBottleneckPytorchLatticeModule(nr_classes=nr_classes, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
-        self.slice_fast_cuda=SliceFastCUDALatticeModule(nr_classes=nr_classes, dropout_prob=dropout_last_layer, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
+        self.slice_fast_cuda=SliceFastCUDALatticeModule(nr_classes=nr_classes, dropout_prob=dropout_last_layer, experiment=experiment, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
         # self.slice_classify=SliceClassifyLatticeModule(nr_classes=nr_classes, dropout_prob=dropout_last_layer, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
         # self.stepdown = StepDownModule([], nr_classes, dropout_last_layer, self.with_debug_output, self.with_error_checking)
         #stepdown densenetmodule is too slow as it requires to copy the whole pointcloud when it concatenas. For semantic kitti this is just too much

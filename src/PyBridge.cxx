@@ -132,6 +132,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def("max_training_epochs",  &TrainParams::max_training_epochs )
     .def("save_checkpoint",  &TrainParams::save_checkpoint )
     .def("checkpoint_path",  &TrainParams::checkpoint_path )
+    .def("experiment",  &TrainParams::experiment )
     ;
 
     // //EvalParams

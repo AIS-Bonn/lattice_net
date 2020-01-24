@@ -98,7 +98,7 @@ class SplatLattice(Function):
 class DistributeLattice(Function):
     @staticmethod
     # def forward(ctx, lattice_py, positions, values, dummy_weight):
-    def forward(ctx, lattice_py, positions, values, with_debug_output, with_error_checking):
+    def forward(ctx, lattice_py, positions, values, experiment, with_debug_output, with_error_checking):
         # lattice_distributed=lattice_py.clone_lattice()
         # lattice_distributed.begin_splat()
         # lattice_distributed.distribute(positions, values)
@@ -116,7 +116,7 @@ class DistributeLattice(Function):
         #subsctract mean from the positions so we have something like a local laplacian as a feature
         distributed=lattice_py.distributed() 
 
-
+        experiments_that_imply_no_mean_substraction=["pointnet_no_local_mean", "pointnet_no_elevate_no_local_mean", "splat"]
         indices=lattice_py.splatting_indices()
         distributed_positions=distributed[:,:3] #get the first 3 columns, the ones corresponding only to the xyz positions
 
@@ -125,15 +125,15 @@ class DistributeLattice(Function):
         #some indices may be -1 because they were not inserted into the hashmap, this will cause an error for scatter_max so we just set them to 0
         indices_long[indices_long<0]=0
 
-        mean_positions = torch_scatter.scatter_mean(distributed_positions, indices_long, dim=0 )
-        mean_positions[0,:]=0 #the first lattice vertex corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
-        #by setting the first row of mean_positions to 0 it means that all the point that splat onto vertex zero will have a wrong mean. We will set those distributed_mean_substracted to also zero later
-        
-
-
-        #the distributed means now has shape nr_positions x pos_dim but we want to substract each distributed position (shape  (nr_positions x m_pos_dim+1) x pos_dim   ) with its corresponding mean. We can do a index_select with splatting indices to get the means
-        distributed_mean_positions=torch.index_select(mean_positions, 0, indices_long)
-        distributed[:,:3]=distributed_positions-distributed_mean_positions
+        if experiment in experiments_that_imply_no_mean_substraction:
+            print("not performing mean substraction as the experiment is ", experiment)
+        else:
+            mean_positions = torch_scatter.scatter_mean(distributed_positions, indices_long, dim=0 )
+            mean_positions[0,:]=0 #the first lattice vertex corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
+            #by setting the first row of mean_positions to 0 it means that all the point that splat onto vertex zero will have a wrong mean. We will set those distributed_mean_substracted to also zero later
+            #the distributed means now has shape nr_positions x pos_dim but we want to substract each distributed position (shape  (nr_positions x m_pos_dim+1) x pos_dim   ) with its corresponding mean. We can do a index_select with splatting indices to get the means
+            distributed_mean_positions=torch.index_select(mean_positions, 0, indices_long)
+            distributed[:,:3]=distributed_positions-distributed_mean_positions
 
         #we have to set the positions that ended up in an invalid vertes or the zero one because it's also considered invalid, to zero
         positions_that_splat_onto_vertex_zero_or_are_invalid=indices_long==0
@@ -161,7 +161,7 @@ class DistributeLattice(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None
 
 
 class BlurLattice(Function):

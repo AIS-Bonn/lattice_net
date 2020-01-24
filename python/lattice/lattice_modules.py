@@ -68,14 +68,15 @@ class SplatLatticeModule(torch.nn.Module):
         return SplatLattice.apply(lattice_py, positions, values, self.with_homogeneous_coord)
 
 class DistributeLatticeModule(torch.nn.Module):
-    def __init__(self, with_debug_output, with_error_checking):
+    def __init__(self, experiment, with_debug_output, with_error_checking):
         super(DistributeLatticeModule, self).__init__()
         self.with_debug_output=with_debug_output
         self.with_error_checking=with_error_checking
+        self.experiment=experiment
         # self.dummy_weight = torch.nn.Parameter( torch.empty( 1 ).to("cuda") ) #works for ConvIm2RowLattice
     def forward(self, lattice_py, positions, values):
         # return DistributeLattice.apply(lattice_py, positions, values, self.dummy_weight)
-        return DistributeLattice.apply(lattice_py, positions, values, self.with_debug_output, self.with_error_checking)
+        return DistributeLattice.apply(lattice_py, positions, values, self.experiment, self.with_debug_output, self.with_error_checking)
 
 class DistributeCapLatticeModule(torch.nn.Module):
     def __init__(self,):
@@ -1008,7 +1009,7 @@ class SliceFastBottleneckPytorchLatticeModule(torch.nn.Module):
 #the last attempt to make a fast slice without having a gigantic feature vector for each point. Rather from the features of the vertices, we regress directly the class probabilities
 #the idea is to not do it with a gather but rather with a special slicing function that also gets as input some learnable weights
 class SliceFastCUDALatticeModule(torch.nn.Module):
-    def __init__(self, nr_classes, dropout_prob, with_debug_output=True, with_error_checking=True):
+    def __init__(self, nr_classes, dropout_prob, experiment, with_debug_output=True, with_error_checking=True):
         super(SliceFastCUDALatticeModule, self).__init__()
         self.nr_classes=nr_classes
         self.with_debug_output=with_debug_output
@@ -1027,6 +1028,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         if(dropout_prob > 0.0):
             self.dropout =DropoutLattice(dropout_prob) 
         # self.drop_bottleneck =DropoutLattice(0.2) 
+        self.experiement=experiment
     def forward(self, lv, ls, positions):
 
         # original_lv=lv.clone()
@@ -1125,6 +1127,9 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # print("delta weights is ", delta_weights)
         # print("delta weights has shape ", delta_weights.shape)
         # sys.exit("what")
+        if self.experiment=="slice_no_deform":
+            print("Using slice with no deform as the experiment is ", experiment)
+            delta_weights*=0
 
 
         #ERROR FOR THE DELTAWEIGHTS
@@ -1690,7 +1695,7 @@ class StepDownModule(torch.nn.Module):
 
 
 class PointNetModule(torch.nn.Module):
-    def __init__(self, nr_output_channels_per_layer, nr_outputs_last_layer, with_debug_output, with_error_checking):
+    def __init__(self, nr_output_channels_per_layer, nr_outputs_last_layer, experiment, with_debug_output, with_error_checking):
         super(PointNetModule, self).__init__()
         self.first_time=True
         self.nr_output_channels_per_layer=nr_output_channels_per_layer
@@ -1703,6 +1708,7 @@ class PointNetModule(torch.nn.Module):
         self.relu=torch.nn.ReLU(inplace=True)
         self.tanh=torch.nn.Tanh()
         self.leaky=torch.nn.LeakyReLU(negative_slope=0.1, inplace=True)
+        self.experiment=experiment
     def forward(self, lattice_py, distributed, indices):
         if (self.first_time):
             with torch.no_grad():
@@ -1742,25 +1748,29 @@ class PointNetModule(torch.nn.Module):
         # print("barycentric weights is ", barycentric_weights)
 
         # #run the distributed through all the layers
-        for i in range(len(self.layers)): 
+        experiment_that_imply_no_elevation=["pointnet_no_elevate", "pointnet_no_elevate_no_local_mean", "splat"]
+        if self.experiment in experiment_that_imply_no_elevation:
+            print("not performing elevation by pointnet as the experiment is", experiement)
+        else:
+            for i in range(len(self.layers)): 
 
-            #start directly with bn relu conv, so batch norming the input which may be a bad idea...
-            # distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
-            # distributed=self.relu(distributed) 
-            # distributed=self.layers[i] (distributed)
+                #start directly with bn relu conv, so batch norming the input which may be a bad idea...
+                # distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+                # distributed=self.relu(distributed) 
+                # distributed=self.layers[i] (distributed)
 
-            distributed=self.layers[i] (distributed)
-            if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
-                #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
-                distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
-            distributed=self.relu(distributed) 
+                distributed=self.layers[i] (distributed)
+                if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
+                    #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
+                    distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+                distributed=self.relu(distributed) 
 
-            # #start with a first conv then does gn conv relu
-            # if i!=0:
-            #     distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
-            # distributed=self.layers[i] (distributed)
-            # if i!=0:
-            #     distributed=self.relu(distributed) 
+                # #start with a first conv then does gn conv relu
+                # if i!=0:
+                #     distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+                # distributed=self.layers[i] (distributed)
+                # if i!=0:
+                #     distributed=self.relu(distributed) 
 
 
 
@@ -1776,79 +1786,34 @@ class PointNetModule(torch.nn.Module):
 
 
 
-        #ATTEMPT 1 at confidence weighting. 
-        # We weight each points fetures directly before the scatter max
-        # print("barycentric weights has shape ", barycentric_weights.shape)
-        # barycentric_weights=barycentric_weights.unsqueeze(1)
-        # distributed.mul( barycentric_weights.expand_as(distributed) )
 
+        if self.experiement=="splat":
+            print("performing splatting since the experiment is ", experiement)
+            distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0)
+        else:
+            distributed_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
+            # distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0)
 
+            #get also the nr of points in the lattice so the max pooled features can be different if there is 1 point then if there are 100
+            ones=torch.cuda.FloatTensor( indices_long.shape[0] ).fill_(1.0)
+            nr_points_per_simplex = torch_scatter.scatter_add(ones, indices_long)
+            nr_points_per_simplex=nr_points_per_simplex.unsqueeze(1)
+            #attempt 3 just by concatenating the barycentric coords
+            # argmax_flatened=argmax.flatten()
+            # argmax_positive=argmax_flatened.clone()
+            # argmax_positive[argmax_flatened<0]=0
+            barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
+            # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax_positive ) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
+            barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
+            distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced),1)
+            # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced, nr_points_per_simplex),1)
+            # distributed_reduced=torch.cat((distributed_reduced, nr_points_per_simplex),1)
 
-        distributed_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
-        # distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0)
+            minimum_points_per_simplex=4
+            simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
+            distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
+            # print("nr of simeplexes which have very low number of points ", simplexes_with_few_points.sum())
 
-        #get also the nr of points in the lattice so the max pooled features can be different if there is 1 point then if there are 100
-        # ones=torch.ones(indices_long.shape[0]).to("cuda")
-        ones=torch.cuda.FloatTensor( indices_long.shape[0] ).fill_(1.0)
-        nr_points_per_simplex = torch_scatter.scatter_add(ones, indices_long)
-        nr_points_per_simplex=nr_points_per_simplex.unsqueeze(1)
-        #the nr points per simplex is a value between 0 and some arbitrary number, but we want it normalized between 0 and 1 so that the value doesnt change as much from input to input
-        # nr_points_per_simplex/=nr_points_per_simplex.max()
-        #or we can use the this to set to zero the vertices that have less than 3 points
-        # print("nr points per simplex has shape ", nr_points_per_simplex.shape)
-
-        #is we use distribute_cap we may accidentally remove some lattice vectors and therefore distributed.size(0) may not coindice with hash_table.nr_filled. must be updated
-        # print("waddwa", torch.tensor(nr_points_per_simplex.size(0)).int())
-        # sys.exit("debug")
-        # lattice_py.lattice.m_hash_table.m_nr_filled_tensor=torch.tensor(nr_points_per_simplex.size(0)).int()
-        # lattice_py.lattice.set_nr_lattice_vertices( int(nr_points_per_simplex.size(0))  )
-
-
-        #calculate also how many points we have per simplex #DOESNT REALLY HELP and actually it seems to make things worse
-        # ones=torch.zeros(distributed.shape[0], 1, device="cuda")
-        # nr_points_per_vertex = torch_scatter.scatter_add(ones, indices_long, dim=0)
-        # distributed_reduced=torch.cat((distributed_reduced,nr_points_per_vertex),1)
-
-        # #ATTEMPT 2 at confidence weighting
-        # #the activations of distributed reduces need to be somehow weighted by the barycentric coordinates, indicating some sort of confidence
-        # # print("argmax is ", argmax)
-        # print("argmax has shape",argmax.shape) #argmax has hsape nr_vertices x 64
-        # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
-        # barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
-        # print("barycentric reduced has shape ", barycentric_reduced.shape)
-        # # print("barycentric reduced is ", barycentric_reduced)
-        # mean_barycentric_reduced=barycentric_reduced.mean(1)
-        # print("mean_barycentric reduced has shape ", mean_barycentric_reduced.shape)
-        # # print("mean barycentric reduced is ", mean_barycentric_reduced)
-        # mean_barycentric_reduced=mean_barycentric_reduced.unsqueeze(1) #makes it a shape nr_vertices x 1
-        # distributed_reduced.mul( mean_barycentric_reduced.expand_as(distributed_reduced) )
-
-
-        #attempt 3 just by concatenating the barycentric coords
-        # argmax_flatened=argmax.flatten()
-        # argmax_positive=argmax_flatened.clone()
-        # argmax_positive[argmax_flatened<0]=0
-        barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
-        # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax_positive ) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
-        barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
-        distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced),1)
-        # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced, nr_points_per_simplex),1)
-        # distributed_reduced=torch.cat((distributed_reduced, nr_points_per_simplex),1)
-
-        minimum_points_per_simplex=4
-        simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
-        distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
-        # print("nr of simeplexes which have very low number of points ", simplexes_with_few_points.sum())
-
-        #attempt 4 by multiplying the features with the barycentric coordinates
-        # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
-        # barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
-        # distributed_reduced=distributed_reduced.mul(barycentric_reduced)
-
-
-
-        # distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0 )
-        # print("pointnet distributed_reduced has shape ", distributed_reduced.shape)
         if self.with_debug_output:
             print("distributed_reduced before the last layer has shape ", distributed_reduced.shape)
         distributed_reduced[0,:]=0 #the first layers corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
