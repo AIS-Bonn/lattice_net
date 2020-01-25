@@ -1019,7 +1019,6 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         self.bottleneck_size=8
         self.norm_pre_gather=None
         self.linear_pre_deltaW=None 
-        # self.gn_middle = torch.nn.GroupNorm( self.bottleneck_size*4+4,  self.bottleneck_size*4+4).to("cuda")
         self.linear_deltaW=None 
         self.linear_clasify=None
         self.tanh=torch.nn.Tanh()
@@ -1046,7 +1045,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
 
         #slowly reduce the features 
         if len(self.stepdown) is 0:
-            for i in range(3):
+            for i in range(2):
                 nr_channels_out= int( val_full_dim/np.power(2,i) ) 
                 if nr_channels_out  < self.bottleneck_size:
                     sys.exit("We used to many linear layers an now the values are lower than the bottlenck size. Which means that the bottleneck would actually do an expansion...")
@@ -1058,7 +1057,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
             self.bottleneck=GnGelu1x1(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
             # self.bottleneck=Gn1x1Gelu(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
         # apply the stepdowns
-        for i in range(3):
+        for i in range(2):
             if i == 0:
                 lv_bottleneck, ls_bottleneck = self.stepdown[i](lv, ls)
             else:
@@ -1093,6 +1092,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # linear layers on the sliced rowified get us to a tensor of 1 x nr_positions x (m_pos_dim+1), this will be the weights offsets for eahc positions into the 4 lattice vertices
         if self.linear_deltaW is None:
             # self.linear_pre_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], sliced_bottleneck_rowified.shape[2], bias=False).to("cuda") 
+            self.gn_middle = torch.nn.GroupNorm( ls.pos_dim()+1,  self.bottleneck_size*4+4).to("cuda") #the nr of groups is the same as the m_pos_dim+1 which is usually 4
             self.linear_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], pos_dim+1, bias=True).to("cuda") 
             # self.gn = torch.nn.GroupNorm(1, sliced_bottleneck_rowified.shape[2]).to("cuda")
             with torch.no_grad():
@@ -1105,12 +1105,13 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
                 self.linear_deltaW.weight*=0.1 #make it smaller so that we start with delta weight that are close to zero
                 torch.nn.init.zeros_(self.linear_deltaW.bias) 
         # sliced_bottleneck_rowified=self.relu(sliced_bottleneck_rowified) #shape 1 x nr_positions x (pos_dim+1)
+        # print("pos dim +1", ls.pos_dim()+1 )
+        # print("sliced_bottleneck_rowified has shape ", sliced_bottleneck_rowified.shape)
         #APPLY
-        # sliced_bottleneck_rowified=self.linear_pre_deltaW(sliced_bottleneck_rowified)
-        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
-        # sliced_bottleneck_rowified=self.gn_middle(sliced_bottleneck_rowified) 
-        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
-        # sliced_bottleneck_rowified=gelu(sliced_bottleneck_rowified) 
+        sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
+        sliced_bottleneck_rowified=self.gn_middle(sliced_bottleneck_rowified) 
+        sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
+        sliced_bottleneck_rowified=F.gelu(sliced_bottleneck_rowified) 
         delta_weights=self.linear_deltaW(sliced_bottleneck_rowified)
         # delta_weights=self.tanh(delta_weights)
 
