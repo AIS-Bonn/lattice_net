@@ -72,6 +72,8 @@ def run():
     loader_test.set_mode_test()
     if isinstance(loader_test, DataLoaderSemanticKitti):
         loader_test.set_sequence("all") #for smenantic kitti in case the train one only trains on only one sequence we still want to test on all
+    if isinstance(loader_test, DataLoaderScanNet):
+        loader_test.set_mode_validation() #scannet doesnt have a ground truth for the test set so we use the validation set
     loader_test.start()
     #create phases
     phases= [
