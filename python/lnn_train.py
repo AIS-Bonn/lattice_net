@@ -105,6 +105,7 @@ def run():
                         positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
                         pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
                         loss = loss_fn(pred_softmax, target)
+                        #print("pred_softmax has shape ", pred_softmax.shape, "target is ", target.shape)
                         loss += secondary_fn(pred_softmax, target)
                         # loss += 0.1*delta_weight_error_sum #TODO is not clear how much it improves iou if at all
                         # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
