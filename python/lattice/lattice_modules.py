@@ -1027,6 +1027,9 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         if(dropout_prob > 0.0):
             self.dropout =DropoutLattice(dropout_prob) 
         # self.drop_bottleneck =DropoutLattice(0.2) 
+
+        self.conv1d=None
+
         self.experiment=experiment
     def forward(self, lv, ls, positions):
 
@@ -1088,12 +1091,16 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # sliced_bottleneck_rowified=sliced_bottleneck_rowified.view(1,nr_positions, -1 )
         # print("sliced_bottleneck_rowified has shape ", sliced_bottleneck_rowified.shape)
 
+        nr_vertices_per_simplex=ls.pos_dim()+1
+        val_dim_of_each_vertex=int(sliced_bottleneck_rowified.shape[2]/ nr_vertices_per_simplex)
+
         #from this slice rowified we regress for each position some barycentric offest of size m_pos_dim+1
         # linear layers on the sliced rowified get us to a tensor of 1 x nr_positions x (m_pos_dim+1), this will be the weights offsets for eahc positions into the 4 lattice vertices
         if self.linear_deltaW is None:
             # self.linear_pre_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], sliced_bottleneck_rowified.shape[2], bias=False).to("cuda") 
             self.gn_middle = torch.nn.GroupNorm( ls.pos_dim()+1,  self.bottleneck_size*4+4).to("cuda") #the nr of groups is the same as the m_pos_dim+1 which is usually 4
-            self.linear_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], pos_dim+1, bias=True).to("cuda") 
+            # self.linear_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], pos_dim+1, bias=True).to("cuda") 
+            self.linear_deltaW=torch.nn.Linear( int(sliced_bottleneck_rowified.shape[2]/ (ls.pos_dim()+1) ), 1, bias=True).to("cuda") 
             # self.gn = torch.nn.GroupNorm(1, sliced_bottleneck_rowified.shape[2]).to("cuda")
             with torch.no_grad():
                 # torch.nn.init.kaiming_uniform_(self.linear_pre_deltaW.weight, mode='fan_in', nonlinearity='relu') 
@@ -1104,16 +1111,119 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
                 torch.nn.init.kaiming_uniform_(self.linear_deltaW.weight, mode='fan_in', nonlinearity='tanh') 
                 self.linear_deltaW.weight*=0.1 #make it smaller so that we start with delta weight that are close to zero
                 torch.nn.init.zeros_(self.linear_deltaW.bias) 
+            #attempt 2
+            self.conv1d=torch.nn.Conv1d(sliced_bottleneck_rowified.shape[2], pos_dim+1, val_dim_of_each_vertex , stride=1, padding=0, dilation=1, groups=4, bias=True, padding_mode='zeros').to("cuda")
+            with torch.no_grad():
+                self.conv1d.weight*=0.1 #make it smaller so that we start with delta weight that are close to zero
+                torch.nn.init.zeros_(self.conv1d.bias) 
+            self.gamma  = torch.nn.Parameter( torch.zeros( val_dim_of_each_vertex ).to("cuda") ) 
+
+
+
         # sliced_bottleneck_rowified=self.relu(sliced_bottleneck_rowified) #shape 1 x nr_positions x (pos_dim+1)
         # print("pos dim +1", ls.pos_dim()+1 )
         # print("sliced_bottleneck_rowified has shape ", sliced_bottleneck_rowified.shape)
-        #APPLY
-        sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
-        sliced_bottleneck_rowified=self.gn_middle(sliced_bottleneck_rowified) 
-        sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
-        sliced_bottleneck_rowified=F.gelu(sliced_bottleneck_rowified) 
+        #APPLY TODO decide if this is necessary. it seems to make overfitting a lot more difficult
+        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
+        # sliced_bottleneck_rowified=self.gn_middle(sliced_bottleneck_rowified) 
+        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
+        # sliced_bottleneck_rowified=F.gelu(sliced_bottleneck_rowified) 
+
+        #in order to make it rotation invariant we have to apply it m_pos_dim times with various rotations of the kernels 
+        # print("weights is" , self.linear_deltaW.weight.shape)
+        # print("biases is" , self.linear_deltaW.bias.shape)
+        # v= np.arange(0,12)
+        # tens = torch.from_numpy(v)
+        # tens= tens.reshape(2,6)
+        # permutation=[]
+        # nr_vertices_per_simplex=ls.pos_dim()+1
+        # val_dim_of_each_vertex=int(sliced_bottleneck_rowified.shape[2]/ nr_vertices_per_simplex)
+        # delta_weights=None
+        # #DEBUG
+        # # val_dim_of_each_vertex=2
+        # for i in range (self.linear_deltaW.weight.shape[1]-val_dim_of_each_vertex): #weight will have shape like 4,36 we have to pemrute the 36 columns
+        #     permutation.append(i+val_dim_of_each_vertex)
+        # for i in range(val_dim_of_each_vertex):
+        #     permutation.append(i)
+        # print("permutation is ", permutation)
+
+        # for i in range(ls.pos_dim()+1):
+        #     # print("appying delta for rotation", i)
+        #     #assume we have 3 vertices that we need to permute
+        #     # tens=tens.transpose(0,1)
+        #     # tens=tens.reshape(2,2,3)
+        #     # permute=[1,2,0]
+        #     # permute=[2,3,4,5,0,1]
+        #     # tens=tens[:,:,permute]
+        #     # tens=tens[:,permute]
+        #     # tens=tens.transpose(0,1)
+        #     # tens= tens.reshape(2,6)
+        #     # print("tens is \n", tens)
+
+        #     self.linear_deltaW.weight= torch.nn.Parameter(self.linear_deltaW.weight[:,permutation])
+        #     delta_weights_cur_rot=self.linear_deltaW(sliced_bottleneck_rowified)
+        #     if i==0:
+        #         delta_weights=delta_weights_cur_rot
+        #     else:
+        #         delta_weights=torch.max(delta_weights, delta_weights_cur_rot)
+
+        #chekc if the tensor and the parameter share memory
+
+
+
+
+        ###ORIGNAL
+        # delta_weights=self.linear_deltaW(sliced_bottleneck_rowified)
+
+
+
+
+
+
+
+
+        ## ATTEMPT 2 try to predict each barycentric coordinate only for the corresponding vertex by using group convolution
+        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
+        # delta_weights=self.conv1d(sliced_bottleneck_rowified)
+        # delta_weights=delta_weights.transpose(1,2)
+
+
+
+        #attmept 4 predict a barycentric coordinate for each lattice vertex, and then use max over all the features in the simplex like in here https://arxiv.org/pdf/1611.04500.pdf
+        sliced_bottleneck_rowified=sliced_bottleneck_rowified.view(1,nr_positions, nr_vertices_per_simplex, val_dim_of_each_vertex)
+        # print("sliced_bottleneck_rowified has size", sliced_bottleneck_rowified.shape)
+        #max over the al the vertices in a simplex
+        # max_vals,_=sliced_bottleneck_rowified.max(2)
+        max_vals=sliced_bottleneck_rowified.sum(2)/(ls.pos_dim()+1)
+        max_vals=max_vals.unsqueeze(2)
+        # print("max vals has size", max_vals.shape)
+        print("gamma is ", self.gamma)
+
+        sliced_bottleneck_rowified+= self.gamma* max_vals
         delta_weights=self.linear_deltaW(sliced_bottleneck_rowified)
+        delta_weights=delta_weights.reshape(1,nr_positions, nr_vertices_per_simplex)
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         # delta_weights=self.tanh(delta_weights)
+
+        # sys.exit("what")
 
         # #gn,relu,linear
         # sliced_bottleneck_rowified_gn=sliced_bottleneck_rowified.transpose(1,2)
@@ -1125,13 +1235,13 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # print("linear deltaW weight is ", self.linear_deltaW.weight )
 
 
-        # print("delta weights is ", delta_weights)
         # print("delta weights has shape ", delta_weights.shape)
         # sys.exit("what")
         if self.experiment=="slice_no_deform":
             # print("Using slice with no deform as the experiment is ", self.experiment)
             delta_weights*=0
 
+        # print("delta weights is ", delta_weights)
 
         #ERROR FOR THE DELTAWEIGHTS
         #the delta of the barycentric coordinates should sum to zero so that the sum of the normal barycentric coordinates should still sum to 1.0
