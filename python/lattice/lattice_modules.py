@@ -1098,7 +1098,8 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # linear layers on the sliced rowified get us to a tensor of 1 x nr_positions x (m_pos_dim+1), this will be the weights offsets for eahc positions into the 4 lattice vertices
         if self.linear_deltaW is None:
             # self.linear_pre_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], sliced_bottleneck_rowified.shape[2], bias=False).to("cuda") 
-            self.gn_middle = torch.nn.GroupNorm( ls.pos_dim()+1,  self.bottleneck_size*4+4).to("cuda") #the nr of groups is the same as the m_pos_dim+1 which is usually 4
+            # self.gn_middle = torch.nn.GroupNorm( ls.pos_dim()+1,  self.bottleneck_size*4+4).to("cuda") #the nr of groups is the same as the m_pos_dim+1 which is usually 4
+            # self.gn_middle = torch.nn.GroupNorm( self.bottleneck_size*4+4,  self.bottleneck_size*4+4).to("cuda") 
             # self.linear_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], pos_dim+1, bias=True).to("cuda") 
             self.linear_deltaW=torch.nn.Linear( int(sliced_bottleneck_rowified.shape[2]/ (ls.pos_dim()+1) ), 1, bias=True).to("cuda") 
             # self.gn = torch.nn.GroupNorm(1, sliced_bottleneck_rowified.shape[2]).to("cuda")
@@ -1197,9 +1198,9 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         max_vals=sliced_bottleneck_rowified.sum(2)/(ls.pos_dim()+1)
         max_vals=max_vals.unsqueeze(2)
         # print("max vals has size", max_vals.shape)
-        print("gamma is ", self.gamma)
+        # print("gamma is ", self.gamma)
 
-        sliced_bottleneck_rowified+= self.gamma* max_vals
+        sliced_bottleneck_rowified-= self.gamma* max_vals
         delta_weights=self.linear_deltaW(sliced_bottleneck_rowified)
         delta_weights=delta_weights.reshape(1,nr_positions, nr_vertices_per_simplex)
  
