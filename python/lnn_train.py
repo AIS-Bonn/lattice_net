@@ -23,7 +23,8 @@ from optimizers.over9000.radam import *
 
 
 #config_file="lnn_train_shapenet.cfg"
-config_file="lnn_train_semantic_kitti.cfg"
+# config_file="lnn_train_semantic_kitti.cfg"
+config_file="lnn_train_scannet.cfg"
 
 torch.manual_seed(0)
 
