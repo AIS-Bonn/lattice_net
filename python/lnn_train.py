@@ -22,8 +22,8 @@ from callbacks.phase import *
 from optimizers.over9000.radam import *
 
 
-config_file="lnn_train_shapenet.cfg"
-# config_file="lnn_train_semantic_kitti.cfg"
+#config_file="lnn_train_shapenet.cfg"
+config_file="lnn_train_semantic_kitti.cfg"
 
 torch.manual_seed(0)
 
@@ -60,7 +60,7 @@ def run():
     cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
         ViewerCallback(),
-        VisdomCallback(),
+        # VisdomCallback(),
         StateCallback() #changes the iter nr epoch nr,
     ])
     #create loaders
