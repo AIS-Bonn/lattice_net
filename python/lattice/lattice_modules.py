@@ -1100,6 +1100,8 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
             # self.linear_pre_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], sliced_bottleneck_rowified.shape[2], bias=False).to("cuda") 
             # self.gn_middle = torch.nn.GroupNorm( ls.pos_dim()+1,  self.bottleneck_size*4+4).to("cuda") #the nr of groups is the same as the m_pos_dim+1 which is usually 4
             # self.gn_middle = torch.nn.GroupNorm( self.bottleneck_size*4+4,  self.bottleneck_size*4+4).to("cuda") 
+            # self.gn_middle = torch.nn.GroupNorm( 1,  self.bottleneck_size*4+4).to("cuda") 
+            # self.gn_middle = torch.nn.GroupNorm( 1,  self.bottleneck_size+1).to("cuda") 
             # self.linear_deltaW=torch.nn.Linear(sliced_bottleneck_rowified.shape[2], pos_dim+1, bias=True).to("cuda") 
             self.linear_deltaW=torch.nn.Linear( int(sliced_bottleneck_rowified.shape[2]/ (ls.pos_dim()+1) ), 1, bias=True).to("cuda") 
             # self.gn = torch.nn.GroupNorm(1, sliced_bottleneck_rowified.shape[2]).to("cuda")
@@ -1118,6 +1120,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
                 self.conv1d.weight*=0.1 #make it smaller so that we start with delta weight that are close to zero
                 torch.nn.init.zeros_(self.conv1d.bias) 
             self.gamma  = torch.nn.Parameter( torch.zeros( val_dim_of_each_vertex ).to("cuda") ) 
+            self.beta  = torch.nn.Parameter( torch.zeros( val_dim_of_each_vertex ).to("cuda") ) 
 
 
 
@@ -1194,13 +1197,21 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         sliced_bottleneck_rowified=sliced_bottleneck_rowified.view(1,nr_positions, nr_vertices_per_simplex, val_dim_of_each_vertex)
         # print("sliced_bottleneck_rowified has size", sliced_bottleneck_rowified.shape)
         #max over the al the vertices in a simplex
-        # max_vals,_=sliced_bottleneck_rowified.max(2)
-        max_vals=sliced_bottleneck_rowified.sum(2)/(ls.pos_dim()+1)
+        max_vals,_=sliced_bottleneck_rowified.max(2)
+        # max_vals=sliced_bottleneck_rowified.sum(2)/(ls.pos_dim()+1)
         max_vals=max_vals.unsqueeze(2)
         # print("max vals has size", max_vals.shape)
         # print("gamma is ", self.gamma)
+        # print("beta is ", self.beta)
 
-        sliced_bottleneck_rowified-= self.gamma* max_vals
+        sliced_bottleneck_rowified-= self.gamma* max_vals + self.beta #max vals broadcasts to all the vertices in the simplex and substracts the max from them
+        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.view(1,nr_positions, nr_vertices_per_simplex* val_dim_of_each_vertex)
+        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
+        # sliced_bottleneck_rowified=self.gn_middle(sliced_bottleneck_rowified) 
+        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
+        # sliced_bottleneck_rowified=sliced_bottleneck_rowified.view(1,nr_positions, nr_vertices_per_simplex, val_dim_of_each_vertex)
+        # sliced_bottleneck_rowified=F.gelu(sliced_bottleneck_rowified)
+        # sliced_bottleneck_rowified=torch.tanh(sliced_bottleneck_rowified)
         delta_weights=self.linear_deltaW(sliced_bottleneck_rowified)
         delta_weights=delta_weights.reshape(1,nr_positions, nr_vertices_per_simplex)
  
