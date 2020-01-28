@@ -28,7 +28,7 @@ while True:
 
         random_point=cloud.V[1,:]
         # print("random point is ", random_point)
-        nr_points=cloud.radius_search(random_point, 0.02)
+        nr_points=cloud.radius_search(random_point, 0.05)
 
         nr_points_in_radius.append(nr_points)
         print("mean_nr_points: ", np.mean(nr_points_in_radius))
