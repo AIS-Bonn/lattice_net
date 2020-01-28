@@ -1933,9 +1933,9 @@ class PointNetModule(torch.nn.Module):
             # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced, nr_points_per_simplex),1)
             # distributed_reduced=torch.cat((distributed_reduced, nr_points_per_simplex),1)
 
-            minimum_points_per_simplex=4
-            simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
-            distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
+            # minimum_points_per_simplex=4
+            # simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
+            # distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
             # print("nr of simeplexes which have very low number of points ", simplexes_with_few_points.sum())
 
         if self.with_debug_output:

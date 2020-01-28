@@ -93,6 +93,14 @@
                 sigma: 0.15 nr_points_per_simlex: 156, iou
                 sigma: 0.175 nr_points_per_simlex: 204, iou
                 sigma: 0.2 nr_points_per_simlex: 238, iou
+        Scannet with different sigma sizes
+            influence_in_m: 0.02, sigma: X  points_per_simplex: 5 iou: 
+            influence_in_m: 0.05, sigma: X  points_per_simplex: 30 iou: 
+            influence_in_m: 0.10, sigma: X  points_per_simplex: 114 iou: 
+            influence_in_m: 0.20, sigma: X  points_per_simplex: 400 iou: 
+            influence_in_m: 0.40, sigma: X  points_per_simplex: 1430 iou: 
+            influence_in_m: 0.80, sigma: X  points_per_simplex: 5429 iou: 
+            influence_in_m: 1.60, sigma: X  points_per_simplex: 20798 iou: 
 
     -things to implement before starting all the runs   
         -we need to rerun the dockerfile on bg5
