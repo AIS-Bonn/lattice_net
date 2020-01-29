@@ -21,7 +21,8 @@ from callbacks.phase import *
 #semantickitt on infcuda2
 
 
-config_file="lnn_eval_semantic_kitti.cfg"
+# config_file="lnn_eval_semantic_kitti.cfg"
+config_file="lnn_eval_scannet.cfg"
 
 torch.manual_seed(0)
 
