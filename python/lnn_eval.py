@@ -170,6 +170,7 @@ def run():
                             # print("diff to gt  is ", diff_to_gt)
                             # print("diff to tangentconv  is ", diff_to_tangentconv)
                             score=diff_to_tangentconv-diff_to_gt ##we try to maximize this score
+                            score /=gt.shape[0] #normalize by the number of points becuase otherwise the score will be squeed towards grabbing point clouds that are just gigantic because they have more points
                             print("score is ", score)
 
                             #store the score and the path in a list
