@@ -35,9 +35,11 @@ while True:
         cloud=loader.get_cloud()
         # Scene.show(cloud, "gt")
 
+        #nice 
         seq="19"
-        cloud_name="000535"
-        # cloud_name="002621"
+        cloud_name="004597"
+        # seq="18"
+        # cloud_name="001523"
 
 
         #load gt

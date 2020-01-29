@@ -14,22 +14,19 @@ sequences = [ f.path for f in os.scandir(pred_folder) if f.is_dir() ]
 print("sequences is ", sequences)
 for seq_folder in sequences:
     seq=os.path.basename(seq_folder)
-    out_folder_with_sequences=os.path.join(out_folder, "sequences", seq )
+    out_folder_with_sequences=os.path.join(out_folder, "sequences", seq, "predictions" )
     print("out_folder_with_sequences ", out_folder_with_sequences)
     os.makedirs(out_folder_with_sequences, exist_ok=True)
     files = [f for f in os.listdir(seq_folder) if os.path.isfile(os.path.join(seq_folder, f))]
+    nr_files_for_seq=0
     for file_basename in files:
         file=os.path.join(seq_folder, file_basename)
         extension = os.path.splitext(file)[1]
         if extension==".label":
-            # print("file is ", file)
+            nr_files_for_seq+=1
             labels = np.loadtxt(file)
-            # print("labels is ", labels)
-
             out_file=os.path.join(out_folder_with_sequences, file_basename)
-            print("writing in", out_file)
-            # np.save(out_file, labels)
-
+            # print("writing in", out_file)
             f= open(out_file,"w+")
             labels=labels.astype(np.int32)
             labels.tofile(f)
@@ -40,5 +37,6 @@ for seq_folder in sequences:
             # print("labels is ", labels)
             # diff = (a!=labels).sum()
             # print("diff is", diff)
+    print("nr_file_for_seq", nr_files_for_seq)
 
 
