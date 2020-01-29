@@ -110,7 +110,7 @@
             influence_in_m: 0.05, sigma: X  points_per_simplex: 30 iou:  CANNOT RUN due to memory
             influence_in_m: 0.10, sigma: 0.15  points_per_simplex: 114 iou: No need to run since it's too close to the default sigma of 0.08 (maybe run only if we have time)
             influence_in_m: 0.20, sigma: 0.3  points_per_simplex: 400 iou:  mem: 11.1GB      RUNNING on infcuda2 card 1 
-            influence_in_m: 0.40, sigma: 0.6  points_per_simplex: 1430 iou: mem: 9.4GB     Running on infcuda2 card 0
+            influence_in_m: 0.40, sigma: 0.6  points_per_simplex: 1430 iou_val: 0.4087  iou_test:   mem: 9.4GB     Running on infcuda2 card 0
             influence_in_m: 0.80, sigma: 1.0  points_per_simplex: 5429 iou: mem: 7.9GB     Running on bigcuda5 card 1
             influence_in_m: 1.60, sigma: 2.4  points_per_simplex: 20798 iou: mem: 7.7GB    Running on bigcuda5 card 3
 
