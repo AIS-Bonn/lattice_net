@@ -190,8 +190,9 @@ def run():
                             #write the sorted predictions to file 
                             best_predictions_file=os.path.join(eval_params.output_predictions_path(), "best_preds.txt")
                             with open(best_predictions_file, 'w') as f:
-                                for item in predictions_sorted:
-                                    f.write("%s\n" % item)
+                                for i in range(len(predictions_sorted)):
+                                    line= predictions_sorted[i] +  "    score: " +  str(scores_sorted[i]) + "\n"
+                                    f.write(line)
 
 
                 if phase.loader.is_finished():
