@@ -1,86 +1,32 @@
 #!/usr/bin/env python3.6
 
 import torch
-from torch.autograd import Function
-from torch import Tensor
 
 import sys
 import os
-# http://wiki.ros.org/Packages#Client_Library_Support
-import rospkg
-rospack = rospkg.RosPack()
-sf_src_path=rospack.get_path('surfel_renderer')
-sf_build_path=os.path.abspath(sf_src_path + "/../../build/surfel_renderer")
-sys.path.append(sf_build_path) #contains the modules of pycom
+import numpy as np
+from tqdm import tqdm
 
-from DataLoaderTest  import *
-from lattice_py import LatticePy
-from lattice_funcs import * #for the timing macros
-import visdom
-import torchnet
-from lr_finder import LRFinder
-from scores import Scores
-from model_ctx import ModelCtx
+from easypbr  import *
+from dataloaders import *
+from lattice.lattice_py import LatticePy
+from lattice.models import *
 
-# np.set_printoptions(threshold=np.inf)
-# torch.set_printoptions(threshold=50000)
-# torch.set_printoptions(profile="full")
+from callbacks.callback import *
+from callbacks.viewer_callback import *
+from callbacks.visdom_callback import *
+from callbacks.state_callback import *
+from callbacks.phase import *
 
-# config_file="lnn_train_semantic_kitti.cfg"
-# config_file="lnn_eval_semantic_kitti_bg5.cfg"
-config_file="lnn_eval_shapenet.cfg"
-# config_file="lnn_eval_scannet_bg5.cfg"
 
+
+config_file="lnn_eval_semantic_kitti.cfg"
 
 torch.manual_seed(0)
 
-node_name="eval_lnn"
-vis = visdom.Visdom()
-port=8097
-logger_test_loss = torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_test_loss'}, port=port, env=node_name)
-
-#initialize the parameters used for evaluating
-eval_params=EvalParams.create(config_file)    
-dataset_name=eval_params.dataset_name()
-with_viewer=eval_params.with_viewer()
-with_viewer=eval_params.with_viewer()
-checkpoint_path=eval_params.checkpoint_path()
-do_write_predictions=eval_params.do_write_predictions()
-output_predictions_path=eval_params.output_predictions_path()
-#rest of params needed by the net to will not be used since we are not training
-batch_size=1
-learning_rate=0
-base_lr=0
-weight_decay=0
-nr_epochs_per_half_cycle=0
-exponential_gamma=0.0
-max_training_epochs=0
-with_debug_output=False
-with_error_checking=False
-
+# #initialize the parameters used for training
+eval_params=EvalParams.create(config_file) 
 model_params=ModelParams.create(config_file)    
-
-def show_predicted_cloud(pred_softmax, cloud):
-    mesh_pred=cloud.clone()
-    l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
-    mesh_pred.L_pred=l_pred
-    mesh_pred.m_vis.m_point_size=4
-    mesh_pred.m_vis.set_color_semanticpred()
-    mesh_pred.move_in_z(cloud.get_scale()) #good for shapenetpartseg
-    Scene.show(mesh_pred, "mesh_pred")
-
-
-def write_prediction(pred_softmax, cloud, pred_path):
-    mesh_pred=cloud.clone()
-    l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
-    mesh_pred.color_from_label_indices(l_pred)
-    mesh_pred.L_pred=l_pred
-    mesh_pred.save_to_file(pred_path)
-    
-def write_gt(cloud, gt_path):
-    mesh_gt=cloud.clone()
-    mesh_gt.color_from_label_indices(cloud.L_gt)
-    mesh_gt.save_to_file(gt_path)
 
 
 def create_loader(dataset_name, config_file):
@@ -88,10 +34,6 @@ def create_loader(dataset_name, config_file):
         loader=DataLoaderSemanticKitti(config_file)
     elif dataset_name=="shapenet":
         loader=DataLoaderShapeNetPartSeg(config_file)
-    elif dataset_name=="toyexample":
-        loader=DataLoaderToyExample(config_file)
-    elif dataset_name=="stanford":
-        loader=DataLoaderStanfordIndoor(config_file)
     elif dataset_name=="scannet":
         loader=DataLoaderScanNet(config_file)
     else:
@@ -99,139 +41,85 @@ def create_loader(dataset_name, config_file):
         sys.exit(err)
 
     return loader
-#depending on the object loaded by shapenet we need a differnt sigma  in order to get around 20 points per simplex
-def set_appropriate_sigma(lattice_to_splat, object_name):
-    # airplane, bag, cap, car, chair, earphone, guitar, knife, lamp, motorbike, mug, pistol, rocket, skateboard, table
-    if object_name=="airplane":
-        lattice_to_splat.lattice.set_sigma(0.035)
-    elif object_name=="bag":
-        lattice_to_splat.lattice.set_sigma(0.06)
-    elif object_name=="cap":
-        lattice_to_splat.lattice.set_sigma(0.06)
-    elif object_name=="car":
-        lattice_to_splat.lattice.set_sigma(0.06)
-    elif object_name=="chair":
-        lattice_to_splat.lattice.set_sigma(0.055)
-    elif object_name=="earphone":
-        lattice_to_splat.lattice.set_sigma(0.045)
-    elif object_name=="guitar":
-        lattice_to_splat.lattice.set_sigma(0.035)
-    elif object_name=="knife":
-        lattice_to_splat.lattice.set_sigma(0.03)
-    elif object_name=="lamp":
-        lattice_to_splat.lattice.set_sigma(0.04)
-    elif object_name=="laptop":
-        lattice_to_splat.lattice.set_sigma(0.06)
-    elif object_name=="motorbike":
-        lattice_to_splat.lattice.set_sigma(0.045)
-    elif object_name=="mug":
-        lattice_to_splat.lattice.set_sigma(0.06)
-    elif object_name=="pistol":
-        lattice_to_splat.lattice.set_sigma(0.04)
-    elif object_name=="rocket":
-        lattice_to_splat.lattice.set_sigma(0.04)
-    elif object_name=="skateboard":
-        lattice_to_splat.lattice.set_sigma(0.04)
-    elif object_name=="table":
-        lattice_to_splat.lattice.set_sigma(0.055)
-    else:
-        err=object_name+" is not a known object"
-        sys.exit(err)
 
 
 def run():
-    if with_viewer:
-        view=Viewer(config_file)
-
-    loader_test=create_loader(dataset_name, config_file)
-    loader_test.start()
+    config_path=os.path.join( os.path.dirname( os.path.realpath(__file__) ) , '../config', config_file)
+    if train_params.with_viewer():
+        view=Viewer.create(config_path)
 
     first_time=True
-    iter_test_nr=0 #nr of batches processed
-    samples_test_processed=0
 
     #torch stuff 
-    lattice_to_splat=LatticePy()
-    lattice_to_splat.create(config_file, "splated_lattice") #IMPORTANT THAT the size of the lattice in this file is the same as the size of the lattice that was used during training
-    model_ctx=ModelCtx(base_lr, learning_rate, weight_decay, batch_size, nr_epochs_per_half_cycle, exponential_gamma, model_params, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-    mode="eval" #this will switch between train and eval as we finish each epoch
+    lattice=LatticePy()
+    lattice.create(config_path, "splated_lattice")
 
-    torch.set_grad_enabled(False)
-    scores=Scores(node_name, port)
-
-    write_scannet_predictions=False
-
+    cb = CallbacksGroup([
+        # LatticeSigmaCallback() #TODO
+        ViewerCallback(),
+        # VisdomCallback(),
+        StateCallback() #changes the iter nr epoch nr,
+    ])
+    #create loaders
+    loader_test=create_loader(train_params.dataset_name(), config_path)
+    loader_test.set_mode_test()
+    if isinstance(loader_test, DataLoaderSemanticKitti):
+        loader_test.set_sequence("all") #for smenantic kitti in case the train one only trains on only one sequence we still want to test on all
+    if isinstance(loader_test, DataLoaderScanNet):
+        loader_test.set_mode_validation() #scannet doesnt have a ground truth for the test set so we use the validation set
+    loader_test.start()
+    #create phases
+    phases= [
+        Phase('test', loader_test, grad=False)
+    ]
+    #model 
+    model=LNN_skippy_efficient(loader_test.label_mngr().nr_classes(), model_params, False, False).to("cuda")
 
     while True:
-        if with_viewer:
-            view.update()
 
-        if(loader_test.has_data()): 
-            cloud=loader_test.get_cloud()
-            if with_viewer:
-                cloud.m_vis.m_point_size=4
-                Scene.show(cloud,"cloud")
+        for phase in phases:
+            cb.epoch_started(phase=phase)
+            cb.phase_started(phase=phase)
+            model.train(phase.grad)
 
-            #set the lattice sigmas on shapenet depending on the object 
-            if isinstance(loader_test, DataLoaderShapeNetPartSeg):
-                set_appropriate_sigma(lattice_to_splat, loader_test.get_object_name())
-            
-            positions, values, target = model_ctx.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
-            pred_softmax, pred_raw, delta_weight_error_sum=model_ctx.forward(lattice_to_splat, positions, values, mode, cloud.m_label_mngr.nr_classes(), loader_test.nr_samples() )
+            pbar = tqdm(total=phase.loader.nr_samples())
+            while ( phase.samples_processed_this_epoch < phase.loader.nr_samples()):
+                
+                if(phase.loader.has_data()): 
+                    cloud=phase.loader.get_cloud()
 
-          
-            if first_time:
-                first_time=False
-                #now that all the parameters are created we can fill them with a model from a file
-                model_ctx.model.load_state_dict(torch.load(checkpoint_path))
-                #need to rerun forward with the new parameters to get an accurate prediction
-                pred_softmax, pred_raw, delta_weight_error_sum=model_ctx.forward(lattice_to_splat, positions, values, mode, cloud.m_label_mngr.nr_classes(), loader_test.nr_samples() )
+                    is_training = phase.grad
+
+                    #forward
+                    with torch.set_grad_enabled(is_training):
+                        cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
+                        positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
+                        pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+                      
+
+                        #if its the first time we do a forward on the model we need to load here the checkpoint
+                        if first_time:
+                            first_time=False
+                            #TODO load checkpoint
+                            # now that all the parameters are created we can fill them with a model from a file
+                            model.load_state_dict(torch.load(eval_params.checkpoint_path()))
+                            #need to rerun forward with the new parameters to get an accurate prediction
+                            pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+
+                        cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=0, phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
+                        pbar.update(1)
+
+                if phase.loader.is_finished():
+                    pbar.close()
+                    if not is_training: #we reduce the learning rate when the test iou plateus
+                        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                            scheduler.step(phase.loss_acum_per_epoch) #for ReduceLROnPlateau
+                    cb.epoch_ended(phase=phase, model=model, save_checkpoint=False, checkpoint_path="" ) 
+                    cb.phase_ended(phase=phase) 
 
 
-
-            # #scannet has the test set only on the server so we need to write the predictions to a file in the format they want...
-            # if write_scannet_predictions:
-            #     print("got cloud with name ", cloud.name)
-            #     print("predsoftmax is ", pred_softmax)
-            #     l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
-            #     print("l_pred is ", l_pred)
-            #     cloud.L_pred=l_pred
-            #     path_for_eval="/home/local/staff/rosu/data/scannet/for_evaluation"
-            #     loader_test.write_for_evaluating_on_scannet_server(cloud, path_for_eval)
-
-            #     #why are they so many predictions that are unlabeled? Did the network learn the unlabeled class??
-            #     #for sanity checking, compact the preditions again and write the color cloud to file
-            #     pred_path_scannet="/home/local/staff/rosu/data/scannet/predictions/for_server/"+cloud.name+".ply"
-            #     write_prediction(pred_softmax, cloud, pred_path_scannet)
-
-
-
-            # Profiler.print_all_stats()
-            if with_viewer:
-                show_predicted_cloud(pred_softmax, cloud)
-
-            if do_write_predictions:
-                pred_path=os.path.join(output_predictions_path, str(samples_test_processed)+"_pred.ply" )
-                gt_path=os.path.join(output_predictions_path, str(samples_test_processed)+"_gt.ply" )
-                print("writing prediction to ", pred_path)
-                write_prediction(pred_softmax, cloud, pred_path)
-                write_gt(cloud, gt_path)
-
-            loss_per_batch, finished_batch=model_ctx.loss(pred_softmax, pred_raw, target, cloud.m_label_mngr.get_idx_unlabeled(), cloud.m_label_mngr.class_frequencies(), samples_test_processed )
-            samples_test_processed+=1
-            if finished_batch:
-                logger_test_loss.log(iter_test_nr, loss_per_batch, name='loss_per_batch_test')
-                iter_test_nr+=1
-            TIME_START("accumulate_scores")
-            scores.accumulate_scores(pred_softmax, target, cloud.m_label_mngr.get_idx_unlabeled() )
-            TIME_END("accumulate_scores")
-            scores.show(epoch_nr=samples_test_processed)
-
-        if loader_test.is_finished():
-            print("epoch of testing is finished")
-            #print results
-            scores.show(epoch_nr=samples_test_processed)
-
+                if train_params.with_viewer():
+                    view.update()
 
 
 def main():
@@ -252,4 +140,4 @@ if __name__ == "__main__":
 
     # # Now trace execution:
     # tracer = trace.Trace(trace=1, count=0, ignoredirs=["/usr", sys.prefix])
-    # tracer.run('main()')
+    # tracer.run('main()'

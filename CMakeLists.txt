@@ -90,6 +90,7 @@ cuda_add_library(latticenet_cu  SHARED  ${CMAKE_SOURCE_DIR}/src/Lattice.cu
                                         ${CMAKE_SOURCE_DIR}/src/HashTable.cu  
                                         ${CMAKE_SOURCE_DIR}/src/ModelParams.cxx
                                         ${CMAKE_SOURCE_DIR}/src/TrainParams.cxx
+                                        ${CMAKE_SOURCE_DIR}/src/EvalParams.cxx
                                         )
 # set(LIBS ${LIBS} latticenet_cu)
 

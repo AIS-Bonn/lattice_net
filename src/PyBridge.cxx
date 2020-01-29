@@ -12,6 +12,7 @@
 #include "lattice_net/HashTable.cuh"
 #include "lattice_net/TrainParams.h"
 #include "lattice_net/ModelParams.h"
+#include "lattice_net/EvalParams.h"
 
 
 // https://pybind11.readthedocs.io/en/stable/advanced/cast/stl.html
@@ -131,16 +132,15 @@ PYBIND11_MODULE(latticenet, m) {
     .def("checkpoint_path",  &TrainParams::checkpoint_path )
     ;
 
-    // //EvalParams
-    // py::class_<EvalParams, std::shared_ptr<EvalParams>   > (m, "EvalParams")
-    // .def_static("create", &EvalParams::create<const std::string> ) //for templated methods like this one we need to explicitly instantiate one of the arguments
-    // .def("dataset_name",  &EvalParams::dataset_name )
-    // .def("with_viewer",  &EvalParams::with_viewer )
-    // .def("batch_size",  &EvalParams::batch_size )
-    // .def("checkpoint_path",  &EvalParams::checkpoint_path )
-    // .def("do_write_predictions",  &EvalParams::do_write_predictions )
-    // .def("output_predictions_path",  &EvalParams::output_predictions_path )
-    // ;
+    //EvalParams
+    py::class_<EvalParams, std::shared_ptr<EvalParams>   > (m, "EvalParams")
+    .def_static("create", &EvalParams::create<const std::string> ) //for templated methods like this one we need to explicitly instantiate one of the arguments
+    .def("dataset_name",  &EvalParams::dataset_name )
+    .def("with_viewer",  &EvalParams::with_viewer )
+    .def("checkpoint_path",  &EvalParams::checkpoint_path )
+    .def("do_write_predictions",  &EvalParams::do_write_predictions )
+    .def("output_predictions_path",  &EvalParams::output_predictions_path )
+    ;
 
     //ModelParams
     py::class_<ModelParams, std::shared_ptr<ModelParams>   > (m, "ModelParams")
