@@ -81,6 +81,7 @@
 
     RERUNS
         -rerun semantic kitti
+            model_e_5_0.5141485143006357
         -rerun scannet
             on infcuda2 got iou_eval of 57.081 on epoch 68 on /home/user/rosu/data/scannet/saved_models/after_icra_experiments_none
             on infcuda2 running with a pointnet of 32 instead of 64 and possibly also with a fixed deform slice: /home/user/rosu/data/scannet/saved_models/after_icra_experiments_none_fixed_deform_slice_pointnet_32
