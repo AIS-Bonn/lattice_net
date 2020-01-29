@@ -141,7 +141,7 @@ def run():
                             pred_path=to_save_path+"_pred.ply"
                             gt_path=to_save_path+"_gt.ply"
                             # print("writing prediction to ", pred_path)
-                            write_prediction(pred_softmax, cloud, pred_path)
+                            # write_prediction(pred_softmax, cloud, pred_path)
                             write_gt(cloud, gt_path)
 
 
@@ -151,6 +151,13 @@ def run():
                             with open(labels_file, 'w') as f:
                                 for i in range(l_pred.shape[0]):
                                     line= str(l_pred[i]) + "\n"
+                                    f.write(line)
+                            #write GT labels file (just a file containing for each point the predicted label)
+                            gt = np.squeeze(cloud.L_gt)
+                            labels_file= os.path.join(path_before_file, (basename+".gt") )                
+                            with open(labels_file, 'w') as f:
+                                for i in range(gt.shape[0]):
+                                    line= str(gt[i]) + "\n"
                                     f.write(line)
 
 
