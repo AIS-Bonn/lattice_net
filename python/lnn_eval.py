@@ -88,6 +88,9 @@ def run():
     #model 
     model=LNN_skippy_efficient(loader_test.label_mngr().nr_classes(), model_params, False, False).to("cuda")
 
+    predictions_list=[]
+    scores_list=[]
+
     while True:
 
         for phase in phases:
@@ -140,6 +143,56 @@ def run():
                             # print("writing prediction to ", pred_path)
                             write_prediction(pred_softmax, cloud, pred_path)
                             write_gt(cloud, gt_path)
+
+                            #check the predictions from tangentconv and get how much different we are from it. We want to show an image of the biggest change in accuracy
+                            #we want the difference to gt to be small and the difference to tangent conv to be big
+                            tangentconv_path="/home/user/rosu/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21"
+                            cloud_path_without_seq=os.path.abspath(os.path.join(os.path.dirname(cloud_path_full), "../"))
+                            cloud_path_with_seq=os.path.relpath( cloud_path_full, cloud_path_without_seq  )
+                            seq=os.path.dirname(cloud_path_with_seq)
+                            path_to_tangentconv_pred=os.path.join(tangentconv_path, seq,  (basename + ".label")  )
+                            print("path_to_tangentconv_pred", path_to_tangentconv_pred)
+
+                            f = open(path_to_tangentconv_pred, "r")
+                            tangentconv_labels = np.fromfile(f, dtype=np.uint32)
+
+                            #compute score 
+                            l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+                            gt = np.squeeze(cloud.L_gt)
+                            # print("gt shape", gt.shape)
+                            # print("l_pref shape", l_pred.shape)
+                            # print("tangentconv_labels shape", tangentconv_labels.shape)
+                            point_is_valid = gt!=0
+                            point_is_different_than_gt = gt != l_pred
+                            diff_to_gt_boolean_vec = np.logical_and(point_is_different_than_gt, point_is_valid)
+                            diff_to_gt= (diff_to_gt_boolean_vec ).sum()
+                            diff_to_tangentconv = (l_pred != tangentconv_labels).sum()
+                            # print("diff to gt  is ", diff_to_gt)
+                            # print("diff to tangentconv  is ", diff_to_tangentconv)
+                            score=diff_to_tangentconv-diff_to_gt ##we try to maximize this score
+                            print("score is ", score)
+
+                            #store the score and the path in a list
+                            predictions_list.append(cloud_path_head)
+                            scores_list.append(score)
+                            # print("predictions_list",predictions_list)
+                            # print("score_lists",scores_list)
+
+                            #sort based on score https://stackoverflow.com/a/6618543
+                            predictions_sorted=[predictions_list for _,predictions_list in sorted(zip(scores_list,predictions_list))]
+                            scores_sorted=np.sort(scores_list)
+                            # print("predictions_sorted",predictions_sorted)
+                            # print("scores_sorted",scores_sorted)
+                            # print("predictions_list",predictions_list)
+                            # print("score_lists",scores_list)
+
+
+                            #write the sorted predictions to file 
+                            best_predictions_file=os.path.join(eval_params.output_predictions_path(), "best_preds.txt")
+                            with open(best_predictions_file, 'w') as f:
+                                for item in predictions_sorted:
+                                    f.write("%s\n" % item)
+
 
                 if phase.loader.is_finished():
                     pbar.close()
