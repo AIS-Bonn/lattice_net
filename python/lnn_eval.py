@@ -18,6 +18,7 @@ from callbacks.visdom_callback import *
 from callbacks.state_callback import *
 from callbacks.phase import *
 
+#semantickitt on infcuda2
 
 
 config_file="lnn_eval_semantic_kitti.cfg"
@@ -45,7 +46,7 @@ def create_loader(dataset_name, config_file):
 
 def run():
     config_path=os.path.join( os.path.dirname( os.path.realpath(__file__) ) , '../config', config_file)
-    if train_params.with_viewer():
+    if eval_params.with_viewer():
         view=Viewer.create(config_path)
 
     first_time=True
@@ -61,7 +62,7 @@ def run():
         StateCallback() #changes the iter nr epoch nr,
     ])
     #create loaders
-    loader_test=create_loader(train_params.dataset_name(), config_path)
+    loader_test=create_loader(eval_params.dataset_name(), config_path)
     loader_test.set_mode_test()
     if isinstance(loader_test, DataLoaderSemanticKitti):
         loader_test.set_sequence("all") #for smenantic kitti in case the train one only trains on only one sequence we still want to test on all
@@ -106,10 +107,10 @@ def run():
                             #need to rerun forward with the new parameters to get an accurate prediction
                             pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
 
-                        cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=0, phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
+                        cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=0, phase=phase, lr=0) #visualizes the prediction 
                         pbar.update(1)
 
-                        if do_write_predictions:
+                        if eval_params.do_write_predictions():
                             # full path in which we save the cloud depends on the data loader. If it's semantic kitti we save also with the sequence, if it's scannet
                             cloud_path=cloud.m_disk_path
                             print("cloud_path is ", cloud_path)
@@ -128,7 +129,7 @@ def run():
                     cb.phase_ended(phase=phase) 
 
 
-                if train_params.with_viewer():
+                if eval_params.with_viewer():
                     view.update()
 
 
