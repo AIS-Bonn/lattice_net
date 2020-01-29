@@ -21,10 +21,13 @@ loader.start()
 
 arr=np.load("/home/rosu/Downloads/prediction.npz")
 data=arr["arr_0"]
+print("data has shape ", data.shape)
 
 mesh=Mesh()
 mesh.V=data[:,0:3]
+print("V is ", mesh.V.shape)
 mesh.L_pred=data[:,3:4]
+print("pred is ", mesh.L_pred.shape)
 
 
 while True:
@@ -33,6 +36,7 @@ while True:
         cloud=loader.get_cloud()
 
         mesh.m_label_mngr=cloud.m_label_mngr
+        mesh.m_vis.m_show_points=True
         Scene.show(mesh,"mesh")
 
     view.update()

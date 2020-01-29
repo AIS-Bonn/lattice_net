@@ -43,9 +43,14 @@ while True:
 
         #load my prediction
         # my_pred=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/final_7_amsgrad_iou/18_pred.ply")
-        my_pred=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535_pred.ply")
+        # my_pred=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535_pred.ply")
+        my_pred_file="/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535.label"
+        my_pred=gt.clone()
+        f = open(my_pred_file, "r")
+        a = np.loadtxt(my_pred_file)
         my_pred.m_label_mngr=cloud.m_label_mngr
-        # my_pred.L_gt=cloud.L_gt
+        my_pred.L_pred=a
+        my_pred.m_vis.set_color_semanticpred()
         Scene.show(my_pred, "my_pred")
 
 
