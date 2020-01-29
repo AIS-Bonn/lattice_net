@@ -33,19 +33,27 @@ while True:
 
     if(loader.has_data()): 
         cloud=loader.get_cloud()
-        Scene.show(cloud, "gt")
+        # Scene.show(cloud, "gt")
+
+
+        #load gt
+        gt=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535_gt.ply")
+        Scene.show(gt, "gt")
+
 
         #load my prediction
-        my_pred=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/final_7_amsgrad_iou/18_pred.ply")
+        # my_pred=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/final_7_amsgrad_iou/18_pred.ply")
+        my_pred=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535_pred.ply")
         my_pred.m_label_mngr=cloud.m_label_mngr
-        my_pred.L_gt=cloud.L_gt
+        # my_pred.L_gt=cloud.L_gt
         Scene.show(my_pred, "my_pred")
 
 
 
         #load also the prediction from splatnet 
-        splatnet_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/splatnet_semantic_kitti_single_frame_final_predictions_11_21/15/predictions/001700.label"
-        cloud_splatnet=cloud.clone()
+        # splatnet_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/splatnet_semantic_kitti_single_frame_final_predictions_11_21/15/predictions/001700.label"
+        splatnet_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/splatnet_semantic_kitti_single_frame_final_predictions_11_21/19/predictions/000535.label"
+        cloud_splatnet=my_pred.clone()
         f = open(splatnet_pred_file, "r")
         a = np.fromfile(f, dtype=np.uint32)
         cloud_splatnet.L_pred=a
@@ -53,8 +61,9 @@ while True:
         Scene.show(cloud_splatnet, "splatnet")
 
         #load also the prediction from tangentconv
-        tangentconv_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21/15/001700.label"
-        cloud_tangentconv=cloud.clone()
+        # tangentconv_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21/15/001700.label"
+        tangentconv_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21/19/000535.label"
+        cloud_tangentconv=my_pred.clone()
         f = open(tangentconv_pred_file, "r")
         a = np.fromfile(f, dtype=np.uint32)
         cloud_tangentconv.L_pred=a
