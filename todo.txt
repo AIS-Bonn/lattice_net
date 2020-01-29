@@ -23,18 +23,22 @@
 
     -text changes 
         -groupnorm uses the default 32 groups.
+            DONE
         -gn-relu-conv became gn-conv-relu
             NO it didnt
         -add the dataset from the bonn activity maps
         -explain why shapenet is not so good sometimes (it is very saturated)
+            DONE
         -explain why scannet is not so good ( Minkowsky is run with 5cm and 2cm voxels= calculate what is the average number of points that fall into the influence of a vertex of a voxel and what is the average for our case)
         -make more of an effort to apply it to robotics (autonomous driving or autonomous perception in realtime)
         -hpflow has a nice explanation on why not they slice after each convolution. Maybe we need to say something like that
         -explain CRF ( add abreviation for Conditional Random Field)
+            DONE
         - Say in the peformance section: performance and especially memory constumption will likely improve with more specialized cuda kernels. One of the reasons of success of grid like sctructues are libraries like cuddnn which provide extremely  high performance. Since the sparse lattices are not a structure supported in maintream libraries,  the performance is not up to par. We however believe that with more optimization effort this can improve significantly.
         - the matrices D_vg and D_vf are never are not stored explicitly in memory as the PointNEt architecture operates over each point in the point cloud individually.
         - Implementation :
             DeformSlice and the last linear layer are performed in one fused cuda kernel in order to avoid storing high dimensional vectors for each point and then regress the class. 
+                DONE
             
 
     -things to try before we decide on a architecture
@@ -58,10 +62,18 @@
     -TODO 
         - recheck all related work papers to see if what we say is correct
         - find out which image did we use for the prediction of the cloud in semantic kitti
+            We have a few candidates: 
+                /home/user/rosu/data/semantic_kitti/test/19/001960.npz
+                /home/user/rosu/data/semantic_kitti/test/19/003756.npz
+                /home/user/rosu/data/semantic_kitti/test/15/000269.npz
+                /home/user/rosu/data/semantic_kitti/test/15/001700.npz
         - the arrows in slice and deform slice kinda go inside the circles, make them touch exactly
+            Done
         - add url for related work
             DONE
         -find out how much is the spacial extent of a vertex in latticenet
+            DOne
+        -fix the architecture because now the deform slice doesnt doa  gn-relu-conv
 
 
     RERUNS

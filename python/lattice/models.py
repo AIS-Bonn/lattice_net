@@ -1173,8 +1173,8 @@ class LNN_skippy_efficient(torch.nn.Module):
         with torch.set_grad_enabled(False):
             distributed, indices=self.distribute(ls, positions, values)
         TIME_END("distribute_py")
-        ls.compute_nr_points_per_lattice_vertex()
-        print( ls.nr_lattice_vertices() )
+        # ls.compute_nr_points_per_lattice_vertex()
+        # print( ls.nr_lattice_vertices() )
 
         # print("distributed has shape", distributed.shape)
         # print("indices has shape", indices.shape)
