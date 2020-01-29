@@ -126,94 +126,109 @@ def run():
                         pbar.update(1)
 
                         if eval_params.do_write_predictions():
-                            # full path in which we save the cloud depends on the data loader. If it's semantic kitti we save also with the sequence, if it's scannet
-                            cloud_path_full=cloud.m_disk_path
-                            # cloud_path=os.path.join(os.path.dirname(cloud_path), "../../")
-                            basename=os.path.splitext(os.path.basename(cloud_path_full))[0]
-                            cloud_path_base=os.path.abspath(os.path.join(os.path.dirname(cloud_path_full), "../../"))
-                            cloud_path_head=os.path.relpath( cloud_path_full, cloud_path_base  )
-                            # print("cloud_path_head is ", cloud_path_head)
-                            # print("basename is ", basename)
-                            path_before_file=os.path.join(eval_params.output_predictions_path(), os.path.dirname(cloud_path_head))
-                            os.makedirs(path_before_file, exist_ok=True)
-                            to_save_path=os.path.join(path_before_file, basename )
-                            print("saving in ", to_save_path)
-                            pred_path=to_save_path+"_pred.ply"
-                            gt_path=to_save_path+"_gt.ply"
-                            # print("writing prediction to ", pred_path)
-                            # write_prediction(pred_softmax, cloud, pred_path)
-                            write_gt(cloud, gt_path)
+                            if isinstance(loader_test, DataLoaderScanNet):
+                                to_save_path=os.path.join(eval_params.output_predictions_path(), cloud.name )
+                                print("saving in ", to_save_path)
+                                pred_path=to_save_path+"_pred.ply"
+                                gt_path=to_save_path+"_gt.ply"
+                                write_prediction(pred_softmax, cloud, pred_path)
+                                write_gt(cloud, gt_path)
 
 
-                            #write labels file (just a file containing for each point the predicted label)
-                            l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
-                            labels_file= os.path.join(path_before_file, (basename+".label") )                
-                            with open(labels_file, 'w') as f:
-                                for i in range(l_pred.shape[0]):
-                                    line= str(l_pred[i]) + "\n"
-                                    f.write(line)
-                            #write GT labels file (just a file containing for each point the predicted label)
-                            gt = np.squeeze(cloud.L_gt)
-                            labels_file= os.path.join(path_before_file, (basename+".gt") )                
-                            with open(labels_file, 'w') as f:
-                                for i in range(gt.shape[0]):
-                                    line= str(gt[i]) + "\n"
-                                    f.write(line)
+                                print("got cloud with name ", cloud.name)
+                                l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+                                cloud.L_pred=l_pred
+                                path_for_eval=os.path.join(eval_params.output_predictions_path(), "for_evaluation")
+                                os.makedirs(path_for_eval, exist_ok=True)
+                                loader_test.write_for_evaluating_on_scannet_server(cloud, path_for_eval)
+
+                                
+
+                            if isinstance(loader_test, DataLoaderSemanticKitti):
+                                # full path in which we save the cloud depends on the data loader. If it's semantic kitti we save also with the sequence, if it's scannet
+                                cloud_path_full=cloud.m_disk_path
+                                # cloud_path=os.path.join(os.path.dirname(cloud_path), "../../")
+                                basename=os.path.splitext(os.path.basename(cloud_path_full))[0]
+                                cloud_path_base=os.path.abspath(os.path.join(os.path.dirname(cloud_path_full), "../../"))
+                                cloud_path_head=os.path.relpath( cloud_path_full, cloud_path_base  )
+                                # print("cloud_path_head is ", cloud_path_head)
+                                # print("basename is ", basename)
+                                path_before_file=os.path.join(eval_params.output_predictions_path(), os.path.dirname(cloud_path_head))
+                                os.makedirs(path_before_file, exist_ok=True)
+                                to_save_path=os.path.join(path_before_file, basename )
+                                print("saving in ", to_save_path)
+                                pred_path=to_save_path+"_pred.ply"
+                                gt_path=to_save_path+"_gt.ply"
+                                # print("writing prediction to ", pred_path)
+                                # write_prediction(pred_softmax, cloud, pred_path)
+                                write_gt(cloud, gt_path)
 
 
+                                #write labels file (just a file containing for each point the predicted label)
+                                l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+                                labels_file= os.path.join(path_before_file, (basename+".label") )                
+                                with open(labels_file, 'w') as f:
+                                    for i in range(l_pred.shape[0]):
+                                        line= str(l_pred[i]) + "\n"
+                                        f.write(line)
+                                #write GT labels file (just a file containing for each point the predicted label)
+                                gt = np.squeeze(cloud.L_gt)
+                                labels_file= os.path.join(path_before_file, (basename+".gt") )                
+                                with open(labels_file, 'w') as f:
+                                    for i in range(gt.shape[0]):
+                                        line= str(gt[i]) + "\n"
+                                        f.write(line)
 
+                                #check the predictions from tangentconv and get how much different we are from it. We want to show an image of the biggest change in accuracy
+                                #we want the difference to gt to be small and the difference to tangent conv to be big
+                                tangentconv_path="/home/user/rosu/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21"
+                                cloud_path_without_seq=os.path.abspath(os.path.join(os.path.dirname(cloud_path_full), "../"))
+                                cloud_path_with_seq=os.path.relpath( cloud_path_full, cloud_path_without_seq  )
+                                seq=os.path.dirname(cloud_path_with_seq)
+                                path_to_tangentconv_pred=os.path.join(tangentconv_path, seq,  (basename + ".label")  )
+                                print("path_to_tangentconv_pred", path_to_tangentconv_pred)
 
-                            #check the predictions from tangentconv and get how much different we are from it. We want to show an image of the biggest change in accuracy
-                            #we want the difference to gt to be small and the difference to tangent conv to be big
-                            tangentconv_path="/home/user/rosu/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21"
-                            cloud_path_without_seq=os.path.abspath(os.path.join(os.path.dirname(cloud_path_full), "../"))
-                            cloud_path_with_seq=os.path.relpath( cloud_path_full, cloud_path_without_seq  )
-                            seq=os.path.dirname(cloud_path_with_seq)
-                            path_to_tangentconv_pred=os.path.join(tangentconv_path, seq,  (basename + ".label")  )
-                            print("path_to_tangentconv_pred", path_to_tangentconv_pred)
+                                f = open(path_to_tangentconv_pred, "r")
+                                tangentconv_labels = np.fromfile(f, dtype=np.uint32)
 
-                            f = open(path_to_tangentconv_pred, "r")
-                            tangentconv_labels = np.fromfile(f, dtype=np.uint32)
+                                #compute score 
+                                l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+                                gt = np.squeeze(cloud.L_gt)
+                                # print("gt shape", gt.shape)
+                                # print("l_pref shape", l_pred.shape)
+                                # print("tangentconv_labels shape", tangentconv_labels.shape)
+                                point_is_valid = gt!=0
+                                nr_valid_points=point_is_valid.sum()
+                                point_is_different_than_gt = gt != l_pred
+                                diff_to_gt = (np.logical_and(point_is_different_than_gt, point_is_valid)).sum()
+                                point_is_different_than_tangentconv = tangentconv_labels != l_pred
+                                diff_to_tangentconv = (np.logical_and(point_is_different_than_tangentconv, point_is_valid)).sum()
+                                # print("diff to gt  is ", diff_to_gt)
+                                # print("diff to tangentconv  is ", diff_to_tangentconv)
+                                score=diff_to_tangentconv-diff_to_gt ##we try to maximize this score
+                                score /=nr_valid_points #normalize by the number of points becuase otherwise the score will be squeed towards grabbing point clouds that are just gigantic because they have more points
+                                print("score is ", score)
 
-                            #compute score 
-                            l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
-                            gt = np.squeeze(cloud.L_gt)
-                            # print("gt shape", gt.shape)
-                            # print("l_pref shape", l_pred.shape)
-                            # print("tangentconv_labels shape", tangentconv_labels.shape)
-                            point_is_valid = gt!=0
-                            nr_valid_points=point_is_valid.sum()
-                            point_is_different_than_gt = gt != l_pred
-                            diff_to_gt = (np.logical_and(point_is_different_than_gt, point_is_valid)).sum()
-                            point_is_different_than_tangentconv = tangentconv_labels != l_pred
-                            diff_to_tangentconv = (np.logical_and(point_is_different_than_tangentconv, point_is_valid)).sum()
-                            # print("diff to gt  is ", diff_to_gt)
-                            # print("diff to tangentconv  is ", diff_to_tangentconv)
-                            score=diff_to_tangentconv-diff_to_gt ##we try to maximize this score
-                            score /=nr_valid_points #normalize by the number of points becuase otherwise the score will be squeed towards grabbing point clouds that are just gigantic because they have more points
-                            print("score is ", score)
+                                #store the score and the path in a list
+                                predictions_list.append(cloud_path_head)
+                                scores_list.append(score)
+                                # print("predictions_list",predictions_list)
+                                # print("score_lists",scores_list)
 
-                            #store the score and the path in a list
-                            predictions_list.append(cloud_path_head)
-                            scores_list.append(score)
-                            # print("predictions_list",predictions_list)
-                            # print("score_lists",scores_list)
+                                #sort based on score https://stackoverflow.com/a/6618543
+                                predictions_sorted=[predictions_list for _,predictions_list in sorted(zip(scores_list,predictions_list))]
+                                scores_sorted=np.sort(scores_list)
+                                # print("predictions_sorted",predictions_sorted)
+                                # print("scores_sorted",scores_sorted)
+                                # print("predictions_list",predictions_list)
+                                # print("score_lists",scores_list)
 
-                            #sort based on score https://stackoverflow.com/a/6618543
-                            predictions_sorted=[predictions_list for _,predictions_list in sorted(zip(scores_list,predictions_list))]
-                            scores_sorted=np.sort(scores_list)
-                            # print("predictions_sorted",predictions_sorted)
-                            # print("scores_sorted",scores_sorted)
-                            # print("predictions_list",predictions_list)
-                            # print("score_lists",scores_list)
-
-
-                            #write the sorted predictions to file 
-                            best_predictions_file=os.path.join(eval_params.output_predictions_path(), "best_preds.txt")
-                            with open(best_predictions_file, 'w') as f:
-                                for i in range(len(predictions_sorted)):
-                                    line= predictions_sorted[i] +  "    score: " +  str(scores_sorted[i]) + "\n"
-                                    f.write(line)
+                                #write the sorted predictions to file 
+                                best_predictions_file=os.path.join(eval_params.output_predictions_path(), "best_preds.txt")
+                                with open(best_predictions_file, 'w') as f:
+                                    for i in range(len(predictions_sorted)):
+                                        line= predictions_sorted[i] +  "    score: " +  str(scores_sorted[i]) + "\n"
+                                        f.write(line)
 
 
                 if phase.loader.is_finished():
