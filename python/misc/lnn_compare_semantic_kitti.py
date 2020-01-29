@@ -35,16 +35,21 @@ while True:
         cloud=loader.get_cloud()
         # Scene.show(cloud, "gt")
 
+        seq="19"
+        cloud_name="000535"
+
 
         #load gt
-        gt=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535_gt.ply")
+        # gt=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535_gt.ply")
+        gt=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/"+seq+"/"+cloud_name+"_gt.ply")
         Scene.show(gt, "gt")
 
 
         #load my prediction
         # my_pred=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/final_7_amsgrad_iou/18_pred.ply")
         # my_pred=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535_pred.ply")
-        my_pred_file="/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535.label"
+        # my_pred_file="/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535.label"
+        my_pred_file="/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/"+seq+"/"+cloud_name+".label"
         my_pred=gt.clone()
         f = open(my_pred_file, "r")
         a = np.loadtxt(my_pred_file)
@@ -57,7 +62,7 @@ while True:
 
         #load also the prediction from splatnet 
         # splatnet_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/splatnet_semantic_kitti_single_frame_final_predictions_11_21/15/predictions/001700.label"
-        splatnet_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/splatnet_semantic_kitti_single_frame_final_predictions_11_21/19/predictions/000535.label"
+        splatnet_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/splatnet_semantic_kitti_single_frame_final_predictions_11_21/"+seq+"/predictions/"+cloud_name+".label"
         cloud_splatnet=my_pred.clone()
         f = open(splatnet_pred_file, "r")
         a = np.fromfile(f, dtype=np.uint32)
@@ -67,7 +72,7 @@ while True:
 
         #load also the prediction from tangentconv
         # tangentconv_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21/15/001700.label"
-        tangentconv_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21/19/000535.label"
+        tangentconv_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21/"+seq+"/"+cloud_name+".label"
         cloud_tangentconv=my_pred.clone()
         f = open(tangentconv_pred_file, "r")
         a = np.fromfile(f, dtype=np.uint32)
