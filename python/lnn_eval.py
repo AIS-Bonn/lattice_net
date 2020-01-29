@@ -236,6 +236,7 @@ def run():
                     pbar.close()
                     cb.epoch_ended(phase=phase, model=model, save_checkpoint=False, checkpoint_path="" ) 
                     cb.phase_ended(phase=phase) 
+                    return
 
 
                 if eval_params.with_viewer():
