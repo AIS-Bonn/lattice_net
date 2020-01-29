@@ -41,10 +41,13 @@ while True:
         # seq="18"
         # cloud_name="001523"
 
+        point_size=12
+
 
         #load gt
         # gt=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535_gt.ply")
         gt=Mesh("/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/"+seq+"/"+cloud_name+"_gt.ply")
+        gt.m_vis.m_point_size=point_size
         Scene.show(gt, "gt")
 
 
@@ -54,6 +57,7 @@ while True:
         # my_pred_file="/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/19/000535.label"
         my_pred_file="/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test/"+seq+"/"+cloud_name+".label"
         my_pred=gt.clone()
+        my_pred.m_vis.m_point_size=point_size
         f = open(my_pred_file, "r")
         a = np.loadtxt(my_pred_file)
         my_pred.m_label_mngr=cloud.m_label_mngr
@@ -67,6 +71,7 @@ while True:
         # splatnet_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/splatnet_semantic_kitti_single_frame_final_predictions_11_21/15/predictions/001700.label"
         splatnet_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/splatnet_semantic_kitti_single_frame_final_predictions_11_21/"+seq+"/predictions/"+cloud_name+".label"
         cloud_splatnet=my_pred.clone()
+        cloud_splatnet.m_vis.m_point_size=point_size
         f = open(splatnet_pred_file, "r")
         a = np.fromfile(f, dtype=np.uint32)
         cloud_splatnet.L_pred=a
@@ -77,11 +82,14 @@ while True:
         # tangentconv_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21/15/001700.label"
         tangentconv_pred_file="/media/rosu/Data/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21/"+seq+"/"+cloud_name+".label"
         cloud_tangentconv=my_pred.clone()
+        cloud_tangentconv.m_vis.m_point_size=point_size
         f = open(tangentconv_pred_file, "r")
         a = np.fromfile(f, dtype=np.uint32)
         cloud_tangentconv.L_pred=a
         cloud_tangentconv.m_vis.set_color_semanticpred()
         Scene.show(cloud_tangentconv, "tangentconv")
+
+        view.m_camera.from_string("3.18081 306.493  215.98  -0.464654 0.00651987 0.00342135 0.885462       0 -6.3551       0 30 0.3 7830.87")
 
 
 
