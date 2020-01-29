@@ -39,6 +39,9 @@
         - Implementation :
             DeformSlice and the last linear layer are performed in one fused cuda kernel in order to avoid storing high dimensional vectors for each point and then regress the class. 
                 DONE
+        -In the section of performance for scannet we have a value of 7.6 GB that is not true anymore as the memory now went up to 11.7
+        -Say that the memory usage is largely influences by the number of points in the point cloud and the number of dimensions to which we elevate before the maxpooling operation. In some cases, the memory usage can be almost halfed by reducing the PointNet dimensionality from 64 to 32.
+        -Calculate the actual memory used when running scannet at pointnet of 32
             
 
     -things to try before we decide on a architecture

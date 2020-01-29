@@ -37,6 +37,7 @@ while True:
 
         seq="19"
         cloud_name="000535"
+        # cloud_name="002621"
 
 
         #load gt
