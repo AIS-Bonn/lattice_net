@@ -144,6 +144,18 @@ def run():
                             write_prediction(pred_softmax, cloud, pred_path)
                             write_gt(cloud, gt_path)
 
+
+                            #write labels file (just a file containing for each point the predicted label)
+                            l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+                            labels_file= os.path.join(path_before_file, (basename+".label") )                
+                            with open(labels_file, 'w') as f:
+                                for i in range(l_pred.shape[0]):
+                                    line= str(l_pred[i]) + "\n"
+                                    f.write(line)
+
+
+
+
                             #check the predictions from tangentconv and get how much different we are from it. We want to show an image of the biggest change in accuracy
                             #we want the difference to gt to be small and the difference to tangent conv to be big
                             tangentconv_path="/home/user/rosu/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21"
@@ -163,14 +175,15 @@ def run():
                             # print("l_pref shape", l_pred.shape)
                             # print("tangentconv_labels shape", tangentconv_labels.shape)
                             point_is_valid = gt!=0
+                            nr_valid_points=point_is_valid.sum()
                             point_is_different_than_gt = gt != l_pred
-                            diff_to_gt_boolean_vec = np.logical_and(point_is_different_than_gt, point_is_valid)
-                            diff_to_gt= (diff_to_gt_boolean_vec ).sum()
-                            diff_to_tangentconv = (l_pred != tangentconv_labels).sum()
+                            diff_to_gt = (np.logical_and(point_is_different_than_gt, point_is_valid)).sum()
+                            point_is_different_than_tangentconv = tangentconv_labels != l_pred
+                            diff_to_tangentconv = (np.logical_and(point_is_different_than_tangentconv, point_is_valid)).sum()
                             # print("diff to gt  is ", diff_to_gt)
                             # print("diff to tangentconv  is ", diff_to_tangentconv)
                             score=diff_to_tangentconv-diff_to_gt ##we try to maximize this score
-                            score /=gt.shape[0] #normalize by the number of points becuase otherwise the score will be squeed towards grabbing point clouds that are just gigantic because they have more points
+                            score /=nr_valid_points #normalize by the number of points becuase otherwise the score will be squeed towards grabbing point clouds that are just gigantic because they have more points
                             print("score is ", score)
 
                             #store the score and the path in a list
