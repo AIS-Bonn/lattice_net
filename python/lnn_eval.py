@@ -109,6 +109,16 @@ def run():
                         cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=0, phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
                         pbar.update(1)
 
+                        if do_write_predictions:
+                            # full path in which we save the cloud depends on the data loader. If it's semantic kitti we save also with the sequence, if it's scannet
+                            cloud_path=cloud.m_disk_path
+                            print("cloud_path is ", cloud_path)
+                            # pred_path=os.path.join(eval_params.output_predictions_path(), str(samples_test_processed)+"_pred.ply" )
+                            # gt_path=os.path.join(eval_params.output_predictions_path(), str(samples_test_processed)+"_gt.ply" )
+                            # print("writing prediction to ", pred_path)
+                            # write_prediction(pred_softmax, cloud, pred_path)
+                            # write_gt(cloud, gt_path)
+
                 if phase.loader.is_finished():
                     pbar.close()
                     if not is_training: #we reduce the learning rate when the test iou plateus
