@@ -29,6 +29,18 @@ torch.manual_seed(0)
 eval_params=EvalParams.create(config_file) 
 model_params=ModelParams.create(config_file)    
 
+def write_prediction(pred_softmax, cloud, pred_path):
+    mesh_pred=cloud.clone()
+    l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+    mesh_pred.color_from_label_indices(l_pred)
+    mesh_pred.L_pred=l_pred
+    mesh_pred.save_to_file(pred_path)
+    
+def write_gt(cloud, gt_path):
+    mesh_gt=cloud.clone()
+    mesh_gt.color_from_label_indices(cloud.L_gt)
+    mesh_gt.save_to_file(gt_path)
+
 
 def create_loader(dataset_name, config_file):
     if(dataset_name=="semantickitti"):
@@ -112,13 +124,22 @@ def run():
 
                         if eval_params.do_write_predictions():
                             # full path in which we save the cloud depends on the data loader. If it's semantic kitti we save also with the sequence, if it's scannet
-                            cloud_path=cloud.m_disk_path
-                            print("cloud_path is ", cloud_path)
-                            # pred_path=os.path.join(eval_params.output_predictions_path(), str(samples_test_processed)+"_pred.ply" )
-                            # gt_path=os.path.join(eval_params.output_predictions_path(), str(samples_test_processed)+"_gt.ply" )
+                            cloud_path_full=cloud.m_disk_path
+                            # cloud_path=os.path.join(os.path.dirname(cloud_path), "../../")
+                            basename=os.path.splitext(os.path.basename(cloud_path_full))[0]
+                            cloud_path_base=os.path.abspath(os.path.join(os.path.dirname(cloud_path_full), "../../"))
+                            cloud_path_head=os.path.relpath( cloud_path_full, cloud_path_base  )
+                            # print("cloud_path_head is ", cloud_path_head)
+                            # print("basename is ", basename)
+                            path_before_file=os.path.join(eval_params.output_predictions_path(), os.path.dirname(cloud_path_head))
+                            os.makedirs(path_before_file, exist_ok=True)
+                            to_save_path=os.path.join(path_before_file, basename )
+                            print("saving in ", to_save_path)
+                            pred_path=to_save_path+"_pred.ply"
+                            gt_path=to_save_path+"_gt.ply"
                             # print("writing prediction to ", pred_path)
-                            # write_prediction(pred_softmax, cloud, pred_path)
-                            # write_gt(cloud, gt_path)
+                            write_prediction(pred_softmax, cloud, pred_path)
+                            write_gt(cloud, gt_path)
 
                 if phase.loader.is_finished():
                     pbar.close()
