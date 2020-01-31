@@ -142,7 +142,8 @@ def run():
                             scheduler.step(phase.loss_acum_per_epoch) #for ReduceLROnPlateau
                     cb.epoch_ended(phase=phase, model=model, save_checkpoint=train_params.save_checkpoint(), checkpoint_path=train_params.checkpoint_path() ) 
                     cb.phase_ended(phase=phase) 
-                    # Profiler.print_all_stats()
+                    if not phase.grad:
+                        Profiler.print_all_stats()
 
 
                 if train_params.with_viewer():
