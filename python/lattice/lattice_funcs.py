@@ -226,7 +226,8 @@ class ConvIm2RowLattice(Function):
         # ctx.save_for_backward(filter_bank, bias, lattice_py.lattice_rowified() ) 
         # print("saving for backwards convolved lattice which has nr filled", convolved_lattice_py.lattice.m_hash_table.m_nr_filled_tensor)
         # print("saving for backwards, filter_bank of shape", filter_bank.shape, "lattice rowified ", lattice_py.lattice_rowified().shape , "lattice_neighbours_values" )
-        ctx.save_for_backward(filter_bank, lattice_py.lattice_rowified(), lattice_neighbours_values ) 
+        # ctx.save_for_backward(filter_bank, lattice_py.lattice_rowified(), lattice_neighbours_values ) 
+        ctx.save_for_backward(filter_bank, lattice_values, lattice_neighbours_values ) 
         ctx.lattice_py=lattice_py
         # ctx.convolved_lattice_py=convolved_lattice_py #seems like its a bad idea to store an output because in the backwards pass this object might not be in the same state as we expected it to
         ctx.lattice_neighbours_structure=lattice_neighbours_structure
@@ -281,8 +282,12 @@ class ConvIm2RowLattice(Function):
         val_full_dim=ctx.val_full_dim
 
         # lattice_rowified=lattice_py.lattice_rowified()   
-        filter_bank, lattice_rowified, lattice_neighbours_values =ctx.saved_tensors
+        filter_bank, lattice_values, lattice_neighbours_values =ctx.saved_tensors
         filter_extent=int(filter_bank.shape[0]/val_full_dim)
+
+        #reconstruct lattice_rowified 
+        lattice_py.set_values(lattice_values)
+        lattice_rowified= lattice_py.im2row(filter_extent, lattice_neighbours_structure, dilation, use_center_vertex_from_lattice_neighbours, False)
 
         filter_bank_transposed=filter_bank.transpose(0,1) 
         if(ctx.with_homogeneous_coord):
