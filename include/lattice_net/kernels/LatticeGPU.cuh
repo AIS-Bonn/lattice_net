@@ -3097,7 +3097,6 @@ __global__ void slice_classify_with_precomputation(const float* positions,  floa
 
     const float* delta_weights_row=delta_weights+idx*(pos_dim+1); //delta_weights has shape nr_positions x (pos_dim+1)
 
-    int key[pos_dim];
     for (int remainder = 0; remainder <= pos_dim; remainder++) {
         int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + remainder];
         if(splatting_idx>=0){
