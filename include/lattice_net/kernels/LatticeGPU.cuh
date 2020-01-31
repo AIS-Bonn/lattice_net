@@ -422,9 +422,9 @@ public:
 
 
             m_lattice_program.kernel("slice_classify_with_precomputation")
-                        .instantiate(pos_dim, val_full_dim)
+                        .instantiate(pos_dim, val_full_dim, nr_classes)
                         .configure(blocks, blockSize)
-                        .launch( positions, class_logits, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
+                        .launch( positions, class_logits, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
             CUDA_CHECK_ERROR();
         }
 
@@ -3079,14 +3079,16 @@ __global__ void slice_classify_no_precomputation(const float* positions,  float*
 
 
 
-template<int pos_dim, int val_full_dim>
-__global__ void slice_classify_with_precomputation(const float* positions,  float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+template<int pos_dim, int val_full_dim, int nr_classes>
+__global__ void slice_classify_with_precomputation(const float* positions,  float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
 
     if(idx>=nr_positions){ //don't go out of bounds
         return;
     }
+
+    // return;
 
 
 
@@ -3114,11 +3116,25 @@ __global__ void slice_classify_with_precomputation(const float* positions,  floa
     
     }
 
+    // return;
+
     //now the value need to pass through a linear layer
     float* logits_out_for_cur_position=class_logits+idx*nr_classes;//class_logits has shape nr_positions x nr_classes
 
+
+    //load the weights of the linear layers into shared mem 
+    __shared__ float linear_weights_shared[nr_classes*val_full_dim];
+    if (threadIdx.x == 0 ){
+        for (int i = 0; i < nr_classes*val_full_dim; i++) {
+            linear_weights_shared[i]=linear_clasify_weight[i];
+        }
+    }
+    __syncthreads();
+
+
     for (int c = 0; c < nr_classes; c++) {
-        const float* weight_for_class= linear_clasify_weight+ c*val_full_dim;
+        // const float* weight_for_class= linear_clasify_weight+ c*val_full_dim;
+        const float* weight_for_class= linear_weights_shared+ c*val_full_dim;
         for (int val_idx = 0; val_idx < val_full_dim; val_idx++) {
             //WARNING linear clasify weight has shape nr_classes x val_Full_dim. So in the tranposed way that we would expect if it was just a mtrix multiply
             // if (c==0 && val_idx==0){

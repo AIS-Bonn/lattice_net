@@ -28,7 +28,6 @@
 #define CONFIGURU_IMPLICIT_CONVERSIONS 1
 #include <configuru.hpp>
 using namespace configuru;
-
 //Add this header after we add all cuda stuff because we need the profiler to have cudaDeviceSyncronize defined
 #define ENABLE_CUDA_PROFILING 1
 #include "Profiler.h" 
@@ -1094,7 +1093,7 @@ torch::Tensor Lattice::slice_classify_with_precomputation(torch::Tensor& positio
     m_hash_table->update_impl();
 
 
-    TIME_START("slice_classify");
+    TIME_START("slice_classify_cuda");
     m_impl->slice_classify_with_precomputation( positions.data<float>(), 
                                               m_sliced_values_hom_tensor.data<float>(), 
                                               delta_weights.data<float>(), 
@@ -1107,7 +1106,7 @@ torch::Tensor Lattice::slice_classify_with_precomputation(torch::Tensor& positio
                                               m_splatting_indices_tensor.data<int>(), 
                                               m_splatting_weights_tensor.data<float>(), 
                                               *(m_hash_table->m_impl) );
-    TIME_END("slice_classify");
+    TIME_END("slice_classify_cuda");
 
     return m_sliced_values_hom_tensor;
 

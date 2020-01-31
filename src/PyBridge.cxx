@@ -79,7 +79,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def("slice_standalone_no_precomputation", &Lattice::slice_standalone_no_precomputation )
     .def("slice_elevated_verts", &Lattice::slice_elevated_verts )
     .def("slice_classify_no_precomputation", &Lattice::slice_classify_no_precomputation )
-    .def("slice_classify_with_precomputation", &Lattice::slice_classify_no_precomputation )
+    .def("slice_classify_with_precomputation", &Lattice::slice_classify_with_precomputation )
     .def("gather_standalone_no_precomputation", &Lattice::gather_standalone_no_precomputation )
     .def("gather_standalone_with_precomputation", &Lattice::gather_standalone_with_precomputation )
     .def("gather_elevated_standalone_no_precomputation", &Lattice::gather_elevated_standalone_no_precomputation )

@@ -23,8 +23,8 @@ from optimizers.over9000.radam import *
 
 
 # config_file="lnn_train_shapenet.cfg"
-# config_file="lnn_train_semantic_kitti.cfg"
-config_file="lnn_train_scannet.cfg"
+config_file="lnn_train_semantic_kitti.cfg"
+# config_file="lnn_train_scannet.cfg"
 
 torch.manual_seed(0)
 # torch.autograd.set_detect_anomaly(True)
@@ -106,7 +106,9 @@ def run():
                     with torch.set_grad_enabled(is_training):
                         cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
                         positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
+                        TIME_START("forward")
                         pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+                        TIME_END("forward")
                         loss = loss_fn(pred_softmax, target)
                         #print("pred_softmax has shape ", pred_softmax.shape, "target is ", target.shape)
                         loss += secondary_fn(pred_softmax, target)
@@ -133,6 +135,7 @@ def run():
                         cb.after_backward_pass()
                         optimizer.step()
 
+                    Profiler.print_all_stats()
 
 
                 if phase.loader.is_finished():
@@ -142,8 +145,7 @@ def run():
                             scheduler.step(phase.loss_acum_per_epoch) #for ReduceLROnPlateau
                     cb.epoch_ended(phase=phase, model=model, save_checkpoint=train_params.save_checkpoint(), checkpoint_path=train_params.checkpoint_path() ) 
                     cb.phase_ended(phase=phase) 
-                    if not phase.grad:
-                        Profiler.print_all_stats()
+                    # if not phase.grad:
 
 
                 if train_params.with_viewer():
