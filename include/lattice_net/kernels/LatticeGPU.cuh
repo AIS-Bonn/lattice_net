@@ -269,7 +269,7 @@ public:
         //creates a lattice rowified by grabbing the values of the neighbours from the hash_table_neighbours. The neigbhours are the neighbours of the keys in hash_table_query. Useful for lattices which are at different coarsenes levels
         void im2row(const int nr_vertices, const int pos_dim, const int val_full_dim, const int dilation, float* im2row_out, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neighbours, const bool flip_neighbours, const bool debug_kernel){
 
-            int block_size = 256;
+            int block_size = 128;
             int nr_blocks=nr_vertices/block_size;
             // check for partial block at the end
             if(nr_vertices % block_size) ++nr_blocks; 

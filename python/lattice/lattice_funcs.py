@@ -287,6 +287,8 @@ class ConvIm2RowLattice(Function):
 
         #reconstruct lattice_rowified 
         lattice_py.set_values(lattice_values)
+        if(lattice_neighbours_structure is not None):
+            lattice_neighbours_structure.set_values(lattice_neighbours_values)
         lattice_rowified= lattice_py.im2row(filter_extent, lattice_neighbours_structure, dilation, use_center_vertex_from_lattice_neighbours, False)
 
         filter_bank_transposed=filter_bank.transpose(0,1) 
