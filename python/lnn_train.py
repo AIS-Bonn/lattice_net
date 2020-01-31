@@ -6,6 +6,7 @@ import sys
 import os
 import numpy as np
 from tqdm import tqdm
+import time
 
 from easypbr  import *
 from dataloaders import *
@@ -23,8 +24,8 @@ from optimizers.over9000.radam import *
 
 
 # config_file="lnn_train_shapenet.cfg"
-config_file="lnn_train_semantic_kitti.cfg"
-# config_file="lnn_train_scannet.cfg"
+# config_file="lnn_train_semantic_kitti.cfg"
+config_file="lnn_train_scannet.cfg"
 
 torch.manual_seed(0)
 # torch.autograd.set_detect_anomaly(True)
@@ -76,6 +77,7 @@ def run():
     if isinstance(loader_test, DataLoaderScanNet):
         loader_test.set_mode_validation() #scannet doesnt have a ground truth for the test set so we use the validation set
     loader_test.start()
+    time.sleep(5) #wait a bit so that we actually have some data from the loaders
     #create phases
     phases= [
         Phase('train', loader_train, grad=True),
@@ -135,7 +137,7 @@ def run():
                         cb.after_backward_pass()
                         optimizer.step()
 
-                    Profiler.print_all_stats()
+                    # Profiler.print_all_stats()
 
 
                 if phase.loader.is_finished():
