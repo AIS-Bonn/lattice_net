@@ -351,6 +351,21 @@ public:
 
         }
 
+        void gather_standalone_with_precomputation(const float* positions, float* gathered_values, const int pos_dim, const int val_full_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
+
+        // do it with jitify
+        dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+        dim3 blockSize(BLOCK_SIZE, 1, 1);
+
+        m_lattice_program.kernel("gather_with_precomputation")
+                    .instantiate(pos_dim, val_full_dim)
+                    .configure(blocks, blockSize)
+                    .launch( positions, gathered_values, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
+        CUDA_CHECK_ERROR();
+        }
+
+        
+
         void gather_elevated_standalone_no_precomputation(const int* keys, float* gathered_values, const int pos_dim, const int val_full_dim, const int nr_vertices, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu_to_gather_from, const int lattice_to_gather_from_lvl, const int elevated_verts_lvl){
 
             // do it with jitify
@@ -391,6 +406,22 @@ public:
 
 
             m_lattice_program.kernel("slice_classify_no_precomputation")
+                        .instantiate(pos_dim, val_full_dim)
+                        .configure(blocks, blockSize)
+                        .launch( positions, class_logits, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
+            CUDA_CHECK_ERROR();
+        }
+
+
+        void slice_classify_with_precomputation(const float* positions, float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int pos_dim, const int val_full_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
+
+
+            // do it with jitify
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
+
+
+            m_lattice_program.kernel("slice_classify_with_precomputation")
                         .instantiate(pos_dim, val_full_dim)
                         .configure(blocks, blockSize)
                         .launch( positions, class_logits, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
@@ -2576,6 +2607,51 @@ __global__ void gather_no_precomputation(const float* positions,  float* gathere
 
 }
 
+
+
+template<int pos_dim, int val_full_dim>
+__global__ void gather_with_precomputation(const float* positions,  float* gathered_values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+
+    int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
+
+
+    if(idx>=nr_positions){ //don't go out of bounds
+        return;
+    }
+
+
+    //here we accumulate the values and the homogeneous term
+    // float ga[val_full_dim]{0};
+    int row_size_gathered=(pos_dim+1)*(val_full_dim+1);
+    float* gathered_row = gathered_values + idx * row_size_gathered;
+
+    int key[pos_dim];
+    for (int remainder = 0; remainder <= pos_dim; remainder++) {
+        int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + remainder];
+        if(splatting_idx>=0){
+            float weight = splatting_weights[ idx * (pos_dim + 1) + remainder];
+            float *val = const_cast<float *>(hash_table.m_values + splatting_idx * val_full_dim );
+
+            //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
+            int idx_in_row=remainder*( val_full_dim + 1 );
+            for (int i = 0; i < val_full_dim ; i++){
+                gathered_row[idx_in_row + i] = val[i]*weight;
+            }
+            gathered_row[idx_in_row+val_full_dim]=weight;
+
+        }
+
+
+
+       
+
+
+    }
+
+
+
+}
+
 template<int pos_dim, int val_full_dim>
 __global__ void gather_elevated_no_precomputation(const int* keys,  float* gathered_values, const int nr_vertices, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table_to_gather_from, const int lattice_to_gather_from_lvl, const int elevated_verts_lvl) {
 
@@ -2978,6 +3054,64 @@ __global__ void slice_classify_no_precomputation(const float* positions,  float*
                 // printf("delta weight is   %f \n", delta_weights_row[remainder] );
             }
         }
+    
+    }
+
+    //now the value need to pass through a linear layer
+    float* logits_out_for_cur_position=class_logits+idx*nr_classes;//class_logits has shape nr_positions x nr_classes
+
+    for (int c = 0; c < nr_classes; c++) {
+        const float* weight_for_class= linear_clasify_weight+ c*val_full_dim;
+        for (int val_idx = 0; val_idx < val_full_dim; val_idx++) {
+            //WARNING linear clasify weight has shape nr_classes x val_Full_dim. So in the tranposed way that we would expect if it was just a mtrix multiply
+            // if (c==0 && val_idx==0){
+                // printf("logits_out_for_cur_position  %f \n", logits_out_for_cur_position[0] );
+            // }
+            logits_out_for_cur_position[c]+=weight_for_class[val_idx]*val_hom[val_idx];
+        }
+        logits_out_for_cur_position[c]+=linear_clasify_bias[c];
+    }
+
+  
+
+}
+
+
+
+
+template<int pos_dim, int val_full_dim>
+__global__ void slice_classify_with_precomputation(const float* positions,  float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+
+    int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
+
+    if(idx>=nr_positions){ //don't go out of bounds
+        return;
+    }
+
+
+
+
+
+    //here we accumulate the values and the homogeneous term
+    float val_hom[val_full_dim]{0};
+
+    const float* delta_weights_row=delta_weights+idx*(pos_dim+1); //delta_weights has shape nr_positions x (pos_dim+1)
+
+    int key[pos_dim];
+    for (int remainder = 0; remainder <= pos_dim; remainder++) {
+        int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + remainder];
+        if(splatting_idx>=0){
+            float weight = splatting_weights[ idx * (pos_dim + 1) + remainder];
+            float *val = const_cast<float *>(hash_table.m_values + splatting_idx * val_full_dim );
+
+            //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
+            for (int i = 0; i < val_full_dim ; i++){
+                val_hom[i]+= val[i]* (weight+delta_weights_row[remainder]);
+            }
+
+        }
+
+  
     
     }
 

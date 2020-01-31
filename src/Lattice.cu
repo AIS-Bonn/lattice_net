@@ -877,6 +877,62 @@ torch::Tensor Lattice::gather_elevated_standalone_no_precomputation(const std::s
 
 }
 
+
+torch::Tensor Lattice::gather_standalone_with_precomputation(torch::Tensor& positions_raw){
+
+    // set_and_check_input(positions_raw, values);
+    CHECK(positions_raw.scalar_type()==at::kFloat) << "positions should be of type float";
+    CHECK(positions_raw.dim()==3) << "positions should have dim 3 correspondin to NHW. However it has sizes" << positions_raw.sizes();
+    //set position and check that the sigmas were set correctly
+    m_pos_dim=positions_raw.size(2);
+    CHECK(m_sigmas.size()==m_pos_dim) <<"One must set sigmas for each dimension of the positions. Use set_sigmas. m_sigmas is " << m_sigmas.size() << " m_pos dim is " <<m_pos_dim;
+    CHECK(m_val_dim!=-1) << "m_val_dim is -1. We have to splat something first so that the m_val_dim gets set.";
+    int nr_positions=positions_raw.size(1);
+    m_pos_dim=positions_raw.size(2);
+
+
+     //to cuda
+    TIME_START("upload_cuda");
+    positions_raw=positions_raw.to("cuda");
+    m_sigmas_tensor=m_sigmas_tensor.to("cuda");
+    TIME_END("upload_cuda");
+
+    TIME_START("scale_by_sigma");
+    VLOG(3) << "gather standalone scaling by a sigma of " << m_sigmas_tensor;
+    Tensor positions=positions_raw/m_sigmas_tensor;
+    TIME_END("scale_by_sigma")
+
+    //initialize the output values to zero 
+    int row_size_gathered=(m_pos_dim+1)*(m_val_full_dim+1); //we have m_pos_dim+1 vertices in a lattice and each has values of m_val_full_dim plus a barycentric coord
+    if( !m_gathered_values_tensor.defined() || m_gathered_values_tensor.size(0)!= 1 || m_gathered_values_tensor.size(1)!=nr_positions || m_gathered_values_tensor.size(2)!=row_size_gathered){
+        m_gathered_values_tensor=torch::zeros({1, nr_positions, row_size_gathered}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+    }else{
+        m_gathered_values_tensor.fill_(0);
+    }
+
+    //assume we have already splatting weight and indices
+    if( !m_splatting_indices_tensor.defined() || !m_splatting_weights_tensor.defined()  || m_splatting_indices_tensor.size(0)!=nr_positions*(m_pos_dim+1) ||  m_splatting_weights_tensor.size(0)!=nr_positions*(m_pos_dim+1)  ){
+        LOG(FATAL) << "Indices or wegiths tensor is not created or doesnt have the correct size. We are assuming it has size " << nr_positions*(m_pos_dim+1) << "but indices has size " << m_splatting_indices_tensor.sizes() << " m_splatting_weights_tensor have size "  << m_splatting_weights_tensor.sizes();
+    //     m_splatting_indices_tensor = torch::zeros({nr_vertices*(m_pos_dim+1) }, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
+    //     m_splatting_weights_tensor = torch::zeros({nr_vertices*(m_pos_dim+1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+    }
+    // if( !m_splatting_indices_tensor.defined() || m_splatting_indices_tensor.size(0)!=nr_positions*(m_pos_dim+1)  ){
+    //     m_splatting_indices_tensor = torch::zeros({nr_positions*(m_pos_dim+1) }, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
+    //     m_splatting_weights_tensor = torch::zeros({nr_positions*(m_pos_dim+1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+    // }
+    // m_splatting_indices_tensor.fill_(-1);
+    // m_splatting_weights_tensor.fill_(-1);
+    m_hash_table->update_impl();
+
+
+    TIME_START("gather");
+    m_impl->gather_standalone_with_precomputation( positions.data<float>(), m_gathered_values_tensor.data<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), *(m_hash_table->m_impl) );
+    TIME_END("gather");
+
+    return m_gathered_values_tensor;
+
+}
+
 std::shared_ptr<Lattice> Lattice::slice_elevated_verts(const std::shared_ptr<Lattice> lattice_to_slice_from){
     // hash_table_to_slice_from
         // void slice_elevated_verts(const int hash_table_capacity, float* sliced_values, const int pos_dim, const int val_full_dim, int* splatting_indices, float* splatting_weights, const HashTableGPU& hash_table_to_slice_from, const HashTableGPU& hash_table_elevated_verts, const int lattice_to_slice_from_lvl, const int elevated_vert_lvl){
@@ -969,6 +1025,77 @@ torch::Tensor Lattice::slice_classify_no_precomputation(torch::Tensor& positions
 
     TIME_START("slice_classify");
     m_impl->slice_classify_no_precomputation( positions.data<float>(), 
+                                              m_sliced_values_hom_tensor.data<float>(), 
+                                              delta_weights.data<float>(), 
+                                              linear_clasify_weight.data<float>(), 
+                                              linear_clasify_bias.data<float>(), 
+                                              nr_classes,
+                                              m_pos_dim, 
+                                              m_val_full_dim,  
+                                              nr_positions, 
+                                              m_splatting_indices_tensor.data<int>(), 
+                                              m_splatting_weights_tensor.data<float>(), 
+                                              *(m_hash_table->m_impl) );
+    TIME_END("slice_classify");
+
+    return m_sliced_values_hom_tensor;
+
+}
+
+
+torch::Tensor Lattice::slice_classify_with_precomputation(torch::Tensor& positions_raw, torch::Tensor& delta_weights, torch::Tensor& linear_clasify_weight, torch::Tensor& linear_clasify_bias, const int nr_classes){
+
+    // set_and_check_input(positions_raw, values);
+    CHECK(positions_raw.scalar_type()==at::kFloat) << "positions should be of type float";
+    CHECK(positions_raw.dim()==3) << "positions should have dim 3 correspondin to NHW. However it has sizes" << positions_raw.sizes();
+    //set position and check that the sigmas were set correctly
+    m_pos_dim=positions_raw.size(2);
+    int nr_positions=positions_raw.size(1);
+    CHECK(m_sigmas.size()==m_pos_dim) <<"One must set sigmas for each dimension of the positions. Use set_sigmas. m_sigmas is " << m_sigmas.size() << " m_pos dim is " <<m_pos_dim;
+    CHECK(m_val_dim!=-1) << "m_val_dim is -1. We have to splat something first so that the m_val_dim gets set.";
+
+
+     //to cuda
+    TIME_START("upload_cuda");
+    positions_raw=positions_raw.to("cuda");
+    m_sigmas_tensor=m_sigmas_tensor.to("cuda");
+    delta_weights=delta_weights.to("cuda");
+    linear_clasify_weight=linear_clasify_weight.to("cuda");
+    linear_clasify_bias=linear_clasify_bias.to("cuda");
+    TIME_END("upload_cuda");
+
+    TIME_START("scale_by_sigma");
+    VLOG(3) << "slice standalone scaling by a sigma of " << m_sigmas_tensor;
+    Tensor positions=positions_raw/m_sigmas_tensor;
+    TIME_END("scale_by_sigma")
+
+    //we store here the class logits directly
+    if( !m_sliced_values_hom_tensor.defined() || m_sliced_values_hom_tensor.size(0)!= 1 || m_sliced_values_hom_tensor.size(1)!=nr_positions || m_sliced_values_hom_tensor.size(2)!=nr_classes){
+        m_sliced_values_hom_tensor=torch::zeros({1, nr_positions, nr_classes}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+    }else{
+        m_sliced_values_hom_tensor.fill_(0);
+    }
+
+
+    // //recalculate the splatting indices and weight for the backward pass of the slice
+    // if( !m_splatting_indices_tensor.defined() || m_splatting_indices_tensor.size(0)!=nr_positions*(m_pos_dim+1)  ){
+    //     m_splatting_indices_tensor = torch::zeros({nr_positions*(m_pos_dim+1) }, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
+    //     m_splatting_weights_tensor = torch::zeros({nr_positions*(m_pos_dim+1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+    // }
+    // m_splatting_indices_tensor.fill_(-1);
+    // m_splatting_weights_tensor.fill_(-1);
+
+    //assume we have already splatting weight and indices
+    if( !m_splatting_indices_tensor.defined() || !m_splatting_weights_tensor.defined()  || m_splatting_indices_tensor.size(0)!=nr_positions*(m_pos_dim+1) ||  m_splatting_weights_tensor.size(0)!=nr_positions*(m_pos_dim+1)  ){
+        LOG(FATAL) << "Indices or wegiths tensor is not created or doesnt have the correct size. We are assuming it has size " << nr_positions*(m_pos_dim+1) << "but indices has size " << m_splatting_indices_tensor.sizes() << " m_splatting_weights_tensor have size "  << m_splatting_weights_tensor.sizes();
+    //     m_splatting_indices_tensor = torch::zeros({nr_vertices*(m_pos_dim+1) }, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
+    //     m_splatting_weights_tensor = torch::zeros({nr_vertices*(m_pos_dim+1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+    }
+    m_hash_table->update_impl();
+
+
+    TIME_START("slice_classify");
+    m_impl->slice_classify_with_precomputation( positions.data<float>(), 
                                               m_sliced_values_hom_tensor.data<float>(), 
                                               delta_weights.data<float>(), 
                                               linear_clasify_weight.data<float>(), 

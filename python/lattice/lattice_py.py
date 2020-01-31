@@ -114,6 +114,9 @@ class LatticePy(torch.Tensor):
     def gather_standalone_no_precomputation(self, positions):
         return self.lattice.gather_standalone_no_precomputation(positions)
 
+    def gather_standalone_with_precomputation(self, positions):
+        return self.lattice.gather_standalone_with_precomputation(positions)
+
     def gather_elevated_standalone_no_precomputation(self, lattice_to_gather_from):
         return self.lattice.gather_elevated_standalone_no_precomputation(lattice_to_gather_from.lattice)
 

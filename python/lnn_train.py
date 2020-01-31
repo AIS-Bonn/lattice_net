@@ -27,6 +27,7 @@ config_file="lnn_train_shapenet.cfg"
 # config_file="lnn_train_scannet.cfg"
 
 torch.manual_seed(0)
+# torch.autograd.set_detect_anomaly(True)
 
 # #initialize the parameters used for training
 train_params=TrainParams.create(config_file)    

@@ -1146,9 +1146,11 @@ class SliceClassifyLattice(Function):
 
         initial_values=lattice_values #needed fo the backwards pass TODO maybe the clone is not needed?
 
-        class_logits=lattice_structure.lattice.slice_classify_no_precomputation(positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes)
+        class_logits=lattice_structure.lattice.slice_classify_with_precomputation(positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes)
 
-        ctx.save_for_backward(positions, initial_values, lattice_structure.splatting_indices(), lattice_structure.splatting_weights(), delta_weights, linear_clasify_weight, linear_clasify_bias )
+        # print("slice indices is ", lattice_structure.splatting_indices())
+        # ctx.save_for_backward(positions, initial_values, lattice_structure.splatting_indices(), lattice_structure.splatting_weights(), delta_weights, linear_clasify_weight, linear_clasify_bias )
+        ctx.save_for_backward(positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias )
         ctx.lattice_structure = lattice_structure
         ctx.with_debug_output=with_debug_output
         ctx.with_error_checking=with_error_checking
@@ -1186,13 +1188,14 @@ class SliceClassifyLattice(Function):
             print("input slice clasify backwards is grad_class_logits which has norm", grad_class_logits.norm())
 
 
-        positions, initial_values, splatting_indices, splatting_weights, delta_weights, linear_clasify_weight, linear_clasify_bias =ctx.saved_tensors
+        # positions, initial_values, splatting_indices, splatting_weights, delta_weights, linear_clasify_weight, linear_clasify_bias =ctx.saved_tensors
+        positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias =ctx.saved_tensors
         lattice_py = ctx.lattice_structure
         val_full_dim=ctx.val_full_dim
         nr_classes=ctx.nr_classes
 
-        lattice_py.set_splatting_indices(splatting_indices)
-        lattice_py.set_splatting_weights(splatting_weights)
+        # lattice_py.set_splatting_indices(splatting_indices)
+        # lattice_py.set_splatting_weights(splatting_weights)
         lattice_py.set_val_full_dim(val_full_dim)
 
 
@@ -1255,7 +1258,8 @@ class GatherLattice(Function):
         lattice_structure.set_val_full_dim(lattice_values.shape[1])
 
 
-        gathered_values=lattice_structure.gather_standalone_no_precomputation(positions)
+        # gathered_values=lattice_structure.gather_standalone_no_precomputation(positions)
+        gathered_values=lattice_structure.gather_standalone_with_precomputation(positions)
 
         # initial_values=lattice_structure.values().clone()
         # #debug if we were to ungather the values we should obtain teh same values
@@ -1267,7 +1271,8 @@ class GatherLattice(Function):
 
 
         # ctx.save_for_backward(positions, lattice_structure.splatting_indices(), lattice_structure.splatting_weights() )
-        ctx.save_for_backward(positions, lattice_structure.splatting_indices().clone(), lattice_structure.splatting_weights().clone() )
+        ctx.save_for_backward(positions)
+        # ctx.save_for_backward(positions, lattice_structure.splatting_indices().clone(), lattice_structure.splatting_weights().clone() )
         ctx.lattice_structure = lattice_structure
         ctx.val_full_dim=lattice_values.shape[1]
         ctx.with_debug_output=with_debug_output
@@ -1303,13 +1308,14 @@ class GatherLattice(Function):
             print("input gather backwards is grad_sliced_values which has norm", grad_sliced_values.norm())
 
 
-        positions,splatting_indices, splatting_weights =ctx.saved_tensors
+        # positions,splatting_indices, splatting_weights =ctx.saved_tensors
+        positions, =ctx.saved_tensors
         lattice_py = ctx.lattice_structure
         val_full_dim=ctx.val_full_dim
 
 
-        lattice_py.set_splatting_indices(splatting_indices)
-        lattice_py.set_splatting_weights(splatting_weights)
+        # lattice_py.set_splatting_indices(splatting_indices)
+        # lattice_py.set_splatting_weights(splatting_weights)
 
         # print("at the begginign of gather the values has shape ", lattice_py.values().shape)
 
