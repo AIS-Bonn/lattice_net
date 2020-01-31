@@ -28,6 +28,7 @@ void ModelParams::init_params(const std::string config_file){
 
     m_positions_mode=(std::string)train_config["positions_mode"];
     m_values_mode=(std::string)train_config["values_mode"];
+    m_pointnet_layers=train_config["pointnet_layers"];
     m_pointnet_start_nr_channels=train_config["pointnet_start_nr_channels"];
     m_nr_downsamples=train_config["nr_downsamples"];
     m_nr_blocks_down_stage=train_config["nr_blocks_down_stage"];
@@ -46,6 +47,9 @@ std::string ModelParams::positions_mode(){
 }
 std::string ModelParams::values_mode(){
     return m_values_mode;
+}
+Eigen::Vector3i ModelParams::pointnet_layers(){
+    return m_pointnet_layers;
 }
 int ModelParams::pointnet_start_nr_channels(){
     return m_pointnet_start_nr_channels;

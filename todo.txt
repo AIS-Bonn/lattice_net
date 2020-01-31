@@ -42,6 +42,8 @@
         -In the section of performance for scannet we have a value of 7.6 GB that is not true anymore as the memory now went up to 11.7
         -Say that the memory usage is largely influences by the number of points in the point cloud and the number of dimensions to which we elevate before the maxpooling operation. In some cases, the memory usage can be almost halfed by reducing the PointNet dimensionality from 64 to 32.
         -Calculate the actual memory used when running scannet at pointnet of 32
+        -Say that our apprach has the advantage of working for any general points, untile darknet and segnet
+        -Upsampling and downsampling on the work of splatnet is done by slicing the high dimensional features onto the points, and therefore incurring a high memory, and splatting onto a coarser lattice. We propose to do this in one step
             
 
     -things to try before we decide on a architecture
@@ -191,7 +193,6 @@
             slice_no_deform_regularize: TODO
         scanner_on_infcuda2:
             no_experiment: TODO
-
 
 
 

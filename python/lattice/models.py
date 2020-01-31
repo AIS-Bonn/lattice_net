@@ -1003,8 +1003,10 @@ class LNN_skippy_efficient(torch.nn.Module):
         self.distribute=DistributeLatticeModule(experiment, self.with_debug_output, self.with_error_checking) 
         self.distribute_cap=DistributeCapLatticeModule() 
         #self.distributed_transform=DistributedTransform( [32], self.with_debug_output, self.with_error_checking)  
+        self.pointnet_layers=model_params.pointnet_layers()
         self.start_nr_filters=model_params.pointnet_start_nr_channels()
-        self.point_net=PointNetModule( [16,32,64], self.start_nr_filters, experiment, self.with_debug_output, self.with_error_checking)  
+        print("pointnet layers is ", self.pointnet_layers)
+        self.point_net=PointNetModule( self.pointnet_layers, self.start_nr_filters, experiment, self.with_debug_output, self.with_error_checking)  
         # self.start_nr_filters=model_params.pointnet_start_nr_channels()
         # self.point_net=PointNetDenseModule( growth_rate=16, nr_layers=2, nr_outputs_last_layer=self.start_nr_filters, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking) 
 
@@ -1054,7 +1056,7 @@ class LNN_skippy_efficient(torch.nn.Module):
             # self.coarsens_list.append( GnReluExpandMax(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is actually the worse one...
             # self.coarsens_list.append( GnReluExpandAvg(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking))
             # self.coarsens_list.append( GnReluExpandBlur(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) 
-            self.coarsens_list.append( GnGeluCoarsen(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
+            self.coarsens_list.append( GnReluCoarsen(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             # self.coarsens_list.append( GnCoarsenGelu(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             cur_channels_count=nr_channels_after_coarsening
             corsenings_channel_counts.append(cur_channels_count)
@@ -1099,7 +1101,7 @@ class LNN_skippy_efficient(torch.nn.Module):
                 # seems that the relu in BnReluFinefy stops too much of the gradient from flowing up the network, altought we lose one non-linearity, a BnFinefy seems a lot more eneficial for the general flow of gradients as the network converges a lot faster
                 # self.finefy_list.append( GnFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( GnFinefyGelu(nr_chanels_finefy, self.with_debug_output, self.with_error_checking))
-                self.finefy_list.append( GnGeluFinefy(nr_chanels_finefy, self.with_debug_output, self.with_error_checking))
+                self.finefy_list.append( GnReluFinefy(nr_chanels_finefy, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( GnGeluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
                 # self.finefy_list.append( FinefyLatticeModule(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
             elif self.upsampling_method=="slice_elevated":

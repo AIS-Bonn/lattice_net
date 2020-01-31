@@ -1053,11 +1053,11 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
                 if nr_channels_out  < self.bottleneck_size:
                     sys.exit("We used to many linear layers an now the values are lower than the bottlenck size. Which means that the bottleneck would actually do an expansion...")
                 print("adding stepdown with output of ", nr_channels_out)
-                self.stepdown.append( GnGelu1x1(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
+                self.stepdown.append( GnRelu1x1(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
                 # self.stepdown.append( Gn1x1Gelu(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
         if self.bottleneck is None:
             print("adding bottleneck with output of ", self.bottleneck_size)
-            self.bottleneck=GnGelu1x1(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
+            self.bottleneck=GnRelu1x1(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
             # self.bottleneck=Gn1x1Gelu(self.bottleneck_size, False, self.with_debug_output, self.with_error_checking)            
         # apply the stepdowns
         for i in range(2):
@@ -3321,8 +3321,8 @@ class ResnetBlock(torch.nn.Module):
         # torch.nn.Linear(nr_input_channels, nr_output_channels, bias=True).to("cuda") 
 
         #again with bn-relu-conv
-        self.conv1=GnGeluConv(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        self.conv2=GnGeluConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv1=GnReluConv(nr_filters, dilations[0], biases[0], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv2=GnReluConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         # self.gate  = torch.nn.Parameter( torch.ones( 1, nr_filters ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1,1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 
@@ -3430,9 +3430,9 @@ class BottleneckBlock(torch.nn.Module):
     def __init__(self, out_channels, biases, with_debug_output, with_error_checking):
         super(BottleneckBlock, self).__init__()
         self.downsample = 4
-        self.contract=GnGelu1x1(int(out_channels/self.downsample), biases[0], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        self.conv=GnGeluConv(int(out_channels/self.downsample), 1, biases[1], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
-        self.expand=GnGelu1x1(out_channels, biases[2], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.contract=GnRelu1x1(int(out_channels/self.downsample), biases[0], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv=GnReluConv(int(out_channels/self.downsample), 1, biases[1], with_dropout=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.expand=GnRelu1x1(out_channels, biases[2], with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1,1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 
         # #does gn-conv-gelu

@@ -4,6 +4,8 @@
 #include <stdarg.h>
 #include <vector>
 
+#include <Eigen/Core>
+
 //class used to read some model parameters from a config file ( things like nr of layers and channels for each layer ) This class is also exposed to python so it can be used in pytorch
 
 class ModelParams: public std::enable_shared_from_this<ModelParams>
@@ -16,6 +18,7 @@ public:
 
     std::string positions_mode(); //the values we feed into the lattice can be either: xyz, xyz+rgb
     std::string values_mode(); //the values we feed into the lattice can be either: none, intensity
+    Eigen::Vector3i pointnet_layers();
     int pointnet_start_nr_channels(); //after pointnet architecture we add one more fully connected layer to elevate the lattice vertices up to this nr_channels
     int nr_downsamples(); //the network uses this many corsening of the lattice graph
     std::vector<int> nr_blocks_down_stage(); //each corsening stage inclues some amount of resnetblocks or bottleneck blocks. This says how many blocks for each stage we have
@@ -36,6 +39,7 @@ private:
 
     std::string m_positions_mode;
     std::string m_values_mode;
+    Eigen::Vector3i m_pointnet_layers;
     int m_pointnet_start_nr_channels;
     int m_nr_downsamples; 
     std::vector<int> m_nr_blocks_down_stage; 
