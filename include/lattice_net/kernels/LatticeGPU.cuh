@@ -117,7 +117,7 @@ public:
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         // .launch( positions, values, nr_positions, splatting_indices_and_weights, hash_table_gpu );
-                        .launch( positions, nr_positions, splatting_indices, splatting_weights, hash_table_gpu );
+                        .launch( positions, nr_positions, splatting_indices, splatting_weights, hash_table_gpu, true );
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
             TIME_END("kernel_splat");
             CUDA_CHECK_ERROR();
@@ -175,7 +175,7 @@ public:
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         // .launch( positions, values, nr_positions, splatting_indices_and_weights, hash_table_gpu );
-                        .launch( positions, nr_positions, splatting_indices, splatting_weights, hash_table_gpu );
+                        .launch( positions, nr_positions, splatting_indices, splatting_weights, hash_table_gpu, false );
             TIME_END("kernel_splat");
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
             CUDA_CHECK_ERROR();
@@ -856,7 +856,7 @@ __global__ void create_splatting_mask(bool* mask, const int* splatting_indices, 
 
 
 template<int pos_dim, int val_dim>
-__global__ void kernel_splat(const float* positions, const int nr_positions, int* splatting_indices, float* splatting_weights, HashTableGPU hash_table){
+__global__ void kernel_splat(const float* positions, const int nr_positions, int* splatting_indices, float* splatting_weights, HashTableGPU hash_table, bool write_new_indices_and_weights){
 // __global__ void kernel_splat(const float* positions,const float* values, const int nr_positions, float* splatting_indices_and_weights, HashTableGPU hash_table){
     // determine where in the thread grid we are
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
@@ -973,9 +973,10 @@ __global__ void kernel_splat(const float* positions, const int nr_positions, int
         // printf("got index_in_m_entires %d \n", index_in_m_entries);
         // splatting_indices[idx * (pos_dim + 1) + remainder]=index_in_m_entries; //for the moment this insex indexes in m_entries but after splat_cache it will index in m_keys
         if(index_in_m_entries>=0){
-            // splatting_indices[idx * (pos_dim + 1) + remainder]=index_in_m_entries; //it indexes in m_keys
-            splatting_indices[idx * (pos_dim + 1) + remainder]=hash_table.m_entries[index_in_m_entries]; //it indexes in m_keys
-            splatting_weights[idx * (pos_dim + 1) + remainder]=barycentric[remainder];
+            if( write_new_indices_and_weights ){
+                splatting_indices[idx * (pos_dim + 1) + remainder]=hash_table.m_entries[index_in_m_entries]; //it indexes in m_keys
+                splatting_weights[idx * (pos_dim + 1) + remainder]=barycentric[remainder];
+            }
         }else{
             printf("position %d could not be inserted\n", idx);
         }
@@ -3056,6 +3057,7 @@ __global__ void slice_classify_no_precomputation(const float* positions,  float*
         }
     
     }
+
 
     //now the value need to pass through a linear layer
     float* logits_out_for_cur_position=class_logits+idx*nr_classes;//class_logits has shape nr_positions x nr_classes

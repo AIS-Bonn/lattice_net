@@ -406,7 +406,9 @@ class CoarsenLattice(Function):
 
         # print("fine lattice has keys", lattice_fine_structure.keys()) 
         #coarsened_lattice_py=lattice_fine_structure.create_coarse_verts()
+        # print("lattice fine structure has indices", lattice_fine_structure.splatting_indices())
         coarsened_lattice_py=lattice_fine_structure.create_coarse_verts_naive(positions)
+        # print("coarsened_lattice_py has indices", coarsened_lattice_py.splatting_indices())
         # print("coarsened has keys", coarsened_lattice_py.keys()) 
 
 
@@ -1148,7 +1150,11 @@ class SliceClassifyLattice(Function):
 
         initial_values=lattice_values #needed fo the backwards pass TODO maybe the clone is not needed?
 
+        # print("before slice_no_computation indices are ", lattice_structure.splatting_indices())
+
         class_logits=lattice_structure.lattice.slice_classify_with_precomputation(positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes)
+
+        # print("after slice_no_computation indices are ", lattice_structure.splatting_indices())
 
         # print("slice indices is ", lattice_structure.splatting_indices())
         # ctx.save_for_backward(positions, initial_values, lattice_structure.splatting_indices(), lattice_structure.splatting_weights(), delta_weights, linear_clasify_weight, linear_clasify_bias )

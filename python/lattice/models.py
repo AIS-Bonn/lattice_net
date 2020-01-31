@@ -1209,6 +1209,7 @@ class LNN_skippy_efficient(torch.nn.Module):
             #resnet blocks
             for j in range(self.nr_blocks_down_stage[i]):
                 lv, ls = self.resnet_blocks_per_down_lvl_list[i][j] ( lv, ls) 
+                # print("after resnet indices is ", ls.splatting_indices())
 
             #saving them for when we do finefy so we can concat them there
             fine_structures_list.append(ls) 
@@ -1218,6 +1219,7 @@ class LNN_skippy_efficient(torch.nn.Module):
             # print("down input shape ", lv.shape[1])
             # lv, ls =self.maxpool_list[i](lv,ls)
             lv, ls = self.coarsens_list[i] ( lv, ls)
+            # print("after coarsen indices is ", ls.splatting_indices())
             # print("DOWNSAPLE ", i, " with out lv of shape ", lv.shape)
 
         TIME_END("down_path")
@@ -1276,6 +1278,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         # sv=self.slice_deform_full(lv, ls, positions)
         # sv=self.slice_fast_pytorch(lv, ls, positions, distributed)
         # sv=self.slice_fast_bottleneck_pytorch(lv, ls, positions, distributed)
+        # print("just before calling slice_Fast_cuda in models.py indices is ", ls.splatting_indices())
         sv, delta_weight_error_sum=self.slice_fast_cuda(lv, ls, positions)
         # sv=self.slice_classify(lv, ls, positions)
         TIME_END("slice")

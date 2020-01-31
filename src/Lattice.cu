@@ -318,8 +318,8 @@ void Lattice::just_create_verts(torch::Tensor& positions_raw, const bool with_ho
         m_splatting_weights_tensor = torch::zeros({nr_positions*(m_pos_dim+1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
     }
     // m_splatting_indices_and_weights_tensor = torch::zeros({nr_positions*(m_pos_dim+1), 2 });
-    m_splatting_indices_tensor.fill_(-1);
-    m_splatting_weights_tensor.fill_(-1);
+    // m_splatting_indices_tensor.fill_(-1);
+    // m_splatting_weights_tensor.fill_(-1);
 
 
     //to cuda
@@ -650,8 +650,8 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts(){
     coarse_lattice->m_hash_table->m_entries_tensor=torch::zeros({m_hash_table_capacity}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) ) ;
     coarse_lattice->m_hash_table->m_nr_filled_tensor=torch::zeros({1}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
     coarse_lattice->m_hash_table->clear();
-    coarse_lattice->m_splatting_indices_tensor.fill_(-1);
-    coarse_lattice->m_splatting_weights_tensor.fill_(-1);
+    // coarse_lattice->m_splatting_indices_tensor.fill_(-1);
+    // coarse_lattice->m_splatting_weights_tensor.fill_(-1);
     coarse_lattice->m_hash_table->update_impl();
 
     TIME_START("coarsen");
@@ -672,6 +672,7 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts(){
 std::shared_ptr<Lattice> Lattice::create_coarse_verts_naive(torch::Tensor& positions_raw){
 
     std::shared_ptr<Lattice> coarse_lattice=create(this); //create a lattice with no config but takes the config from this one
+    // VLOG(1) << "new coarse lattice has splatting incies" << m_splatting_indices_tensor;
     coarse_lattice->m_name="coarse_lattice";
     coarse_lattice->m_lvl=m_lvl+1;
     coarse_lattice->m_sigmas_tensor=m_sigmas_tensor.clone()*2.0; //the sigma for the coarser one is double. This is done so if we slice at this lattice we scale the positions with the correct sigma
@@ -692,9 +693,13 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts_naive(torch::Tensor& posit
     coarse_lattice->m_hash_table->m_entries_tensor=torch::zeros({m_hash_table_capacity}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) ) ;
     coarse_lattice->m_hash_table->m_nr_filled_tensor=torch::zeros({1}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
     coarse_lattice->m_hash_table->clear();
+
+    //just by creating the lattice from this one we  copy the splatting indices and tensors because we will either way slice at the finest lattice at the end
+
     coarse_lattice->m_hash_table->update_impl();
-    coarse_lattice->m_splatting_indices_tensor.fill_(-1);
-    coarse_lattice->m_splatting_weights_tensor.fill_(-1);
+
+    // coarse_lattice->m_splatting_indices_tensor.fill_(-1);
+    // coarse_lattice->m_splatting_weights_tensor.fill_(-1);
 
     // TIME_START("coarsen");
     // m_impl->coarsen(m_hash_table_capacity, m_pos_dim, *(m_hash_table->m_impl), *(coarse_lattice->m_hash_table->m_impl)  );
