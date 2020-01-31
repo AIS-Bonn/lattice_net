@@ -574,7 +574,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
     //FOR DEBUG assign the lattice rowified also the the convolve lattice so that we can query it afterwards and debug why there are vertices that don't have any neighbours
     // convolved_lattice->m_lattice_rowified=m_lattice_rowified.clone(); //IMPORTANT at the moment. Do not comment out
-    // convolved_lattice->m_lattice_rowified=m_lattice_rowified;
+    convolved_lattice->m_lattice_rowified=m_lattice_rowified;
 
     return convolved_lattice;
 

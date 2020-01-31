@@ -445,7 +445,8 @@ class CoarsenLattice(Function):
         if with_debug_output:
             print("saving coarsened_lattice_rowified of norm ", coarsened_lattice_py.lattice_rowified().norm() )
             print("saving coarsened_lattice_rowified of shape ", coarsened_lattice_py.lattice_rowified().shape )
-        ctx.save_for_backward(filter_bank, coarsened_lattice_py.lattice_rowified() ) 
+        # ctx.save_for_backward(filter_bank, coarsened_lattice_py.lattice_rowified() ) 
+        ctx.save_for_backward(filter_bank, lattice_fine_values ) 
         ctx.coarsened_lattice_py=coarsened_lattice_py
         ctx.lattice_fine_structure=lattice_fine_structure
         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
@@ -486,8 +487,12 @@ class CoarsenLattice(Function):
         dilation=ctx.dilation
         val_full_dim=ctx.val_full_dim
   
-        filter_bank, lattice_rowified =ctx.saved_tensors
+        filter_bank, lattice_fine_values =ctx.saved_tensors
         filter_extent=int(filter_bank.shape[0]/val_full_dim)
+
+        #reconstruct lattice_rowified 
+        lattice_fine_structure.set_values(lattice_fine_values)
+        lattice_rowified= coarsened_lattice_py.im2row(filter_extent, lattice_fine_structure, dilation, use_center_vertex_from_lattice_neighbours, False)
 
         if with_debug_output:
             print("got from saved_tensors coarsened_lattice_rowified of norm ", lattice_rowified.norm() )
@@ -669,7 +674,8 @@ class FinefyLattice(Function):
 
         # print("saving coarsened_lattice_rowified of norm ", coarsened_lattice_py.lattice_rowified().norm() )
         # print("saving coarsened_lattice_rowified of shape ", coarsened_lattice_py.lattice_rowified().shape )
-        ctx.save_for_backward(filter_bank, lattice_fine_structure.lattice_rowified() ) 
+        # ctx.save_for_backward(filter_bank, lattice_fine_structure.lattice_rowified() ) 
+        ctx.save_for_backward(filter_bank, lattice_coarse_values) 
         # ctx.coarsened_lattice_py=coarsened_lattice_py
         ctx.lattice_fine_structure=lattice_fine_structure
         ctx.lattice_coarse_structure=lattice_coarse_structure
@@ -707,8 +713,12 @@ class FinefyLattice(Function):
         val_full_dim=ctx.val_full_dim
         with_debug_output=ctx.with_debug_output
         with_error_checking=ctx.with_error_checking
-        filter_bank, lattice_rowified =ctx.saved_tensors
+        filter_bank, lattice_coarse_values =ctx.saved_tensors
         filter_extent=int(filter_bank.shape[0]/val_full_dim)
+
+        #reconstruct lattice_rowified 
+        lattice_coarse_structure.set_values(lattice_coarse_values)
+        lattice_rowified= lattice_fine_structure.im2row(filter_extent, lattice_coarse_structure, dilation, use_center_vertex_from_lattice_neighbours, False)
 
         if with_debug_output:
             print("got from saved_tensors coarsened_lattice_rowified of norm ", lattice_rowified.norm() )
