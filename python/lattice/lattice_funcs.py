@@ -192,9 +192,9 @@ class ConvIm2RowLattice(Function):
             lattice_neighbours_structure.set_values(lattice_neighbours_values)
 
         # print("inside ConvIm2RowLattice input lattice values is ", lattice_values.shape)
-        TIME_START("convolution_itself")
+        # TIME_START("convolution_itself")
         convolved_lattice_py=lattice_py.convolve_im2row_standalone(filter_bank, dilation, with_homogeneous_coord, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours)
-        TIME_END("convolution_itself")
+        # TIME_END("convolution_itself")
         # print("conv forwards: convolved lattice has values ", convolved_lattice_py.values())
         if with_error_checking:
             nr_zeros=(convolved_lattice_py.values()==0).sum().item()
@@ -416,11 +416,11 @@ class CoarsenLattice(Function):
             print("after creating the coarse_verts the fine structure has values with norm", lattice_fine_structure.values().norm() )
 
         #convolve at this lattice vertices with the neighbours from lattice_fine
-        TIME_START("convolution_itself")
+        # TIME_START("convolution_itself")
         dilation=1
         with_homogeneous_coord=False
         convolved_lattice_py=coarsened_lattice_py.convolve_im2row_standalone(filter_bank, dilation, with_homogeneous_coord, lattice_fine_structure, use_center_vertex_from_lattice_neighbours)
-        TIME_END("convolution_itself")
+        # TIME_END("convolution_itself")
         # print("coarsening forwards: convolved lattice has values ", convolved_lattice_py.values())
         if with_error_checking:
             nr_zeros=(convolved_lattice_py.values()==0).sum().item()
@@ -651,11 +651,11 @@ class FinefyLattice(Function):
 
 
         #convolve at this lattice vertices with the neighbours from lattice_fine
-        TIME_START("convolution_itself")
+        # TIME_START("convolution_itself")
         dilation=1
         with_homogeneous_coord=False
         convolved_lattice_py=lattice_fine_structure.convolve_im2row_standalone(filter_bank, dilation, with_homogeneous_coord, lattice_coarse_structure, use_center_vertex_from_lattice_neighbours)
-        TIME_END("convolution_itself")
+        # TIME_END("convolution_itself")
         # print("coarsening forwards: convolved lattice has values ", convolved_lattice_py.values())
         # nr_zeros=(convolved_lattice_py.values()==0).sum().item()
         # vals_debug=convolved_lattice_py.values().clone()

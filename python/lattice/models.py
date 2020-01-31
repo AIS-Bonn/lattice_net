@@ -68,13 +68,13 @@ class LNN(torch.nn.Module):
 
 
         #with coarsening block--------------------------------------------------
-        TIME_START("distribute_py")
+        # TIME_START("distribute_py")
         distributed, indices=self.distribute(ls, positions, values)
-        TIME_END("distribute_py")
+        # TIME_END("distribute_py")
 
-        TIME_START("pointnet+bn")
+        # TIME_START("pointnet+bn")
         lv, ls=self.point_net(ls, distributed, indices)
-        TIME_END("pointnet+bn")
+        # TIME_END("pointnet+bn")
 
         #just one coarsening block
         lv, ls = self.conv1(lv,ls)
@@ -1171,10 +1171,10 @@ class LNN_skippy_efficient(torch.nn.Module):
         # TIME_END("create_verts")
 
         #with coarsening block--------------------------------------------------
-        TIME_START("distribute_py")
+        # TIME_START("distribute_py")
         with torch.set_grad_enabled(False):
             distributed, indices=self.distribute(ls, positions, values)
-        TIME_END("distribute_py")
+        # TIME_END("distribute_py")
         # ls.compute_nr_points_per_lattice_vertex()
         # print( ls.nr_lattice_vertices() )
         # print("after distribute indices is ", ls.splatting_indices())
@@ -1189,9 +1189,9 @@ class LNN_skippy_efficient(torch.nn.Module):
         # distributed, ls= self.distributed_transform(ls, distributed, indices)
         # TIME_END("distribute_transform")
 
-        TIME_START("pointnet+bn")
+        # TIME_START("pointnet+bn")
         lv, ls=self.point_net(ls, distributed, indices)
-        TIME_END("pointnet+bn")
+        # TIME_END("pointnet+bn")
 
         # print("lv after pointnet has shape ", lv.shape)
 
@@ -1202,7 +1202,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         #create a whole thing with downsamples and all
         fine_structures_list=[]
         fine_values_list=[]
-        TIME_START("down_path")
+        # TIME_START("down_path")
         for i in range(self.nr_downsamples):
             # print("DOWNSAPLE ", i, " with input lv of shape ", lv.shape)
 
@@ -1222,7 +1222,7 @@ class LNN_skippy_efficient(torch.nn.Module):
             # print("after coarsen indices is ", ls.splatting_indices())
             # print("DOWNSAPLE ", i, " with out lv of shape ", lv.shape)
 
-        TIME_END("down_path")
+        # TIME_END("down_path")
 
         # #bottleneck
         # print("bottleneck input shape ", lv.shape[1])
@@ -1231,7 +1231,7 @@ class LNN_skippy_efficient(torch.nn.Module):
 
 
         #upsample (we start from the bottom of the u, so the upsampling that is closest to the blottlenck)
-        TIME_START("up_path")
+        # TIME_START("up_path")
         for i in range(self.nr_downsamples):
             # print("UPSAMPLE ", i)
 
@@ -1263,7 +1263,7 @@ class LNN_skippy_efficient(torch.nn.Module):
             #resnet blocks
             for j in range(self.nr_blocks_up_stage[i]):
                 lv, ls = self.resnet_blocks_per_up_lvl_list[i][j] ( lv, ls) 
-        TIME_END("up_path")
+        # TIME_END("up_path")
 
 
         # print("print values before slice_conv has shape", lv.shape)
@@ -1271,7 +1271,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         #slicing is quite expensive, because we gather all the values around the simplex. so we try to reduce the nr of values per point 
         # lv, ls = self.last_bottleneck(lv, ls) #sligt regression from using it, Reaches only 75.4 on motoribke instead of 75.8
   
-        TIME_START("slice")
+        # TIME_START("slice")
         # sv=self.slice(lv, ls, positions)
         # sv=self.slice_conv(lv, ls, positions)
         # sv=self.slice_deform(lv, ls, positions)
@@ -1281,7 +1281,7 @@ class LNN_skippy_efficient(torch.nn.Module):
         # print("just before calling slice_Fast_cuda in models.py indices is ", ls.splatting_indices())
         sv, delta_weight_error_sum=self.slice_fast_cuda(lv, ls, positions)
         # sv=self.slice_classify(lv, ls, positions)
-        TIME_END("slice")
+        # TIME_END("slice")
 
         self.per_point_features=sv
         # TIME_START("stepdown")

@@ -22,8 +22,8 @@ from callbacks.phase import *
 from optimizers.over9000.radam import *
 
 
-config_file="lnn_train_shapenet.cfg"
-# config_file="lnn_train_semantic_kitti.cfg"
+# config_file="lnn_train_shapenet.cfg"
+config_file="lnn_train_semantic_kitti.cfg"
 # config_file="lnn_train_scannet.cfg"
 
 torch.manual_seed(0)
@@ -135,7 +135,7 @@ def run():
                         cb.after_backward_pass()
                         optimizer.step()
 
-                    # Profiler.print_all_stats()
+                    Profiler.print_all_stats()
 
 
                 if phase.loader.is_finished():
