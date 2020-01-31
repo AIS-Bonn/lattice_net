@@ -2,11 +2,21 @@
 
 import os
 import numpy as np
+import torch
+from easypbr import *
+from dataloaders import *
 
 
 pred_folder="/media/rosu/Data/data/semantic_kitti/predictions/after_icra_experiments_fixed_deform_none/test"
 
 out_folder="/media/rosu/Data/data/semantic_kitti/for_server/after_icra_experiments_fixed_deform_none"
+
+
+config_file="lnn_compare_semantic_kitti.cfg"
+config_path=os.path.join( os.path.dirname( os.path.realpath(__file__) ) , '../../config', config_file)
+view=Viewer.create(config_path)
+loader=DataLoaderSemanticKitti(config_path)
+loader.start()
 
 
 #inside the pred folder we must go though all of the sequences and read the .label and then write it to binary
@@ -21,6 +31,7 @@ for seq_folder in sequences:
     nr_files_for_seq=0
     for file_basename in files:
         file=os.path.join(seq_folder, file_basename)
+        name_no_basename = os.path.splitext(file)[0]
         extension = os.path.splitext(file)[1]
         if extension==".label":
             nr_files_for_seq+=1
@@ -32,11 +43,28 @@ for seq_folder in sequences:
             labels.tofile(f)
 
             #sanity check 
-            # a = np.fromfile(out_file, dtype=np.uint32)
-            # print("a is ", a)
-            # print("labels is ", labels)
-            # diff = (a!=labels).sum()
-            # print("diff is", diff)
+            a = np.fromfile(out_file, dtype=np.uint32)
+            print("a is ", a)
+            print("labels is ", labels)
+            diff = (a!=labels).sum()
+            print("diff is", diff)
+
+            #read also the gt
+            if(loader.has_data()): 
+                cloud=loader.get_cloud()
+            mesh=Mesh( os.path.join(out_folder_with_sequences, (name_no_basename+"_gt.ply") )  )
+            mesh.L_pred=a
+            mesh.m_label_mngr=cloud.m_label_mngr
+            mesh.m_vis.set_color_semanticpred()
+            Scene.show(mesh,"mesh")
+            view.update()
+
+            
+            
+
+
+
+
     print("nr_file_for_seq", nr_files_for_seq)
 
 
