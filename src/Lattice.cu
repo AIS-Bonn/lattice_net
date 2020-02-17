@@ -279,11 +279,11 @@ void Lattice::splat_standalone(torch::Tensor& positions_raw, torch::Tensor& valu
     TIME_END("scale_by_sigma");
 
     TIME_START("splat");
-    m_impl->splat_standalone(positions.data<float>(), values.data<float>(), nr_positions, m_pos_dim, m_val_dim, m_val_full_dim,
-                            m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), with_homogeneous_coord, *(m_hash_table->m_impl) );
+    m_impl->splat_standalone(positions.data_ptr<float>(), values.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, m_val_full_dim,
+                            m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), with_homogeneous_coord, *(m_hash_table->m_impl) );
 
-    // m_impl->splat_standalone(positions.data<float>(), values.data<float>(), nr_positions, m_pos_dim, m_val_dim, 
-                            // m_splatting_indices_and_weights_tensor.data<float>(), *(m_hash_table.m_impl) );
+    // m_impl->splat_standalone(positions.data_ptr<float>(), values.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, 
+                            // m_splatting_indices_and_weights_tensor.data_ptr<float>(), *(m_hash_table.m_impl) );
     TIME_END("splat");
 
     VLOG(3) << "after splatting nr_verts is " << nr_lattice_vertices();
@@ -334,11 +334,11 @@ void Lattice::just_create_verts(torch::Tensor& positions_raw, const bool with_ho
     // TIME_END("scale_by_sigma");
 
     // TIME_START("just_create_verts");
-    m_impl->just_create_verts(positions.data<float>(), nr_positions, m_pos_dim, m_val_dim, m_val_full_dim,
-                            m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), with_homogeneous_coord, *(m_hash_table->m_impl) );
+    m_impl->just_create_verts(positions.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, m_val_full_dim,
+                            m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), with_homogeneous_coord, *(m_hash_table->m_impl) );
 
-    // m_impl->splat_standalone(positions.data<float>(), values.data<float>(), nr_positions, m_pos_dim, m_val_dim, 
-                            // m_splatting_indices_and_weights_tensor.data<float>(), *(m_hash_table.m_impl) );
+    // m_impl->splat_standalone(positions.data_ptr<float>(), values.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, 
+                            // m_splatting_indices_and_weights_tensor.data_ptr<float>(), *(m_hash_table.m_impl) );
     // TIME_END("just_create_verts");
 
     VLOG(3) << "after just_create_verts nr_verts is " << nr_lattice_vertices();
@@ -398,8 +398,8 @@ void Lattice::distribute(torch::Tensor& positions_raw, torch::Tensor& values){
     // TIME_END("scale_by_sigma");
 
     // TIME_START("distribute");
-    m_impl->distribute(positions.data<float>(), values.data<float>(), m_distributed_tensor.data<float>(), nr_positions, m_pos_dim, m_val_dim, 
-                            m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), *(m_hash_table->m_impl) );
+    m_impl->distribute(positions.data_ptr<float>(), values.data_ptr<float>(), m_distributed_tensor.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, 
+                            m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
     // TIME_END("distribute");
 
     // VLOG(1) << "m_distributed_tensor is " << m_distributed_tensor;
@@ -416,8 +416,8 @@ Tensor Lattice::create_splatting_mask(const torch::Tensor& nr_points_per_simplex
 
     Tensor mask = torch::zeros({nr_positions*(m_pos_dim+1)}, torch::dtype(torch::kBool).device(torch::kCUDA, 0)  );
 
-    // m_impl->create_splatting_mask(mask.data<bool>(), m_splatting_indices_tensor.data<int>(), nr_points_per_simplex.data<int>(), max_nr_points, nr_positions, m_pos_dim, m_devStates); 
-    m_impl->create_splatting_mask(mask.data<bool>(), m_splatting_indices_tensor.data<int>(), nr_points_per_simplex.data<int>(), max_nr_points, nr_positions, m_pos_dim); 
+    // m_impl->create_splatting_mask(mask.data_ptr<bool>(), m_splatting_indices_tensor.data_ptr<int>(), nr_points_per_simplex.data_ptr<int>(), max_nr_points, nr_positions, m_pos_dim, m_devStates); 
+    m_impl->create_splatting_mask(mask.data_ptr<bool>(), m_splatting_indices_tensor.data_ptr<int>(), nr_points_per_simplex.data_ptr<int>(), max_nr_points, nr_positions, m_pos_dim); 
 
     return mask;
 }
@@ -444,7 +444,7 @@ std::shared_ptr<Lattice> Lattice::blur_standalone(){
         if(remainder==0){
             //if it's the first time we do a blur along an axis we blur the values from the current hashtable and store them in the blurred_lattice hash_table_values
             m_impl->blur_standalone(m_hash_table_capacity, m_pos_dim, m_val_full_dim, 
-                blurred_lattice->m_hash_table->m_values_tensor.data<float>(), remainder, *(m_hash_table->m_impl) );
+                blurred_lattice->m_hash_table->m_values_tensor.data_ptr<float>(), remainder, *(m_hash_table->m_impl) );
             // m_impl->blur_standalone(m_hash_table_capacity, m_pos_dim, m_val_dim, blurred_lattice->m_tmp_blurred_values_tensor, remainder, *(m_hash_table.m_impl) );
             m_hash_table->update_impl(); //when swapping we are changing ptr, but this need to be propagated to the cuda implementation too
         }else{
@@ -453,7 +453,7 @@ std::shared_ptr<Lattice> Lattice::blur_standalone(){
 
             //if its the second or above time we do a blur, we blur from the values of the blur lattice and store in the m_tmp_blurred_values_tensor and then we swap. In the end we remove the m_tmp_blurred_values_tensor
             blurred_lattice->m_impl->blur_standalone(m_hash_table_capacity, m_pos_dim, m_val_full_dim, 
-                blurred_lattice->m_tmp_blurred_values_tensor.data<float>(), remainder, *(blurred_lattice->m_hash_table->m_impl) );
+                blurred_lattice->m_tmp_blurred_values_tensor.data_ptr<float>(), remainder, *(blurred_lattice->m_hash_table->m_impl) );
 
             std::swap(blurred_lattice->m_hash_table->m_values_tensor, blurred_lattice->m_tmp_blurred_values_tensor);
             blurred_lattice->m_hash_table->update_impl(); //when swapping we are changing ptr, but this need to be propagated to the cuda implementation too
@@ -536,9 +536,9 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
     // VLOG(1) << "calling im2row with lattice neighbours which have vlaues of norm " << lattice_neighbours->m_hash_table->m_values_tensor.norm();
     VLOG(4) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
-    m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
+    m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
 
-    // m_impl->test_row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex);
+    // m_impl->test_row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex);
     // TIME_END("im2row");
 
     // VLOG(1) <<"lattice rowified is \n" << m_lattice_rowified;
@@ -605,7 +605,7 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
     }
 
     VLOG(3) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
-    m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
+    m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
 
     return m_lattice_rowified;
 
@@ -628,7 +628,7 @@ torch::Tensor Lattice::row2im(const torch::Tensor& lattice_rowified,  const int 
     m_val_full_dim=nr_filters;
     m_hash_table->update_impl();
 
-    m_impl->row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, lattice_rowified.data<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, do_test);
+    m_impl->row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, do_test);
 
     return m_hash_table->m_values_tensor;
 }
@@ -768,7 +768,7 @@ torch::Tensor Lattice::slice_standalone_no_precomputation(torch::Tensor& positio
 
 
     TIME_START("slice");
-    m_impl->slice_standalone_no_precomputation( positions.data<float>(), m_sliced_values_hom_tensor.data<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), *(m_hash_table->m_impl) );
+    m_impl->slice_standalone_no_precomputation( positions.data_ptr<float>(), m_sliced_values_hom_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
     TIME_END("slice");
 
     if(with_homogeneous_coord){
@@ -834,7 +834,7 @@ torch::Tensor Lattice::gather_standalone_no_precomputation(torch::Tensor& positi
 
 
     TIME_START("gather");
-    m_impl->gather_standalone_no_precomputation( positions.data<float>(), m_gathered_values_tensor.data<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), *(m_hash_table->m_impl) );
+    m_impl->gather_standalone_no_precomputation( positions.data_ptr<float>(), m_gathered_values_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
     TIME_END("gather");
 
     return m_gathered_values_tensor;
@@ -874,7 +874,7 @@ torch::Tensor Lattice::gather_elevated_standalone_no_precomputation(const std::s
 
 
     TIME_START("gather");
-    m_impl->gather_elevated_standalone_no_precomputation( keys.data<int>(), m_gathered_values_tensor.data<float>(), m_pos_dim, lattice_to_gather_from->m_val_full_dim,  nr_vertices, m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), *(lattice_to_gather_from->m_hash_table->m_impl), lattice_to_gather_from->m_lvl, m_lvl );
+    m_impl->gather_elevated_standalone_no_precomputation( keys.data_ptr<int>(), m_gathered_values_tensor.data_ptr<float>(), m_pos_dim, lattice_to_gather_from->m_val_full_dim,  nr_vertices, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(lattice_to_gather_from->m_hash_table->m_impl), lattice_to_gather_from->m_lvl, m_lvl );
     TIME_END("gather");
 
     return m_gathered_values_tensor;
@@ -930,7 +930,7 @@ torch::Tensor Lattice::gather_standalone_with_precomputation(torch::Tensor& posi
 
 
     // TIME_START("gather");
-    m_impl->gather_standalone_with_precomputation( positions.data<float>(), m_gathered_values_tensor.data<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), *(m_hash_table->m_impl) );
+    m_impl->gather_standalone_with_precomputation( positions.data_ptr<float>(), m_gathered_values_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
     // TIME_END("gather");
 
     return m_gathered_values_tensor;
@@ -973,8 +973,8 @@ std::shared_ptr<Lattice> Lattice::slice_elevated_verts(const std::shared_ptr<Lat
 
     TIME_START("slice_elev");
     VLOG(3)<< "calling sliced_elevated verts with sliced_lattice values tensor "<< sliced_lattice->m_hash_table->m_values_tensor.sizes() << "the val_full dim is " << val_full_dim_slice_from << "nr filled of " << m_hash_table->m_nr_filled_tensor;
-    m_impl->slice_elevated_verts(m_hash_table_capacity, sliced_lattice->m_hash_table->m_values_tensor.data<float>(), pos_dim_slice_from, val_full_dim_slice_from, 
-                                sliced_lattice->m_splatting_indices_tensor.data<int>(), sliced_lattice->m_splatting_weights_tensor.data<float>(),
+    m_impl->slice_elevated_verts(m_hash_table_capacity, sliced_lattice->m_hash_table->m_values_tensor.data_ptr<float>(), pos_dim_slice_from, val_full_dim_slice_from, 
+                                sliced_lattice->m_splatting_indices_tensor.data_ptr<int>(), sliced_lattice->m_splatting_weights_tensor.data_ptr<float>(),
                                 *(lattice_to_slice_from->m_hash_table->m_impl), *(sliced_lattice->m_hash_table->m_impl) ,
                                 lattice_to_slice_from->m_lvl, sliced_lattice->m_lvl);
     TIME_END("slice_elev");
@@ -1028,17 +1028,17 @@ torch::Tensor Lattice::slice_classify_no_precomputation(torch::Tensor& positions
 
 
     TIME_START("slice_classify");
-    m_impl->slice_classify_no_precomputation( positions.data<float>(), 
-                                              m_sliced_values_hom_tensor.data<float>(), 
-                                              delta_weights.data<float>(), 
-                                              linear_clasify_weight.data<float>(), 
-                                              linear_clasify_bias.data<float>(), 
+    m_impl->slice_classify_no_precomputation( positions.data_ptr<float>(), 
+                                              m_sliced_values_hom_tensor.data_ptr<float>(), 
+                                              delta_weights.data_ptr<float>(), 
+                                              linear_clasify_weight.data_ptr<float>(), 
+                                              linear_clasify_bias.data_ptr<float>(), 
                                               nr_classes,
                                               m_pos_dim, 
                                               m_val_full_dim,  
                                               nr_positions, 
-                                              m_splatting_indices_tensor.data<int>(), 
-                                              m_splatting_weights_tensor.data<float>(), 
+                                              m_splatting_indices_tensor.data_ptr<int>(), 
+                                              m_splatting_weights_tensor.data_ptr<float>(), 
                                               *(m_hash_table->m_impl) );
     TIME_END("slice_classify");
 
@@ -1099,17 +1099,17 @@ torch::Tensor Lattice::slice_classify_with_precomputation(torch::Tensor& positio
 
 
     // TIME_START("slice_classify_cuda");
-    m_impl->slice_classify_with_precomputation( positions.data<float>(), 
-                                              m_sliced_values_hom_tensor.data<float>(), 
-                                              delta_weights.data<float>(), 
-                                              linear_clasify_weight.data<float>(), 
-                                              linear_clasify_bias.data<float>(), 
+    m_impl->slice_classify_with_precomputation( positions.data_ptr<float>(), 
+                                              m_sliced_values_hom_tensor.data_ptr<float>(), 
+                                              delta_weights.data_ptr<float>(), 
+                                              linear_clasify_weight.data_ptr<float>(), 
+                                              linear_clasify_bias.data_ptr<float>(), 
                                               nr_classes,
                                               m_pos_dim, 
                                               m_val_full_dim,  
                                               nr_positions, 
-                                              m_splatting_indices_tensor.data<int>(), 
-                                              m_splatting_weights_tensor.data<float>(), 
+                                              m_splatting_indices_tensor.data_ptr<int>(), 
+                                              m_splatting_weights_tensor.data_ptr<float>(), 
                                               *(m_hash_table->m_impl) );
     // TIME_END("slice_classify_cuda");
 
@@ -1136,7 +1136,7 @@ void Lattice::slice_backwards_standalone_with_precomputation(torch::Tensor& posi
 
 
     TIME_START("slice_back");
-    m_impl->slice_backwards_standalone_with_precomputation( sliced_values_hom.data<float>(), grad_sliced_values.data<float>(), m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), m_pos_dim, m_val_dim, nr_positions, *(m_hash_table->m_impl) );
+    m_impl->slice_backwards_standalone_with_precomputation( sliced_values_hom.data_ptr<float>(), grad_sliced_values.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_dim, nr_positions, *(m_hash_table->m_impl) );
     TIME_END("slice_back");
 
     // return  m_output_values_tensor;
@@ -1178,7 +1178,7 @@ void Lattice::slice_backwards_standalone_with_precomputation_no_homogeneous(torc
 
 
     TIME_START("slice_back");
-    m_impl->slice_backwards_standalone_with_precomputation_no_homogeneous(grad_sliced_values.data<float>(), m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), m_pos_dim, m_val_full_dim, nr_positions, *(m_hash_table->m_impl) );
+    m_impl->slice_backwards_standalone_with_precomputation_no_homogeneous(grad_sliced_values.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim, nr_positions, *(m_hash_table->m_impl) );
     TIME_END("slice_back");
 
     // VLOG(1) << "slice_backwards_standalone_with_precomputation_no_homogeneous at the finale we have  values vector of "<<m_hash_table->m_values_tensor;
@@ -1209,7 +1209,7 @@ void Lattice::slice_backwards_elevated_verts_with_precomputation(const std::shar
 
 
     TIME_START("slice_back");
-    m_impl->slice_backwards_standalone_with_precomputation_no_homogeneous(grad_sliced_values.data<float>(), m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), m_pos_dim, m_val_full_dim, nr_positions, *(lattice_sliced_from->m_hash_table->m_impl) );
+    m_impl->slice_backwards_standalone_with_precomputation_no_homogeneous(grad_sliced_values.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim, nr_positions, *(lattice_sliced_from->m_hash_table->m_impl) );
     TIME_END("slice_back");
 
     // return  m_output_values_tensor;
@@ -1244,8 +1244,8 @@ void Lattice::slice_classify_backwards_with_precomputation(const torch::Tensor& 
 
 
     // TIME_START("slice_clasify_back");
-    m_impl->slice_classify_backwards_with_precomputation(grad_class_logits.data<float>(), initial_values.data<float>(),  m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), m_pos_dim, m_val_full_dim, nr_positions,
-    delta_weights.data<float>(), linear_clasify_weight.data<float>(), linear_clasify_bias.data<float>(), nr_classes, grad_lattice_values.data<float>(), grad_delta_weights.data<float>(), grad_linear_clasify_weight.data<float>(),grad_linear_clasify_bias.data<float>(),
+    m_impl->slice_classify_backwards_with_precomputation(grad_class_logits.data_ptr<float>(), initial_values.data_ptr<float>(),  m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim, nr_positions,
+    delta_weights.data_ptr<float>(), linear_clasify_weight.data_ptr<float>(), linear_clasify_bias.data_ptr<float>(), nr_classes, grad_lattice_values.data_ptr<float>(), grad_delta_weights.data_ptr<float>(), grad_linear_clasify_weight.data_ptr<float>(),grad_linear_clasify_bias.data_ptr<float>(),
      *(m_hash_table->m_impl) );
     // TIME_END("slice_clasify_back");
 
@@ -1283,7 +1283,7 @@ void Lattice::gather_backwards_standalone_with_precomputation(const torch::Tenso
 
 
     // TIME_START("gather_back");
-    m_impl->gather_backwards_standalone_with_precomputation(grad_sliced_values.data<float>(), m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), m_pos_dim, m_val_full_dim, nr_positions, *(m_hash_table->m_impl) );
+    m_impl->gather_backwards_standalone_with_precomputation(grad_sliced_values.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim, nr_positions, *(m_hash_table->m_impl) );
     // TIME_END("gather_back");
 
 
@@ -1318,7 +1318,7 @@ void Lattice::gather_backwards_elevated_standalone_with_precomputation(const std
 
 
     // TIME_START("gather_back");
-    m_impl->gather_backwards_standalone_with_precomputation(grad_sliced_values.data<float>(), m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), m_pos_dim, m_val_full_dim, nr_vertices, *(lattice_gathered_from->m_hash_table->m_impl) );
+    m_impl->gather_backwards_standalone_with_precomputation(grad_sliced_values.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim, nr_vertices, *(lattice_gathered_from->m_hash_table->m_impl) );
     // TIME_END("gather_back");
 
 
@@ -1426,7 +1426,7 @@ Eigen::MatrixXd Lattice::elevate(torch::Tensor& positions_raw){
     elevated.fill_(0);
 
     TIME_START("elevate");
-    m_impl->elevate(positions.data<float>(),  m_pos_dim, nr_positions, elevated.data<float>());
+    m_impl->elevate(positions.data_ptr<float>(),  m_pos_dim, nr_positions, elevated.data_ptr<float>());
     TIME_END("elevate");
 
     elevated=elevated.unsqueeze(0);
@@ -1596,7 +1596,7 @@ void Lattice::increase_sigmas(const float stepsize){
 //     m_lattice_program.kernel("kernel_splat")
 //                 .instantiate(m_pos_dim, m_val_dim)
 //                 .configure(blocks, blockSize)
-//                 .launch( positions.data<float>(), values.data<float>(), nr_positions, m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(),  *(m_hash_table.m_impl) );
+//                 .launch( positions.data_ptr<float>(), values.data_ptr<float>(), nr_positions, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(),  *(m_hash_table.m_impl) );
 //     TIME_END("splat");
 //     CUDA_CHECK_ERROR();
 
@@ -1616,7 +1616,7 @@ void Lattice::increase_sigmas(const float stepsize){
 //     m_lattice_program.kernel("splatCache")
 //                 .instantiate(m_pos_dim, m_val_dim)
 //                 .configure(blocks, blockSize)
-//                 .launch( nr_positions, values.data<float>(), m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), *(m_hash_table.m_impl) );
+//                 .launch( nr_positions, values.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table.m_impl) );
 //     TIME_END("splat_cache");
 //     CUDA_CHECK_ERROR();
 
@@ -1642,8 +1642,8 @@ void Lattice::increase_sigmas(const float stepsize){
 //         m_lattice_program.kernel("blur")
 //                 .instantiate(m_pos_dim, m_val_dim)
 //                 .configure(cleanBlocks, cleanBlockSize)
-//                 // .launch( m_hash_table_capacity, m_new_values_tensor.data<float>(), m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), remainder, *(m_hash_table.m_impl) );
-//                 .launch( m_hash_table_capacity, m_new_values_tensor.data<float>(), remainder, *(m_hash_table.m_impl) );
+//                 // .launch( m_hash_table_capacity, m_new_values_tensor.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), remainder, *(m_hash_table.m_impl) );
+//                 .launch( m_hash_table_capacity, m_new_values_tensor.data_ptr<float>(), remainder, *(m_hash_table.m_impl) );
 //         std::swap(m_hash_table.m_values_tensor, m_new_values_tensor);
 //         m_hash_table.update_impl(); //when swapping we are changing ptr, but this need to be propagated to the cuda implementation too
 //     }
@@ -1686,7 +1686,7 @@ void Lattice::increase_sigmas(const float stepsize){
 //     m_lattice_program.kernel("slice_no_precomputation")
 //                 .instantiate(m_pos_dim, m_val_dim)
 //                 .configure(blocks, blockSize)
-//                 .launch( positions.data<float>(), m_output_values_tensor.data<float>(), nr_positions, *(m_hash_table.m_impl) );
+//                 .launch( positions.data_ptr<float>(), m_output_values_tensor.data_ptr<float>(), nr_positions, *(m_hash_table.m_impl) );
 //     TIME_END("slice");
 //     CUDA_CHECK_ERROR();
 
@@ -1743,7 +1743,7 @@ int Lattice::nr_lattice_vertices(){
     //attempt 2 at making it faster
     m_impl->wait_to_create_vertices(); //we synchronize the event and wait until whatever kernel was launched to create vertices has also finished
     int nr_verts=0;
-    cudaMemcpy ( &nr_verts,  m_hash_table->m_nr_filled_tensor.data<int>(), sizeof(int), cudaMemcpyDeviceToHost );
+    cudaMemcpy ( &nr_verts,  m_hash_table->m_nr_filled_tensor.data_ptr<int>(), sizeof(int), cudaMemcpyDeviceToHost );
     // cudaMemcpy ( &nr_verts,  m_hash_table->m_impl->m_nr_filled, sizeof(int), cudaMemcpyDeviceToHost );
     // VLOG(1) << "nr of verts is " << m_hash_table->m_nr_filled_tensor;
     CHECK(nr_verts>=0) << "nr vertices cannot be negative. However it is ", nr_verts;
@@ -1764,8 +1764,8 @@ void Lattice::set_nr_lattice_vertices(const int nr_verts){
     //attempt 2 at making it faster
     m_impl->wait_to_create_vertices(); //we synchronize the event and wait until whatever kernel was launched to create vertices has also finished
     // int nr_verts=0;
-    // cudaMemcpy ( (void*)&nr_verts,  m_hash_table->m_nr_filled_tensor.data<int>(), sizeof(int), cudaMemcpyHostToDevice );
-    cudaMemcpy( m_hash_table->m_nr_filled_tensor.data<int>(), &nr_verts, sizeof(int), cudaMemcpyHostToDevice);
+    // cudaMemcpy ( (void*)&nr_verts,  m_hash_table->m_nr_filled_tensor.data_ptr<int>(), sizeof(int), cudaMemcpyHostToDevice );
+    cudaMemcpy( m_hash_table->m_nr_filled_tensor.data_ptr<int>(), &nr_verts, sizeof(int), cudaMemcpyHostToDevice);
     // cudaMemcpy ( &nr_verts,  m_hash_table->m_impl->m_nr_filled, sizeof(int), cudaMemcpyDeviceToHost );
     // VLOG(1) << "nr of verts is " << m_hash_table->m_nr_filled_tensor;
     CHECK(nr_verts>=0) << "nr vertices cannot be negative. However it is ", nr_verts;

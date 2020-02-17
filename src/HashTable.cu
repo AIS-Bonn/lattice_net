@@ -87,16 +87,16 @@ void HashTable::update_impl(){
 
     m_impl->m_capacity = m_capacity;
     if(m_keys_tensor.defined()){
-        m_impl->m_keys = m_keys_tensor.data<int>();
+        m_impl->m_keys = m_keys_tensor.data_ptr<int>();
     }
     if(m_values_tensor.defined()){
-        m_impl->m_values = m_values_tensor.data<float>();
+        m_impl->m_values = m_values_tensor.data_ptr<float>();
     }
     if(m_entries_tensor.defined()){
-        m_impl->m_entries = m_entries_tensor.data<int>();
+        m_impl->m_entries = m_entries_tensor.data_ptr<int>();
     }
     if(m_nr_filled_tensor.defined()){
-        m_impl->m_nr_filled = m_nr_filled_tensor.data<int>();
+        m_impl->m_nr_filled = m_nr_filled_tensor.data_ptr<int>();
     }
 
     m_impl->m_pos_dim = m_pos_dim;
