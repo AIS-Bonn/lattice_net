@@ -168,7 +168,7 @@ public:
    
             // do it with jitify
 
-            TIME_START("kernel_splat");
+            // TIME_START("kernel_splat");
             dim3 blocks((nr_positions - 1) / 512 + 1, 1, 1);
             dim3 blockSize(512, 1, 1);
             m_lattice_program.kernel("kernel_splat")
@@ -176,7 +176,7 @@ public:
                         .configure(blocks, blockSize)
                         // .launch( positions, values, nr_positions, splatting_indices_and_weights, hash_table_gpu );
                         .launch( positions, nr_positions, splatting_indices, splatting_weights, hash_table_gpu, false );
-            TIME_END("kernel_splat");
+            // TIME_END("kernel_splat");
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
             CUDA_CHECK_ERROR();
 

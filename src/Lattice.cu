@@ -323,23 +323,23 @@ void Lattice::just_create_verts(torch::Tensor& positions_raw, const bool with_ho
 
 
     //to cuda
-    TIME_START("upload_cuda");
+    // TIME_START("upload_cuda");
     positions_raw=positions_raw.to("cuda");
     m_sigmas_tensor=m_sigmas_tensor.to("cuda");
     // m_new_values_tensor=m_new_values_tensor.to("cuda");
-    TIME_END("upload_cuda");
+    // TIME_END("upload_cuda");
 
-    TIME_START("scale_by_sigma");
+    // TIME_START("scale_by_sigma");
     Tensor positions=positions_raw/m_sigmas_tensor;
-    TIME_END("scale_by_sigma");
+    // TIME_END("scale_by_sigma");
 
-    TIME_START("just_create_verts");
+    // TIME_START("just_create_verts");
     m_impl->just_create_verts(positions.data<float>(), nr_positions, m_pos_dim, m_val_dim, m_val_full_dim,
                             m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), with_homogeneous_coord, *(m_hash_table->m_impl) );
 
     // m_impl->splat_standalone(positions.data<float>(), values.data<float>(), nr_positions, m_pos_dim, m_val_dim, 
                             // m_splatting_indices_and_weights_tensor.data<float>(), *(m_hash_table.m_impl) );
-    TIME_END("just_create_verts");
+    // TIME_END("just_create_verts");
 
     VLOG(3) << "after just_create_verts nr_verts is " << nr_lattice_vertices();
   
@@ -387,20 +387,20 @@ void Lattice::distribute(torch::Tensor& positions_raw, torch::Tensor& values){
 
 
     //to cuda
-    TIME_START("upload_cuda");
+    // TIME_START("upload_cuda");
     positions_raw=positions_raw.to("cuda");
     values=values.to("cuda");
     m_sigmas_tensor=m_sigmas_tensor.to("cuda");
-    TIME_END("upload_cuda");
+    // TIME_END("upload_cuda");
 
-    TIME_START("scale_by_sigma");
+    // TIME_START("scale_by_sigma");
     Tensor positions=positions_raw/m_sigmas_tensor;
-    TIME_END("scale_by_sigma");
+    // TIME_END("scale_by_sigma");
 
-    TIME_START("distribute");
+    // TIME_START("distribute");
     m_impl->distribute(positions.data<float>(), values.data<float>(), m_distributed_tensor.data<float>(), nr_positions, m_pos_dim, m_val_dim, 
                             m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), *(m_hash_table->m_impl) );
-    TIME_END("distribute");
+    // TIME_END("distribute");
 
     // VLOG(1) << "m_distributed_tensor is " << m_distributed_tensor;
 
@@ -517,7 +517,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
     //fill im2row TODO precompute it in the lattice
 
-    TIME_START("create_lattice_rowified");
+    // TIME_START("create_lattice_rowified");
     // VLOG(1) << "checking if lattice rowified has size: nr_vertices" << nr_vertices << " filter_extent " << filter_extent << " m_val_full_dim " << m_val_full_dim;
     if( !m_lattice_rowified.defined() || m_lattice_rowified.size(0)!=nr_vertices || m_lattice_rowified.size(1)!=filter_extent*m_val_full_dim  ){
         // VLOG(1) << "Creating a lattice rowified with size: nr_vertices" << nr_vertices << " filter_extent " << filter_extent << " m_val_full_dim " << m_val_full_dim;
@@ -525,10 +525,10 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     }else{
         m_lattice_rowified.fill_(0);
     }
-    TIME_END("create_lattice_rowified");
+    // TIME_END("create_lattice_rowified");
 
-    TIME_START("convolve_im2row");
-    TIME_START("im2row");
+    // TIME_START("convolve_im2row");
+    // TIME_START("im2row");
     bool debug_kernel=false;
     if(m_lvl==2){
         // debug_kernel=true;
@@ -539,7 +539,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
 
     // m_impl->test_row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex);
-    TIME_END("im2row");
+    // TIME_END("im2row");
 
     // VLOG(1) <<"lattice rowified is \n" << m_lattice_rowified;
     // Tensor lattice_rowified_unsqueezed=m_lattice_rowified.unsqueeze(0);
@@ -564,7 +564,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     }
     convolved_lattice->m_hash_table->update_impl(); //very important
 
-    TIME_END("convolve_im2row");
+    // TIME_END("convolve_im2row");
 
     VLOG(4) << "convolved lattice has nr filled " << convolved_lattice->nr_lattice_vertices();
     CHECK(convolved_lattice->nr_lattice_vertices()!=0) << "Why does this convolved lattice has zero nr_filled?";
@@ -591,13 +591,13 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
     int nr_vertices=nr_lattice_vertices();
 
 
-    TIME_START("create_lattice_rowified");
+    // TIME_START("create_lattice_rowified");
     if( !m_lattice_rowified.defined() || m_lattice_rowified.size(0)!=nr_vertices || m_lattice_rowified.size(1)!=filter_extent*m_val_full_dim  ){
         m_lattice_rowified=torch::zeros({nr_vertices, filter_extent*m_val_full_dim }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
     }else{
         m_lattice_rowified.fill_(0);
     }
-    TIME_END("create_lattice_rowified");
+    // TIME_END("create_lattice_rowified");
 
     bool debug_kernel=false;
     if(m_lvl==2){
@@ -896,15 +896,15 @@ torch::Tensor Lattice::gather_standalone_with_precomputation(torch::Tensor& posi
 
 
      //to cuda
-    TIME_START("upload_cuda");
+    // TIME_START("upload_cuda");
     positions_raw=positions_raw.to("cuda");
     m_sigmas_tensor=m_sigmas_tensor.to("cuda");
-    TIME_END("upload_cuda");
+    // TIME_END("upload_cuda");
 
-    TIME_START("scale_by_sigma");
+    // TIME_START("scale_by_sigma");
     VLOG(3) << "gather standalone scaling by a sigma of " << m_sigmas_tensor;
     Tensor positions=positions_raw/m_sigmas_tensor;
-    TIME_END("scale_by_sigma")
+    // TIME_END("scale_by_sigma")
 
     //initialize the output values to zero 
     int row_size_gathered=(m_pos_dim+1)*(m_val_full_dim+1); //we have m_pos_dim+1 vertices in a lattice and each has values of m_val_full_dim plus a barycentric coord
@@ -929,9 +929,9 @@ torch::Tensor Lattice::gather_standalone_with_precomputation(torch::Tensor& posi
     m_hash_table->update_impl();
 
 
-    TIME_START("gather");
+    // TIME_START("gather");
     m_impl->gather_standalone_with_precomputation( positions.data<float>(), m_gathered_values_tensor.data<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), *(m_hash_table->m_impl) );
-    TIME_END("gather");
+    // TIME_END("gather");
 
     return m_gathered_values_tensor;
 
@@ -1060,18 +1060,18 @@ torch::Tensor Lattice::slice_classify_with_precomputation(torch::Tensor& positio
 
 
      //to cuda
-    TIME_START("upload_cuda");
+    // TIME_START("upload_cuda");
     positions_raw=positions_raw.to("cuda");
     m_sigmas_tensor=m_sigmas_tensor.to("cuda");
     delta_weights=delta_weights.to("cuda");
     linear_clasify_weight=linear_clasify_weight.to("cuda");
     linear_clasify_bias=linear_clasify_bias.to("cuda");
-    TIME_END("upload_cuda");
+    // TIME_END("upload_cuda");
 
-    TIME_START("scale_by_sigma");
+    // TIME_START("scale_by_sigma");
     VLOG(3) << "slice standalone scaling by a sigma of " << m_sigmas_tensor;
     Tensor positions=positions_raw/m_sigmas_tensor;
-    TIME_END("scale_by_sigma")
+    // TIME_END("scale_by_sigma")
 
     //we store here the class logits directly
     if( !m_sliced_values_hom_tensor.defined() || m_sliced_values_hom_tensor.size(0)!= 1 || m_sliced_values_hom_tensor.size(1)!=nr_positions || m_sliced_values_hom_tensor.size(2)!=nr_classes){
@@ -1098,7 +1098,7 @@ torch::Tensor Lattice::slice_classify_with_precomputation(torch::Tensor& positio
     m_hash_table->update_impl();
 
 
-    TIME_START("slice_classify_cuda");
+    // TIME_START("slice_classify_cuda");
     m_impl->slice_classify_with_precomputation( positions.data<float>(), 
                                               m_sliced_values_hom_tensor.data<float>(), 
                                               delta_weights.data<float>(), 
@@ -1111,7 +1111,7 @@ torch::Tensor Lattice::slice_classify_with_precomputation(torch::Tensor& positio
                                               m_splatting_indices_tensor.data<int>(), 
                                               m_splatting_weights_tensor.data<float>(), 
                                               *(m_hash_table->m_impl) );
-    TIME_END("slice_classify_cuda");
+    // TIME_END("slice_classify_cuda");
 
     return m_sliced_values_hom_tensor;
 
@@ -1243,11 +1243,11 @@ void Lattice::slice_classify_backwards_with_precomputation(const torch::Tensor& 
 
 
 
-    TIME_START("slice_clasify_back");
+    // TIME_START("slice_clasify_back");
     m_impl->slice_classify_backwards_with_precomputation(grad_class_logits.data<float>(), initial_values.data<float>(),  m_splatting_indices_tensor.data<int>(), m_splatting_weights_tensor.data<float>(), m_pos_dim, m_val_full_dim, nr_positions,
     delta_weights.data<float>(), linear_clasify_weight.data<float>(), linear_clasify_bias.data<float>(), nr_classes, grad_lattice_values.data<float>(), grad_delta_weights.data<float>(), grad_linear_clasify_weight.data<float>(),grad_linear_clasify_bias.data<float>(),
      *(m_hash_table->m_impl) );
-    TIME_END("slice_clasify_back");
+    // TIME_END("slice_clasify_back");
 
 }
 

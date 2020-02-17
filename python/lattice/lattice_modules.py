@@ -1080,9 +1080,9 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # lv_bottleneck=gelu(lv_bottleneck) 
         # lv_bottleneck=self.drop_bottleneck(lv_bottleneck)
 
-        TIME_START("gather")
+        # TIME_START("gather")
         sliced_bottleneck_rowified=GatherLattice.apply(lv_bottleneck, ls_bottleneck, positions, self.with_debug_output, self.with_error_checking)
-        TIME_END("gather")
+        # TIME_END("gather")
         #sliced rowified, just after gathering has shape 1 x nr_positions x ( (m_pos_dim+1) x (val_full_dim+1)  ) ,so in our case nr_positions x (4* (self.bottleneck_size+1) )
 
         ##concat also the distributed
@@ -1195,7 +1195,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
 
 
 
-        TIME_START("remove_max")
+        # TIME_START("remove_max")
         #attmept 4 predict a barycentric coordinate for each lattice vertex, and then use max over all the features in the simplex like in here https://arxiv.org/pdf/1611.04500.pdf
         sliced_bottleneck_rowified=sliced_bottleneck_rowified.view(1,nr_positions, nr_vertices_per_simplex, val_dim_of_each_vertex)
         # print("sliced_bottleneck_rowified has size", sliced_bottleneck_rowified.shape)
@@ -1217,7 +1217,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # sliced_bottleneck_rowified=torch.tanh(sliced_bottleneck_rowified)
         delta_weights=self.linear_deltaW(sliced_bottleneck_rowified)
         delta_weights=delta_weights.reshape(1,nr_positions, nr_vertices_per_simplex)
-        TIME_END("remove_max")
+        # TIME_END("remove_max")
  
 
 
@@ -1311,9 +1311,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # print("delta_weights is ", delta_weights)
         # sys.exit("debug stop")
 
-        TIME_START("slice_classify")
         classes_logits = SliceClassifyLattice.apply(lv, ls, positions, delta_weights, self.linear_clasify.weight, self.linear_clasify.bias, self.nr_classes, self.with_debug_output, self.with_error_checking)
-        TIME_END("slice_classify")
 
         # print("class logits is ", classes_logits)
 
