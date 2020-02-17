@@ -63,7 +63,7 @@ def run():
     cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
         ViewerCallback(),
-        # VisdomCallback(),
+        VisdomCallback(),
         StateCallback() #changes the iter nr epoch nr,
     ])
     #create loaders
@@ -84,7 +84,7 @@ def run():
         Phase('test', loader_test, grad=False)
     ]
     #model 
-    model=LNN_skippy_efficient(loader_train.label_mngr().nr_classes(), model_params, False, False).to("cuda")
+    model=LNN(loader_train.label_mngr().nr_classes(), model_params, False, False).to("cuda")
     #create loss function
     loss_fn=GeneralizedSoftDiceLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled() ) 
     secondary_fn=torch.nn.NLLLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled())  #combination of nll and dice  https://arxiv.org/pdf/1809.10486.pdf
