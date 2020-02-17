@@ -23,7 +23,7 @@
 #endif
 
 
-#define BLOCK_SIZE 256 //TODO no actually need for it. It can be a parameter. And the one kernel that needs to read this inside it's code can just use BLOCKdim.x
+#define BLOCK_SIZE 256 //we dontt want to use a block size of 512 and rather prefer a lower one of 256 because the 512 causes kernels to silently fail, and not run at all. This is causes by having kernels with shared memory and having to big of a block sizes causes the error. To check if the error happens you can do something like cuda-memcheck ./python/lnn_train.py
 
 class LatticeGPU { 
 public:
@@ -111,8 +111,8 @@ public:
             // do it with jitify
 
             TIME_START("kernel_splat");
-            dim3 blocks((nr_positions - 1) / 512 + 1, 1, 1);
-            dim3 blockSize(512, 1, 1);
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
             m_lattice_program.kernel("kernel_splat")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
@@ -148,8 +148,8 @@ public:
 
 
             TIME_START("splatCacheNaive");
-            blocks=dim3((nr_positions - 1) / 512 + 1, 1, 1);
-            blockSize=dim3(512, 1, 1);
+            blocks=dim3((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            blockSize=dim3(BLOCK_SIZE, 1, 1);
             m_lattice_program.kernel("splatCacheNaive")
                         .instantiate(pos_dim, val_dim, val_full_dim)
                         .configure(blocks, blockSize)
@@ -169,8 +169,8 @@ public:
             // do it with jitify
 
             // TIME_START("kernel_splat");
-            dim3 blocks((nr_positions - 1) / 512 + 1, 1, 1);
-            dim3 blockSize(512, 1, 1);
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
             m_lattice_program.kernel("kernel_splat")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
@@ -186,8 +186,8 @@ public:
 
         void distribute(const float* positions, const float* values, const float* distributed, const int nr_positions, const int pos_dim, const int val_dim,  const int* splatting_indices, const float* splatting_weights, const HashTableGPU& hash_table_gpu){
    
-            dim3 blocks((nr_positions - 1) / 512 + 1, 1, 1);
-            dim3 blockSize(512, 1, 1);
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
             m_lattice_program.kernel("distribute")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
@@ -219,8 +219,8 @@ public:
         void create_splatting_mask(bool* mask,  const int* splatting_indices, const int* nr_points_per_simplex, const int max_nr_points, const int nr_positions, const int pos_dim){
   
             int size_of_indices_vector=nr_positions*(pos_dim+1);
-            dim3 blocks(( nr_positions*(pos_dim+1) - 1) / 512 + 1, 1, 1);
-            dim3 blockSize(512, 1, 1);
+            dim3 blocks(( nr_positions*(pos_dim+1) - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
             m_lattice_program.kernel("create_splatting_mask")
                         .instantiate(pos_dim)
                         .configure(blocks, blockSize)
@@ -231,12 +231,11 @@ public:
 
         void blur_standalone(const int hash_table_capacity, const int pos_dim, const int val_full_dim, const float* new_values, const int remainder, const HashTableGPU& hash_table_gpu){
 
-            int block_size = 512;
-            dim3 blocks((hash_table_capacity - 1) / block_size + 1, 1, 1);
+            dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
 
             m_lattice_program.kernel("blur")
                     .instantiate(pos_dim, val_full_dim)
-                    .configure(blocks, block_size)
+                    .configure(blocks, BLOCK_SIZE)
                     .launch( hash_table_capacity, new_values, remainder, hash_table_gpu );
 
         }
@@ -244,12 +243,11 @@ public:
 // int n, float *newValues, const float* filter_bank, const int num_filters, const int filter_extent, HashTableGPU hash_table
         void convolve_standalone(const int hash_table_capacity, const int pos_dim, const int val_dim, float* new_values, const float* filter_bank, const int nr_filters, const int filter_extent, const HashTableGPU& hash_table_gpu){
 
-            int block_size = 512;
-            dim3 blocks((hash_table_capacity - 1) / block_size + 1, 1, 1);
+            dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
 
             m_lattice_program.kernel("convolve")
                     .instantiate(pos_dim, val_dim)
-                    .configure(blocks, block_size)
+                    .configure(blocks, BLOCK_SIZE)
                     .launch( hash_table_capacity, new_values, filter_bank, nr_filters, filter_extent, hash_table_gpu );
         }
 
@@ -269,10 +267,9 @@ public:
         //creates a lattice rowified by grabbing the values of the neighbours from the hash_table_neighbours. The neigbhours are the neighbours of the keys in hash_table_query. Useful for lattices which are at different coarsenes levels
         void im2row(const int nr_vertices, const int pos_dim, const int val_full_dim, const int dilation, float* im2row_out, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neighbours, const bool flip_neighbours, const bool debug_kernel){
 
-            int block_size = 128;
-            int nr_blocks=nr_vertices/block_size;
+            int nr_blocks=nr_vertices/BLOCK_SIZE;
             // check for partial block at the end
-            if(nr_vertices % block_size) ++nr_blocks; 
+            if(nr_vertices % BLOCK_SIZE) ++nr_blocks; 
 
             // std::cout <<"launching a im2row with block size " << block_size << " and nr blocks " << nr_blocks << std::endl;
             //46ms
@@ -280,7 +277,7 @@ public:
 
             m_lattice_program.kernel("im2row")
                     .instantiate(pos_dim, val_full_dim)
-                    .configure(nr_blocks, block_size)
+                    .configure(nr_blocks, BLOCK_SIZE)
                     .launch( nr_vertices, im2row_out, filter_extent, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, use_center_vertex_from_lattice_neighbours, flip_neighbours, debug_kernel);
         }
 
@@ -300,22 +297,20 @@ public:
 
             // VLOG(1)<< "in the gpu implementation use_center_vertex is " << use_center_vertex;
 
-            int block_size = 512;
-            dim3 blocks((hash_table_capacity - 1) / block_size + 1, 1, 1);
+            dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
 
             m_lattice_program.kernel("row2im")
                     .instantiate(pos_dim, val_full_dim)
-                    .configure(blocks, block_size)
+                    .configure(blocks, BLOCK_SIZE)
                     .launch( hash_table_capacity, im2row_in, filter_extent, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, use_center_vertex_from_lattice_neighbours, do_test);
         }
 
         void coarsen(const int hash_table_capacity, const int pos_dim, const HashTableGPU& fine_hash_table_gpu, const HashTableGPU& coarse_hash_table_gpu){
-            int block_size = 256;
-            dim3 blocks((hash_table_capacity - 1) / block_size + 1, 1, 1);
+            dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
 
             m_lattice_program.kernel("coarsen")
                     .instantiate(pos_dim)
-                    .configure(blocks, block_size)
+                    .configure(blocks, BLOCK_SIZE)
                     .launch(hash_table_capacity, fine_hash_table_gpu, coarse_hash_table_gpu );
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
         }
@@ -424,6 +419,7 @@ public:
             m_lattice_program.kernel("slice_classify_with_precomputation")
                         .instantiate(pos_dim, val_full_dim, nr_classes)
                         .configure(blocks, blockSize)
+                        // .smem(nr_classes*val_full_dim*4) //shared memory in bytes
                         .launch( positions, class_logits, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
             CUDA_CHECK_ERROR();
         }
@@ -433,8 +429,8 @@ public:
         void slice_backwards_standalone_with_precomputation(float* sliced_values_hom, float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  const int pos_dim, const int val_full_dim, const int nr_positions, const HashTableGPU& hash_table_gpu){
 
 
-            dim3 blocks((nr_positions - 1) / 512 + 1, 1, 1);
-            dim3 blockSize(512, 1, 1);
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
             m_lattice_program.kernel("slice_backwards_with_precomputation")
                         .instantiate(pos_dim, val_full_dim)
                         .configure(blocks, blockSize)
@@ -446,8 +442,8 @@ public:
         void slice_backwards_standalone_with_precomputation_no_homogeneous(float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  const int pos_dim, const int val_dim, const int nr_positions, const HashTableGPU& hash_table_gpu){
 
 
-            dim3 blocks((nr_positions - 1) / 512 + 1, 1, 1);
-            dim3 blockSize(512, 1, 1);
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
             m_lattice_program.kernel("slice_backwards_with_precomputation_no_homogeneous")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
@@ -461,12 +457,12 @@ public:
         float* delta_weights, float* linear_clasify_weight, float* linear_clasify_bias, const int nr_classes, float* grad_lattice_values, float* grad_delta_weights, float* grad_linear_clasify_weight, float* grad_linear_clasify_bias,
          const HashTableGPU& hash_table_gpu){
 
-            dim3 blocks((nr_positions - 1) / 512 + 1, 1, 1);
-            dim3 blockSize(512, 1, 1);
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
             m_lattice_program.kernel("slice_classify_backwards_with_precomputation")
-                        .instantiate(pos_dim, val_full_dim)
+                        .instantiate(pos_dim, val_full_dim, nr_classes)
                         .configure(blocks, blockSize)
-                        .launch( nr_positions, grad_class_logits, initial_values, splatting_indices, splatting_weights, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, grad_lattice_values, grad_delta_weights,
+                        .launch( nr_positions, grad_class_logits, initial_values, splatting_indices, splatting_weights, delta_weights, linear_clasify_weight, linear_clasify_bias, grad_lattice_values, grad_delta_weights,
                          grad_linear_clasify_weight, grad_linear_clasify_bias, hash_table_gpu );
             CUDA_CHECK_ERROR()
 
@@ -475,8 +471,8 @@ public:
         void gather_backwards_standalone_with_precomputation(float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  const int pos_dim, const int val_dim, const int nr_positions, const HashTableGPU& hash_table_gpu){
 
 
-            dim3 blocks((nr_positions - 1) / 512 + 1, 1, 1);
-            dim3 blockSize(512, 1, 1);
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
             m_lattice_program.kernel("gather_backwards_with_precomputation")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
@@ -487,8 +483,8 @@ public:
 
         void elevate(float* positions, const int pos_dim, const int nr_positions, float* elevated){
 
-            dim3 blocks((nr_positions - 1) / 512 + 1, 1, 1);
-            dim3 blockSize(512, 1, 1);
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
             m_lattice_program.kernel("elevate_points")
                         .instantiate(pos_dim)
                         .configure(blocks, blockSize)
@@ -3281,18 +3277,34 @@ __global__ void slice_backwards_with_precomputation_no_homogeneous(const int nr_
 
 
 
-template<int pos_dim, int val_full_dim>
-__global__ void slice_classify_backwards_with_precomputation(const int nr_positions, float* grad_class_logits, float* initial_values, int* splatting_indices, float* splatting_weights, float* delta_weights, float* linear_clasify_weight, float* linear_clasify_bias, const int nr_classes, float* grad_lattice_values, float* grad_delta_weights, float* grad_linear_clasify_weight, float* grad_linear_clasify_bias,  HashTableGPU hash_table) {
+template<int pos_dim, int val_full_dim, int nr_classes>
+__global__ void slice_classify_backwards_with_precomputation(const int nr_positions, float* grad_class_logits, float* initial_values, int* splatting_indices, float* splatting_weights, float* delta_weights, float* linear_clasify_weight, float* linear_clasify_bias, float* grad_lattice_values, float* grad_delta_weights, float* grad_linear_clasify_weight, float* grad_linear_clasify_bias,  HashTableGPU hash_table) {
 
 
     //initial_Values refers to the values that the lattice had in the forward pass. it has size nr_vertices x val_full_dim
     //grad_class_logits is the gradient of the loss with respect to the sliced out values which has size nr_positions x nr_classes
 
+    // printf("wtf \n");
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x; // each thread will deal with one position
     if(idx >= nr_positions){
         return;
     }
+
+
+
+
+    //load the weights of the linear layers into shared mem 
+    // printf("trying to allocate shared memory of size %d \n", nr_classes*val_full_dim);
+    __shared__ float linear_weights_shared[nr_classes*val_full_dim];
+    if (threadIdx.x == 0 ){
+        for (int i = 0; i < nr_classes*val_full_dim; i++) {
+            linear_weights_shared[i]=linear_clasify_weight[i];
+        }
+    }
+    __syncthreads();
+
+
 
     //each positions will splat onto pos_dim+1 vertices
     float *grad_class_logits_cur_position = grad_class_logits + idx * nr_classes;
@@ -3311,7 +3323,11 @@ __global__ void slice_classify_backwards_with_precomputation(const int nr_positi
             for (int v = 0; v < val_full_dim; v++) {
                 float grad=0.0;
                 for (int c = 0; c < nr_classes; c++) {
-                    grad+=grad_class_logits_cur_position[c]*linear_clasify_weight[v+c*val_full_dim]*(splat_weight+splat_delta_weight);
+                    // //debug
+                    // if( linear_clasify_weight[v+c*val_full_dim]!=linear_weights_shared[v+c*val_full_dim] ){
+                    //     printf("The global value is not the same as the shared one, global is %f and shared is %f \n",linear_clasify_weight[v+c*val_full_dim],linear_weights_shared[v+c*val_full_dim]  );
+                    // }
+                    grad+=grad_class_logits_cur_position[c]*linear_weights_shared[v+c*val_full_dim]*(splat_weight+splat_delta_weight);
                 }
                 atomicAdd(grad_lattice_vertex_out+v, grad);
             }
@@ -3364,7 +3380,11 @@ __global__ void slice_classify_backwards_with_precomputation(const int nr_positi
                 float grad_output_wrt_dw=0.0;
                 //need to calculate the gradient of the output o1 with respect to the delta weight
                 for (int v = 0; v < val_full_dim; v++) {
-                    grad_output_wrt_dw+=vertex_value[v]*linear_clasify_weight[v +c*val_full_dim];
+                    // //debug
+                    // if( linear_clasify_weight[v+c*val_full_dim]!=linear_weights_shared[v+c*val_full_dim] ){
+                    //     printf("The global value is not the same as the shared one, global is %f and shared is %f ",linear_clasify_weight[v+c*val_full_dim],linear_weights_shared[v+c*val_full_dim]  );
+                    // }
+                    grad_output_wrt_dw+=vertex_value[v]*linear_weights_shared[v +c*val_full_dim];
                 }
                 grad+=grad_output_wrt_dw*grad_class_logits_cur_position[c];
             }
