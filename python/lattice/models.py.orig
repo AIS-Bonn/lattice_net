@@ -20,8 +20,6 @@ from lattice.lattice_funcs import *
 from lattice.lattice_modules import *
 
 
-#
-
 class LNN(torch.nn.Module):
     def __init__(self, nr_classes, model_params, with_debug_output, with_error_checking):
         super(LNN, self).__init__()
@@ -413,5 +411,8 @@ class LNN(torch.nn.Module):
         # TIME_END("prepare")
 
         return positions_tensor, values_tensor, target_tensor
+
+
+
 
 
