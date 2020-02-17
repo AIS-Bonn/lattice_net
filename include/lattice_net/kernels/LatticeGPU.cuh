@@ -597,7 +597,9 @@ __device__ int nr_coords_integer(const float* vec, const int vec_size){
 
 
 template<int pos_dim>
-__global__ void elevate_points(const int nr_positions,  const float* positions, float* elevated){
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+elevate_points(const int nr_positions,  const float* positions, float* elevated){
 
     // determine where in the thread grid we are
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
@@ -615,7 +617,9 @@ __global__ void elevate_points(const int nr_positions,  const float* positions, 
 
 //cuda kernels that have __global__ qualifier have to go outside the class 
 template<int pos_dim, int val_dim>
-__global__ void distribute(float* positions, float* values, const int nr_positions, int* splatting_indices, float* splatting_weights, float* distributed, HashTableGPU hash_table){
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+distribute(float* positions, float* values, const int nr_positions, int* splatting_indices, float* splatting_weights, float* distributed, HashTableGPU hash_table){
 
     // determine where in the thread grid we are
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
@@ -798,7 +802,9 @@ __global__ void distribute(float* positions, float* values, const int nr_positio
 
 template<int pos_dim>
 // __global__ void create_splatting_mask(bool* mask, const int* splatting_indices,  const int* nr_points_per_simplex, const int max_nr_points, const int size_of_indices_vector, curandState* globalState){
-__global__ void create_splatting_mask(bool* mask, const int* splatting_indices,  const int* nr_points_per_simplex, const int max_nr_points, const int size_of_indices_vector){
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+create_splatting_mask(bool* mask, const int* splatting_indices,  const int* nr_points_per_simplex, const int max_nr_points, const int size_of_indices_vector){
 
     // determine where in the thread grid we are
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with an edge going form a point towards a lattice vertex
@@ -852,7 +858,9 @@ __global__ void create_splatting_mask(bool* mask, const int* splatting_indices, 
 
 
 template<int pos_dim, int val_dim>
-__global__ void kernel_splat(const float* positions, const int nr_positions, int* splatting_indices, float* splatting_weights, HashTableGPU hash_table, bool write_new_indices_and_weights){
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+kernel_splat(const float* positions, const int nr_positions, int* splatting_indices, float* splatting_weights, HashTableGPU hash_table, bool write_new_indices_and_weights){
 // __global__ void kernel_splat(const float* positions,const float* values, const int nr_positions, float* splatting_indices_and_weights, HashTableGPU hash_table){
     // determine where in the thread grid we are
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
@@ -1103,7 +1111,9 @@ __global__ void kernel_splat(const float* positions, const int nr_positions, int
 
 template<int pos_dim, int val_dim>
 // __global__ void splatCache(const int n, const float *values, int* splatting_indices, float* splatting_weights, HashTableGPU hash_table) {
-__global__ void splatCache(const int n, const float *values, float* splatting_indices_and_weights,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+splatCache(const int n, const float *values, float* splatting_indices_and_weights,  HashTableGPU hash_table) {
 
     const int idx = threadIdx.x + blockIdx.x * blockDim.x;
     const int threadId = threadIdx.x;
@@ -1184,7 +1194,9 @@ __global__ void splatCache(const int n, const float *values, float* splatting_in
 
 template<int pos_dim, int val_dim, int val_full_dim>
 // __global__ void splatCache(const int n, const float *values, int* splatting_indices, float* splatting_weights, HashTableGPU hash_table) {
-__global__ void splatCacheNaive(const int nr_positions, float *values, int* splatting_indices, float* splatting_weights, const bool with_homogeneous_coord,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+splatCacheNaive(const int nr_positions, float *values, int* splatting_indices, float* splatting_weights, const bool with_homogeneous_coord,  HashTableGPU hash_table) {
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x; // each thread will deal with one position
     if(idx >= nr_positions){
@@ -1241,7 +1253,9 @@ __global__ void splatCacheNaive(const int nr_positions, float *values, int* spla
 }
 
 template<int pos_dim, int val_full_dim>
-__global__ void blur(int n, float *newValues, int remainder,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+blur(int n, float *newValues, int remainder,  HashTableGPU hash_table) {
 
     // const int idx = (blockIdx.y * gridDim.x + blockIdx.x) * blockDim.x * blockDim.y + threadIdx.x;
     const int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a lattice vertex
@@ -1303,7 +1317,9 @@ __global__ void blur(int n, float *newValues, int remainder,  HashTableGPU hash_
 }
 
 template<int pos_dim, int val_dim>
-__global__ void convolve(int n, float *newValues, const float* filter_bank, const int nr_filters, const int filter_extent, HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+convolve(int n, float *newValues, const float* filter_bank, const int nr_filters, const int filter_extent, HashTableGPU hash_table) {
 
     const int idx = (blockIdx.y * gridDim.x + blockIdx.x) * blockDim.x * blockDim.y + threadIdx.x;
     if (idx >= n)
@@ -1435,7 +1451,9 @@ __global__ void convolve(int n, float *newValues, const float* filter_bank, cons
 }
 
 template<int pos_dim, int val_full_dim>
-__global__ void im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neigbhours, bool flip_neighbours, bool debug_kernel) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neigbhours, bool flip_neighbours, bool debug_kernel) {
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a lattice vertex
     if (idx >= nr_vertices) return;
@@ -1704,7 +1722,9 @@ __global__ void im2row(int nr_vertices, float* im2row_out, int filter_extent, in
 
 
 template<int pos_dim, int val_full_dim>
-__global__ void test_row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+test_row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex) {
 
     // const int idx = (blockIdx.y * gridDim.x + blockIdx.x) * blockDim.x * blockDim.y + threadIdx.x;
     const int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a lattice vertex
@@ -1847,7 +1867,9 @@ __global__ void test_row2im(int capacity, float* im2row_in, int filter_extent, i
 
 
 template<int pos_dim, int val_full_dim>
-__global__ void row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neigbhours, const bool do_test) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neigbhours, const bool do_test) {
 
     // printf("inside row2im use_center_vertex is %d\n", use_center_vertex);
     // printf("capacity is %d",capacity );
@@ -2090,7 +2112,9 @@ __global__ void row2im(int capacity, float* im2row_in, int filter_extent, int di
 // } 
 
 template<int pos_dim>
-__global__ void coarsen(int capacity, HashTableGPU fine_hash_table, HashTableGPU coarse_hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+coarsen(int capacity, HashTableGPU fine_hash_table, HashTableGPU coarse_hash_table) {
 
     // finer lattice has a certain lattices at integer coordinates
     // corse_lattice create_coarser_lattice(fine_lattice)
@@ -2292,7 +2316,9 @@ __global__ void coarsen(int capacity, HashTableGPU fine_hash_table, HashTableGPU
 
 
 template<int pos_dim, int val_dim>
-__global__ void slice(const int n, float *values, int* splatting_indices, float* splatting_weights , HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+slice(const int n, float *values, int* splatting_indices, float* splatting_weights , HashTableGPU hash_table) {
 
     const int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx >= n)
@@ -2323,7 +2349,9 @@ __global__ void slice(const int n, float *values, int* splatting_indices, float*
 
 
 template<int pos_dim, int val_full_dim>
-__global__ void slice_no_precomputation(const float* positions,  float* values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+slice_no_precomputation(const float* positions,  float* values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
 
@@ -2476,7 +2504,9 @@ __global__ void slice_no_precomputation(const float* positions,  float* values, 
 
 
 template<int pos_dim, int val_full_dim>
-__global__ void gather_no_precomputation(const float* positions,  float* gathered_values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+gather_no_precomputation(const float* positions,  float* gathered_values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
 
@@ -2607,7 +2637,9 @@ __global__ void gather_no_precomputation(const float* positions,  float* gathere
 
 
 template<int pos_dim, int val_full_dim>
-__global__ void gather_with_precomputation(const float* positions,  float* gathered_values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+gather_with_precomputation(const float* positions,  float* gathered_values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
 
@@ -2650,7 +2682,9 @@ __global__ void gather_with_precomputation(const float* positions,  float* gathe
 }
 
 template<int pos_dim, int val_full_dim>
-__global__ void gather_elevated_no_precomputation(const int* keys,  float* gathered_values, const int nr_vertices, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table_to_gather_from, const int lattice_to_gather_from_lvl, const int elevated_verts_lvl) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+gather_elevated_no_precomputation(const int* keys,  float* gathered_values, const int nr_vertices, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table_to_gather_from, const int lattice_to_gather_from_lvl, const int elevated_verts_lvl) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
 
@@ -2785,7 +2819,9 @@ __global__ void gather_elevated_no_precomputation(const int* keys,  float* gathe
 }
 
 template<int pos_dim, int val_full_dim>
-__global__ void slice_elevated_verts(float* values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table_to_slice_from, HashTableGPU hash_table_elevated_verts, const int lattice_to_slice_from_lvl, const int elevated_verts_lvl) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+slice_elevated_verts(float* values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table_to_slice_from, HashTableGPU hash_table_elevated_verts, const int lattice_to_slice_from_lvl, const int elevated_verts_lvl) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
 
@@ -2941,7 +2977,9 @@ __global__ void slice_elevated_verts(float* values, int* splatting_indices, floa
 
 
 template<int pos_dim, int val_full_dim>
-__global__ void slice_classify_no_precomputation(const float* positions,  float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+slice_classify_no_precomputation(const float* positions,  float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
 
@@ -3078,7 +3116,9 @@ __global__ void slice_classify_no_precomputation(const float* positions,  float*
 
 
 template<int pos_dim, int val_full_dim, int nr_classes>
-__global__ void slice_classify_with_precomputation(const float* positions,  float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+slice_classify_with_precomputation(const float* positions,  float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
 
@@ -3149,7 +3189,9 @@ __global__ void slice_classify_with_precomputation(const float* positions,  floa
 
 
 template<int pos_dim, int val_dim>
-__global__ void slice_backwards_with_precomputation(const int nr_positions, float* sliced_values_hom, float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+slice_backwards_with_precomputation(const int nr_positions, float* sliced_values_hom, float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
     //values_vertices refers to the values that the lattice had in the forward pass. it has size m_hash_table_capcity x (val_dim+1)
     //grad_sliced_values is the gradient of the loss with respect to the sliced out values which has size nr_positions x val_dim
@@ -3220,7 +3262,9 @@ __global__ void slice_backwards_with_precomputation(const int nr_positions, floa
 
 
 template<int pos_dim, int val_full_dim>
-__global__ void slice_backwards_with_precomputation_no_homogeneous(const int nr_positions, float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+slice_backwards_with_precomputation_no_homogeneous(const int nr_positions, float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
     //values_vertices refers to the values that the lattice had in the forward pass. it has size m_hash_table_capcity x (val_dim+1)
     //grad_sliced_values is the gradient of the loss with respect to the sliced out values which has size nr_positions x val_dim
@@ -3278,7 +3322,9 @@ __global__ void slice_backwards_with_precomputation_no_homogeneous(const int nr_
 
 
 template<int pos_dim, int val_full_dim, int nr_classes>
-__global__ void slice_classify_backwards_with_precomputation(const int nr_positions, float* grad_class_logits, float* initial_values, int* splatting_indices, float* splatting_weights, float* delta_weights, float* linear_clasify_weight, float* linear_clasify_bias, float* grad_lattice_values, float* grad_delta_weights, float* grad_linear_clasify_weight, float* grad_linear_clasify_bias,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+slice_classify_backwards_with_precomputation(const int nr_positions, float* grad_class_logits, float* initial_values, int* splatting_indices, float* splatting_weights, float* delta_weights, float* linear_clasify_weight, float* linear_clasify_bias, float* grad_lattice_values, float* grad_delta_weights, float* grad_linear_clasify_weight, float* grad_linear_clasify_bias,  HashTableGPU hash_table) {
 
 
     //initial_Values refers to the values that the lattice had in the forward pass. it has size nr_vertices x val_full_dim
@@ -3293,7 +3339,6 @@ __global__ void slice_classify_backwards_with_precomputation(const int nr_positi
 
 
 
-
     //load the weights of the linear layers into shared mem 
     // printf("trying to allocate shared memory of size %d \n", nr_classes*val_full_dim);
     __shared__ float linear_weights_shared[nr_classes*val_full_dim];
@@ -3303,7 +3348,6 @@ __global__ void slice_classify_backwards_with_precomputation(const int nr_positi
         }
     }
     __syncthreads();
-
 
 
     //each positions will splat onto pos_dim+1 vertices
@@ -3401,7 +3445,9 @@ __global__ void slice_classify_backwards_with_precomputation(const int nr_positi
 
 
 template<int pos_dim, int val_full_dim>
-__global__ void gather_backwards_with_precomputation(const int nr_positions, float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+gather_backwards_with_precomputation(const int nr_positions, float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x; // each thread will deal with one position
