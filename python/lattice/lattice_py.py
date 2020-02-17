@@ -1,8 +1,8 @@
 import torch
 # from torch import Tensor
 
-import sys
-sys.path.append('/media/rosu/Data/phd/c_ws/build/surfel_renderer/') #contains the modules of pycom
+# import sys
+# sys.path.append('/media/rosu/Data/phd/c_ws/build/surfel_renderer/') #contains the modules of pycom
 from latticenet  import Lattice
 from easypbr  import Mesh
 from easypbr  import Scene
