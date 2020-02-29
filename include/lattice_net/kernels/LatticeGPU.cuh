@@ -23,7 +23,7 @@
 #endif
 
 
-#define BLOCK_SIZE 256 //we dontt want to use a block size of 512 and rather prefer a lower one of 256 because the 512 causes kernels to silently fail, and not run at all. This is causes by having kernels with shared memory and having to big of a block sizes causes the error. To check if the error happens you can do something like cuda-memcheck ./python/lnn_train.py
+#define BLOCK_SIZE 512 
 
 class LatticeGPU { 
 public:
@@ -113,13 +113,14 @@ public:
             TIME_START("kernel_splat");
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
-            m_lattice_program.kernel("kernel_splat")
+            CUresult res_1= m_lattice_program.kernel("kernel_splat")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         // .launch( positions, values, nr_positions, splatting_indices_and_weights, hash_table_gpu );
                         .launch( positions, nr_positions, splatting_indices, splatting_weights, hash_table_gpu, true );
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
             TIME_END("kernel_splat");
+            CUDA_CHECK_CURESULT(res_1);
             CUDA_CHECK_ERROR();
 
             //the nr of m_filled can be a lot bigger than the actual nr of lattice vertices because of the fact that the keys in the hashtable can have duplicates. While cleaning the hashtable we retreive all the keys and we check their index in the m_keys. The maximum index will be the new m_filled
@@ -150,12 +151,13 @@ public:
             TIME_START("splatCacheNaive");
             blocks=dim3((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             blockSize=dim3(BLOCK_SIZE, 1, 1);
-            m_lattice_program.kernel("splatCacheNaive")
+            CUresult res_2= m_lattice_program.kernel("splatCacheNaive")
                         .instantiate(pos_dim, val_dim, val_full_dim)
                         .configure(blocks, blockSize)
                         // .launch( nr_positions, values, splatting_indices_and_weights, hash_table_gpu );
                         .launch( nr_positions, values, splatting_indices, splatting_weights, with_homogeneous_coord, hash_table_gpu );
             TIME_END("splatCacheNaive");
+            CUDA_CHECK_CURESULT(res_2);
             CUDA_CHECK_ERROR()
 
             // VLOG(1) << "after splatting nr_verts is " << nr_lattice_vertices();
@@ -171,13 +173,14 @@ public:
             // TIME_START("kernel_splat");
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
-            m_lattice_program.kernel("kernel_splat")
+            CUresult res= m_lattice_program.kernel("kernel_splat")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         // .launch( positions, values, nr_positions, splatting_indices_and_weights, hash_table_gpu );
                         .launch( positions, nr_positions, splatting_indices, splatting_weights, hash_table_gpu, false );
             // TIME_END("kernel_splat");
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
 
         }
@@ -188,12 +191,13 @@ public:
    
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
-            m_lattice_program.kernel("distribute")
+            CUresult res= m_lattice_program.kernel("distribute")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         // .launch( positions, values, nr_positions, splatting_indices_and_weights, hash_table_gpu );
                         .launch( positions, values, nr_positions, splatting_indices, splatting_weights, distributed, hash_table_gpu );
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
 
            
@@ -221,10 +225,11 @@ public:
             int size_of_indices_vector=nr_positions*(pos_dim+1);
             dim3 blocks(( nr_positions*(pos_dim+1) - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
-            m_lattice_program.kernel("create_splatting_mask")
+            CUresult res= m_lattice_program.kernel("create_splatting_mask")
                         .instantiate(pos_dim)
                         .configure(blocks, blockSize)
                         .launch( mask, splatting_indices, nr_points_per_simplex, max_nr_points, size_of_indices_vector);
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
         }
 
@@ -233,10 +238,12 @@ public:
 
             dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
 
-            m_lattice_program.kernel("blur")
+            CUresult res= m_lattice_program.kernel("blur")
                     .instantiate(pos_dim, val_full_dim)
                     .configure(blocks, BLOCK_SIZE)
                     .launch( hash_table_capacity, new_values, remainder, hash_table_gpu );
+            CUDA_CHECK_CURESULT(res);
+            CUDA_CHECK_ERROR();
 
         }
 
@@ -245,10 +252,12 @@ public:
 
             dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
 
-            m_lattice_program.kernel("convolve")
+            CUresult res= m_lattice_program.kernel("convolve")
                     .instantiate(pos_dim, val_dim)
                     .configure(blocks, BLOCK_SIZE)
                     .launch( hash_table_capacity, new_values, filter_bank, nr_filters, filter_extent, hash_table_gpu );
+            CUDA_CHECK_CURESULT(res);
+            CUDA_CHECK_ERROR();
         }
 
         //creates a lattice rowified by grabbing the values of the neighbours from the hash_table_query_and_neighbours
@@ -275,10 +284,12 @@ public:
             //46ms
             //43ms
 
-            m_lattice_program.kernel("im2row")
+            CUresult res= m_lattice_program.kernel("im2row")
                     .instantiate(pos_dim, val_full_dim)
                     .configure(nr_blocks, BLOCK_SIZE)
                     .launch( nr_vertices, im2row_out, filter_extent, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, use_center_vertex_from_lattice_neighbours, flip_neighbours, debug_kernel);
+            CUDA_CHECK_CURESULT(res);
+            CUDA_CHECK_ERROR();
         }
 
         // void test_row2im(const int hash_table_capacity, const int pos_dim, const int val_full_dim, const int dilation, float* im2row_in, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex){
@@ -299,20 +310,24 @@ public:
 
             dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
 
-            m_lattice_program.kernel("row2im")
+            CUresult res= m_lattice_program.kernel("row2im")
                     .instantiate(pos_dim, val_full_dim)
                     .configure(blocks, BLOCK_SIZE)
                     .launch( hash_table_capacity, im2row_in, filter_extent, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, use_center_vertex_from_lattice_neighbours, do_test);
+            CUDA_CHECK_CURESULT(res);
+            CUDA_CHECK_ERROR();
         }
 
         void coarsen(const int hash_table_capacity, const int pos_dim, const HashTableGPU& fine_hash_table_gpu, const HashTableGPU& coarse_hash_table_gpu){
             dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
 
-            m_lattice_program.kernel("coarsen")
+            CUresult res= m_lattice_program.kernel("coarsen")
                     .instantiate(pos_dim)
                     .configure(blocks, BLOCK_SIZE)
                     .launch(hash_table_capacity, fine_hash_table_gpu, coarse_hash_table_gpu );
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
+            CUDA_CHECK_CURESULT(res);
+            CUDA_CHECK_ERROR();
         }
 
         void slice_standalone_no_precomputation(const float* positions, float* sliced_values, const int pos_dim, const int val_full_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
@@ -324,10 +339,11 @@ public:
             dim3 cleanBlocks((nr_positions - 1) / cleanBlockSize + 1, 2 * (pos_dim + 1), 1);
 
             blockSize.y = 1;
-            m_lattice_program.kernel("slice_no_precomputation")
+            CUresult res= m_lattice_program.kernel("slice_no_precomputation")
                         .instantiate(pos_dim, val_full_dim)
                         .configure(blocks, blockSize)
                         .launch( positions, sliced_values, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
 
         }
@@ -338,25 +354,27 @@ public:
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
-            m_lattice_program.kernel("gather_no_precomputation")
+            CUresult res= m_lattice_program.kernel("gather_no_precomputation")
                         .instantiate(pos_dim, val_full_dim)
                         .configure(blocks, blockSize)
                         .launch( positions, gathered_values, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
 
         }
 
         void gather_standalone_with_precomputation(const float* positions, float* gathered_values, const int pos_dim, const int val_full_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
-        // do it with jitify
-        dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
-        dim3 blockSize(BLOCK_SIZE, 1, 1);
+            // do it with jitify
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
 
-        m_lattice_program.kernel("gather_with_precomputation")
-                    .instantiate(pos_dim, val_full_dim)
-                    .configure(blocks, blockSize)
-                    .launch( positions, gathered_values, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
-        CUDA_CHECK_ERROR();
+            CUresult res= m_lattice_program.kernel("gather_with_precomputation")
+                        .instantiate(pos_dim, val_full_dim)
+                        .configure(blocks, blockSize)
+                        .launch( positions, gathered_values, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
+            CUDA_CHECK_CURESULT(res);
+            CUDA_CHECK_ERROR();
         }
 
         
@@ -367,10 +385,11 @@ public:
             dim3 blocks((nr_vertices - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
-            m_lattice_program.kernel("gather_elevated_no_precomputation")
+            CUresult res= m_lattice_program.kernel("gather_elevated_no_precomputation")
                         .instantiate(pos_dim, val_full_dim)
                         .configure(blocks, blockSize)
                         .launch( keys, gathered_values, nr_vertices, splatting_indices, splatting_weights, hash_table_gpu_to_gather_from, lattice_to_gather_from_lvl,  elevated_verts_lvl);
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
 
         }
@@ -384,10 +403,11 @@ public:
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
             blockSize.y = 1;
-            m_lattice_program.kernel("slice_elevated_verts")
+            CUresult res= m_lattice_program.kernel("slice_elevated_verts")
                         .instantiate(pos_dim, val_full_dim)
                         .configure(blocks, blockSize)
                         .launch( sliced_values, splatting_indices, splatting_weights, hash_table_to_slice_from, hash_table_elevated_verts, lattice_to_slice_from_lvl, elevated_vert_lvl);
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
 
         }
@@ -400,10 +420,11 @@ public:
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
 
-            m_lattice_program.kernel("slice_classify_no_precomputation")
+            CUresult res= m_lattice_program.kernel("slice_classify_no_precomputation")
                         .instantiate(pos_dim, val_full_dim)
                         .configure(blocks, blockSize)
                         .launch( positions, class_logits, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
         }
 
@@ -416,11 +437,12 @@ public:
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
 
-            m_lattice_program.kernel("slice_classify_with_precomputation")
+            CUresult res= m_lattice_program.kernel("slice_classify_with_precomputation")
                         .instantiate(pos_dim, val_full_dim, nr_classes)
                         .configure(blocks, blockSize)
                         // .smem(nr_classes*val_full_dim*4) //shared memory in bytes
                         .launch( positions, class_logits, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
         }
 
@@ -431,7 +453,7 @@ public:
 
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
-            m_lattice_program.kernel("slice_backwards_with_precomputation")
+            CUresult res= m_lattice_program.kernel("slice_backwards_with_precomputation")
                         .instantiate(pos_dim, val_full_dim)
                         .configure(blocks, blockSize)
                         .launch( nr_positions, sliced_values_hom, grad_sliced_values, splatting_indices, splatting_weights, hash_table_gpu );
@@ -444,10 +466,11 @@ public:
 
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
-            m_lattice_program.kernel("slice_backwards_with_precomputation_no_homogeneous")
+            CUresult res= m_lattice_program.kernel("slice_backwards_with_precomputation_no_homogeneous")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         .launch( nr_positions, grad_sliced_values, splatting_indices, splatting_weights, hash_table_gpu );
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR()
 
         }
@@ -459,11 +482,13 @@ public:
 
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
-            m_lattice_program.kernel("slice_classify_backwards_with_precomputation")
+            CUresult res= m_lattice_program.kernel("slice_classify_backwards_with_precomputation")
                         .instantiate(pos_dim, val_full_dim, nr_classes)
                         .configure(blocks, blockSize)
                         .launch( nr_positions, grad_class_logits, initial_values, splatting_indices, splatting_weights, delta_weights, linear_clasify_weight, linear_clasify_bias, grad_lattice_values, grad_delta_weights,
                          grad_linear_clasify_weight, grad_linear_clasify_bias, hash_table_gpu );
+
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR()
 
         }
@@ -473,10 +498,11 @@ public:
 
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
-            m_lattice_program.kernel("gather_backwards_with_precomputation")
+            CUresult res = m_lattice_program.kernel("gather_backwards_with_precomputation")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         .launch( nr_positions, grad_sliced_values, splatting_indices, splatting_weights, hash_table_gpu );
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR()
 
         }
@@ -485,10 +511,11 @@ public:
 
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
-            m_lattice_program.kernel("elevate_points")
+            CUresult res= m_lattice_program.kernel("elevate_points")
                         .instantiate(pos_dim)
                         .configure(blocks, blockSize)
                         .launch( nr_positions, positions, elevated );
+            CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR()
 
         }

@@ -14,20 +14,7 @@ import math
 import torch_scatter
 from lattice.lattice_py import LatticePy
 from lattice.lattice_funcs import *
-# import visdom
-# import torchnet
-# import torch.nn.functional as F
 
-# node_name="lnn"
-# vis = visdom.Visdom()
-# port=8097
-# logger_mean_before= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_mean_before'}, port=port, env='train_'+node_name)
-# logger_mean_after= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_mean_after'}, port=port, env='train_'+node_name)
-# logger_var_before= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_var_before'}, port=port, env='train_'+node_name)
-# logger_var_after= torchnet.logger.VisdomPlotLogger('line', opts={'title': 'logger_var_after'}, port=port, env='train_'+node_name)
-
-# def gelu(x):
-#   return 0.5 * x * (1 + torch.tanh(math.sqrt(math.pi / 2) * (x + 0.044715 * x ** 3)))
 
 class DropoutLattice(torch.nn.Module):
     def __init__(self, prob):
