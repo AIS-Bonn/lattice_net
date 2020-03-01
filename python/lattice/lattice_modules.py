@@ -1108,7 +1108,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
             with torch.no_grad():
                 self.conv1d.weight*=0.1 #make it smaller so that we start with delta weight that are close to zero
                 torch.nn.init.zeros_(self.conv1d.bias) 
-            self.gamma  = torch.nn.Parameter( torch.zeros( val_dim_of_each_vertex ).to("cuda") ) 
+            self.gamma  = torch.nn.Parameter( torch.ones( val_dim_of_each_vertex ).to("cuda") ) 
             self.beta  = torch.nn.Parameter( torch.zeros( val_dim_of_each_vertex ).to("cuda") ) 
 
 
@@ -1202,8 +1202,10 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # sliced_bottleneck_rowified=sliced_bottleneck_rowified.view(1,nr_positions, nr_vertices_per_simplex, val_dim_of_each_vertex)
         # sliced_bottleneck_rowified=F.gelu(sliced_bottleneck_rowified)
         # sliced_bottleneck_rowified=torch.tanh(sliced_bottleneck_rowified)
+        # print("gamma is", self.gamma)
         delta_weights=self.linear_deltaW(sliced_bottleneck_rowified)
         delta_weights=delta_weights.reshape(1,nr_positions, nr_vertices_per_simplex)
+        # delta_weights=self.tanh(delta_weights)
         # TIME_END("remove_max")
  
 
