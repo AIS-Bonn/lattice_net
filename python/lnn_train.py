@@ -120,7 +120,7 @@ def run():
                         #if its the first time we do a forward on the model we need to create here the optimizer because only now are all the tensors in the model instantiated
                         if first_time:
                             first_time=False
-                            # optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.base_lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
+                            # optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
                             optimizer=RAdam(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay())
                             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
 
