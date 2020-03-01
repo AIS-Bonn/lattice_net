@@ -1832,8 +1832,8 @@ class PointNetModule(torch.nn.Module):
                 self.first_time=False
 
                 #get the nr of channels of the distributed tensor
-                nr_input_channels=distributed.shape[1] - 1
-                # nr_input_channels=distributed.shape[1] 
+                # nr_input_channels=distributed.shape[1] - 1
+                nr_input_channels=distributed.shape[1] 
                 # initial_nr_channels=distributed.shape[1]
 
                 nr_layers=0
@@ -1859,8 +1859,8 @@ class PointNetModule(torch.nn.Module):
 
         # initial_distributed=distributed
 
-        barycentric_weights=distributed[:,-1]
-        distributed=distributed[:, :distributed.shape[1]-1] #IGNORE the barycentric weights for the moment and lift the coordinates of only the xyz and values
+        # barycentric_weights=distributed[:,-1]
+        # distributed=distributed[:, :distributed.shape[1]-1] #IGNORE the barycentric weights for the moment and lift the coordinates of only the xyz and values
         # print("distriuted is ", distributed)
         # print("barycentric weights is ", barycentric_weights)
 
@@ -1920,10 +1920,10 @@ class PointNetModule(torch.nn.Module):
             # argmax_flatened=argmax.flatten()
             # argmax_positive=argmax_flatened.clone()
             # argmax_positive[argmax_flatened<0]=0
-            barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
+            # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
             # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax_positive ) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
-            barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
-            distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced),1)
+            # barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
+            # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced),1)
             # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced, nr_points_per_simplex),1)
             # distributed_reduced=torch.cat((distributed_reduced, nr_points_per_simplex),1)
 
