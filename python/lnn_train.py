@@ -118,12 +118,11 @@ def run():
                         TIME_END("forward")
                         # loss_dice = 0.3*loss_fn(pred_logsoftmax, target) #seems to work quite good with 0.3 of dice and 0.7 of CE. Trying now to lovasz
                         # loss_dice = 0.5*loss_fn(pred_logsoftmax, target)
-                        loss_dice = loss_fn(pred_logsoftmax, target)
+                        loss_dice = 0.8*loss_fn(pred_logsoftmax, target)
                         # loss_dice = 0.0
                         #print("pred_softmax has shape ", pred_softmax.shape, "target is ", target.shape)
-                        # loss_ce = 0.7*secondary_fn(pred_softmax, target)
-                        # loss_ce = 0.5*secondary_fn(pred_logsoftmax, target)
-                        loss_ce = 0.0
+                        loss_ce = 0.2*secondary_fn(pred_logsoftmax, target)
+                        # loss_ce = 0.0
                         loss = loss_dice+loss_ce
                         # loss += 0.1*delta_weight_error_sum #TODO is not clear how much it improves iou if at all
                         # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
