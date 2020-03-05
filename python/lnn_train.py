@@ -131,10 +131,10 @@ def run():
                         if first_time:
                             first_time=False
                             # optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
-                            # optimizer=RAdam(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay())
+                            optimizer=RAdam(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay())
                             # optimizer=torch.optim.SGD(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay(), momentum=0.9, nesterov=True)
                             # optimizer=AdaBound(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay()) #starts as adam, becomes sgd epoch 175, reduced lr twice, got train iou of 82.5 and test iou of 74.5
-                            optimizer=AdaMod(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay()) #does warmup like radam but all along the training after  epoch 70, reaches train iou of 83.3 and test iou of 74.8 and converges a lot faster than the adabound
+                            # optimizer=AdaMod(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay()) #does warmup like radam but all along the training after  epoch 70, reaches train iou of 83.3 and test iou of 74.8 and converges a lot faster than the adabound
                             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
                             # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=5)
 
