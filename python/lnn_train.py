@@ -12,6 +12,7 @@ from easypbr  import *
 from dataloaders import *
 from lattice.lattice_py import LatticePy
 from lattice.diceloss import GeneralizedSoftDiceLoss
+from lattice.lovasz_loss import LovaszSoftmax
 from lattice.models import *
 
 from callbacks.callback import *
@@ -21,6 +22,8 @@ from callbacks.state_callback import *
 from callbacks.phase import *
 
 from optimizers.over9000.radam import *
+from optimizers.pytorch_optimizer.torch_optimizer.adabound import *
+from optimizers.pytorch_optimizer.torch_optimizer.adamod import *
 
 
 config_file="lnn_train_shapenet.cfg"
@@ -63,7 +66,7 @@ def run():
     cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
         ViewerCallback(),
-        # VisdomCallback(),
+        VisdomCallback(),
         StateCallback() #changes the iter nr epoch nr,
     ])
     #create loaders
@@ -86,7 +89,9 @@ def run():
     #model 
     model=LNN(loader_train.label_mngr().nr_classes(), model_params, False, False).to("cuda")
     #create loss function
-    loss_fn=GeneralizedSoftDiceLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled() ) 
+    # loss_fn=GeneralizedSoftDiceLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled() ) 
+    loss_fn=LovaszSoftmax(ignore_index=loader_train.label_mngr().get_idx_unlabeled())
+    # class_weights_tensor=model.compute_class_weights(loader_train.label_mngr().class_frequencies(), loader_train.label_mngr().get_idx_unlabeled())
     secondary_fn=torch.nn.NLLLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled())  #combination of nll and dice  https://arxiv.org/pdf/1809.10486.pdf
 
     while True:
@@ -109,11 +114,17 @@ def run():
                         cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
                         positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
                         TIME_START("forward")
-                        pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+                        pred_logsoftmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
                         TIME_END("forward")
-                        loss = loss_fn(pred_softmax, target)
+                        # loss_dice = 0.3*loss_fn(pred_logsoftmax, target) #seems to work quite good with 0.3 of dice and 0.7 of CE. Trying now to lovasz
+                        # loss_dice = 0.5*loss_fn(pred_logsoftmax, target)
+                        loss_dice = loss_fn(pred_logsoftmax, target)
+                        # loss_dice = 0.0
                         #print("pred_softmax has shape ", pred_softmax.shape, "target is ", target.shape)
-                        loss += secondary_fn(pred_softmax, target)
+                        # loss_ce = 0.7*secondary_fn(pred_softmax, target)
+                        # loss_ce = 0.5*secondary_fn(pred_logsoftmax, target)
+                        loss_ce = 0.0
+                        loss = loss_dice+loss_ce
                         # loss += 0.1*delta_weight_error_sum #TODO is not clear how much it improves iou if at all
                         # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
 
@@ -121,10 +132,14 @@ def run():
                         if first_time:
                             first_time=False
                             # optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
-                            optimizer=RAdam(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay())
+                            # optimizer=RAdam(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay())
+                            # optimizer=torch.optim.SGD(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay(), momentum=0.9, nesterov=True)
+                            # optimizer=AdaBound(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay()) #starts as adam, becomes sgd epoch 175, reduced lr twice, got train iou of 82.5 and test iou of 74.5
+                            optimizer=AdaMod(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay()) #does warmup like radam but all along the training after  epoch 70, reaches train iou of 83.3 and test iou of 74.8 and converges a lot faster than the adabound
                             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
+                            # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=5)
 
-                        cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=loss, phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
+                        cb.after_forward_pass(pred_softmax=pred_logsoftmax, target=target, cloud=cloud, loss=loss.item(), loss_dice=loss_dice.item(), phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
                         pbar.update(1)
 
                     #backward

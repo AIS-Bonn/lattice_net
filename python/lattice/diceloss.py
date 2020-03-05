@@ -203,14 +203,14 @@ class GeneralizedSoftDiceLoss(nn.Module):
         target=target.float()
         intersection_per_class = (output * encoded_target).sum(0)  #summ over all the points, the points that have a 1 exactly where the gt is 1, will count as an intersection
         union_per_class= (output + encoded_target).sum(0)
-        union_per_class-=intersection_per_class #to acount for the fasct that the intersection gets counted twice when we sum the output and the target
+        # union_per_class-=intersection_per_class #to acount for the fasct that the intersection gets counted twice when we sum the output and the target
         # print("intersection_per_class is ", intersection_per_class)
         # print("union_per_class is ", union_per_class)
 
         #you can also avoid the sum and get a dice coeff per class which you can then use some weighting upon
         # intersection_per_class=mask_ignore_idx*intersection_per_class
         # union_per_class=mask_ignore_idx*union_per_class
-        dice_coeff_per_class= (intersection_per_class+smooth) / ( union_per_class + smooth +eps )
+        dice_coeff_per_class= (2*intersection_per_class+smooth) / ( union_per_class + smooth +eps )
         loss_per_class=1-dice_coeff_per_class
         loss_per_class=self.weight*loss_per_class
         # print("loss per class is ", loss_per_class)

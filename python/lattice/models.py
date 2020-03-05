@@ -203,6 +203,7 @@ class LNN(torch.nn.Module):
         # self.stepdown = StepDownModuleDensenetNoBottleneck(16, 3, nr_classes, self.with_debug_output, self.with_error_checking)
        
         self.logsoftmax=torch.nn.LogSoftmax(dim=2)
+        # self.softmax=torch.nn.Softmax(dim=2)
 
 
         if experiment!="none":
@@ -340,11 +341,13 @@ class LNN(torch.nn.Module):
 
 
         logsoftmax=self.logsoftmax(sv)
+        # softmax=self.softmax(sv)
         # logsoftmax=self.logsoftmax(s_final)
 
         # delta_weight_error_sum=torch.tensor(0).to("cuda")
 
         logsoftmax=logsoftmax.squeeze(0)
+        # softmax=softmax.squeeze(0)
         sv=sv.squeeze(0)
 
         return logsoftmax, sv, delta_weight_error_sum
@@ -414,4 +417,28 @@ class LNN(torch.nn.Module):
 
         return positions_tensor, values_tensor, target_tensor
 
+    #like in here https://github.com/drethage/fully-convolutional-point-network/blob/60b36e76c3f0cc0512216e9a54ef869dbc8067ac/data.py 
+    #also the Enet paper seems to have a similar weighting
+    def compute_class_weights(self, class_frequencies, background_idx):
+        """ Computes class weights based on the inverse logarithm of a normalized frequency of class occurences.
+        Args:
+        class_counts: np.array
+        Returns: list[float]
+        """
+        # class_counts /= np.sum(class_counts[0:self._empty_class_id])
+        # class_weights = (1 / np.log(1.2 + class_counts))
+
+        # class_weights[self._empty_class_id] = self._special_weights['empty']
+        # class_weights[self._masked_class_id] = self._special_weights['masked']
+
+        # return class_weights.tolist()
+
+
+        #doing it my way but inspired by their approach of using the logarithm
+        class_frequencies_tensor=torch.from_numpy(class_frequencies).float().to("cuda")
+        class_weights = (1.0 / torch.log(1.05 + class_frequencies_tensor)) #the 1.2 says pretty much what is the maximum weight that we will assign to the least frequent class. Try plotting the 1/log(x) and you will see that I mean. The lower the value, the more weight we give to the least frequent classes. But don't go below the value of 1.0
+        #1 / log(1.01+0.000001) = 100
+        class_weights[background_idx]=0.00000001
+
+        return class_weights
 
