@@ -41,7 +41,7 @@ class LNN(torch.nn.Module):
         dropout_last_layer=model_params.dropout_last_layer()
         experiment=model_params.experiment()
         #check that the experiment has a valid string
-        valid_experiment=["none", "slice_no_deform", "pointnet_no_elevate", "pointnet_no_local_mean", "pointnet_no_elevate_no_local_mean", "splat"]
+        valid_experiment=["none", "slice_no_deform", "pointnet_no_elevate", "pointnet_no_local_mean", "pointnet_no_elevate_no_local_mean", "splat", "attention_pool"]
         if experiment not in valid_experiment:
             err = "Experiment " + experiment + " is not valid"
             sys.exit(err)

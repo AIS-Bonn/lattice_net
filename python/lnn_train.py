@@ -156,7 +156,7 @@ def run():
 
                 if phase.loader.is_finished():
                     pbar.close()
-                    if not is_training: #we reduce the learning rate when the test iou plateus
+                    if is_training: #we reduce the learning rate when the train iou plateus
                         if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                             scheduler.step(phase.loss_acum_per_epoch) #for ReduceLROnPlateau
                     cb.epoch_ended(phase=phase, model=model, save_checkpoint=train_params.save_checkpoint(), checkpoint_path=train_params.checkpoint_path() ) 

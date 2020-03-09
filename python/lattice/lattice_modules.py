@@ -1194,7 +1194,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # print("gamma is ", self.gamma)
         # print("beta is ", self.beta)
 
-        sliced_bottleneck_rowified-= self.gamma* max_vals + self.beta #max vals broadcasts to all the vertices in the simplex and substracts the max from them
+        sliced_bottleneck_rowified+= self.gamma* max_vals + self.beta #max vals broadcasts to all the vertices in the simplex and substracts the max from them
         # sliced_bottleneck_rowified=sliced_bottleneck_rowified.view(1,nr_positions, nr_vertices_per_simplex* val_dim_of_each_vertex)
         # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
         # sliced_bottleneck_rowified=self.gn_middle(sliced_bottleneck_rowified) 
@@ -1833,7 +1833,8 @@ class PointNetModule(torch.nn.Module):
 
                 #get the nr of channels of the distributed tensor
                 nr_input_channels=distributed.shape[1] - 1
-                # nr_input_channels=distributed.shape[1] 
+                if (self.experiment=="attention_pool"):
+                    nr_input_channels=distributed.shape[1] 
                 # initial_nr_channels=distributed.shape[1]
 
                 nr_layers=0
@@ -1852,6 +1853,14 @@ class PointNetModule(torch.nn.Module):
                     nr_input_channels=nr_output_channels
                     nr_layers=nr_layers+1
 
+                if (self.experiment=="attention_pool"):
+                    self.pre_conv=torch.nn.Linear(nr_input_channels, nr_input_channels, bias=False).to("cuda") #the last distributed is the result of relu, so we want to start this paralel branch with a conv now
+                    self.gamma  = torch.nn.Parameter( torch.ones( nr_input_channels ).to("cuda") ) 
+                    with torch.no_grad():
+                        torch.nn.init.kaiming_normal_(self.pre_conv.weight, mode='fan_in', nonlinearity='relu')
+                    self.att_activ=GnRelu1x1(nr_input_channels, False, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
+                    self.att_scores=GnRelu1x1(nr_input_channels, True, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
+
 
                 self.last_conv=ConvLatticeModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=False, with_homogeneous_coord=False, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking) #disable the bias becuse it is followed by a gn
 
@@ -1860,7 +1869,10 @@ class PointNetModule(torch.nn.Module):
         # initial_distributed=distributed
 
         barycentric_weights=distributed[:,-1]
-        distributed=distributed[:, :distributed.shape[1]-1] #IGNORE the barycentric weights for the moment and lift the coordinates of only the xyz and values
+        if ( self.experiment=="attention_pool"):
+            distributed=distributed #when we use attention pool we use the distributed tensor that contains the barycentric weights
+        else:
+            distributed=distributed[:, :distributed.shape[1]-1] #IGNORE the barycentric weights for the moment and lift the coordinates of only the xyz and values
         # print("distriuted is ", distributed)
         # print("barycentric weights is ", barycentric_weights)
 
@@ -1877,11 +1889,18 @@ class PointNetModule(torch.nn.Module):
                 # distributed=self.relu(distributed) 
                 # distributed=self.layers[i] (distributed)
 
-                distributed=self.layers[i] (distributed)
-                if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
-                    #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
+
+
+                if (self.experiment=="attention_pool"):
+                    distributed=self.layers[i] (distributed)
                     distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
-                distributed=self.relu(distributed) 
+                    distributed=self.relu(distributed) 
+                else:
+                    distributed=self.layers[i] (distributed)
+                    if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
+                        #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
+                        distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+                    distributed=self.relu(distributed) 
 
                 # #start with a first conv then does gn conv relu
                 # if i!=0:
@@ -1908,6 +1927,39 @@ class PointNetModule(torch.nn.Module):
         if self.experiment=="splat":
             # print("performing splatting since the experiment is ", self.experiment)
             distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0)
+        if self.experiment=="attention_pool":
+            #attention pooling ##################################################
+            #concat for each vertex the max over the simplex
+            max_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
+            max_per_vertex=torch.index_select(max_reduced, 0, indices_long)
+            # distributed_with_max=torch.cat( (distributed, max_per_vertex),1 )
+            distributed_with_max=distributed+self.gamma*max_per_vertex
+            # print("gamma is ", self.gamma)
+
+            pre_conv=self.pre_conv(distributed_with_max) 
+            att_activ, lattice_py=self.att_activ(pre_conv, lattice_py)
+            att_scores, lattice_py=self.att_scores(att_activ, lattice_py)
+            att_scores=torch.exp(att_scores)
+            att_scores_sum_reduced = torch_scatter.scatter_add(att_scores, indices_long, dim=0)
+            att_scores_sum=torch.index_select(att_scores_sum_reduced, 0, indices_long)
+            att_scores=att_scores/att_scores_sum
+            #softmax them somehow
+            distributed=distributed*att_scores
+            distributed_reduced = torch_scatter.scatter_add(distributed, indices_long, dim=0)
+
+            # #concat also the att scores weighted by the barucentric coords
+            # barycentric_weights=barycentric_weights.unsqueeze(1)
+            # att_scores_weighted= barycentric_weights*att_scores
+            # att_scores_weighted_reduced,_ = torch_scatter.scatter_max(att_scores_weighted, indices_long, dim=0)
+            # distributed_reduced=torch.cat((distributed_reduced,att_scores_weighted_reduced),1)
+
+            #get also the nr of points in the lattice so the max pooled features can be different if there is 1 point then if there are 100
+            ones=torch.cuda.FloatTensor( indices_long.shape[0] ).fill_(1.0)
+            nr_points_per_simplex = torch_scatter.scatter_add(ones, indices_long)
+            nr_points_per_simplex=nr_points_per_simplex.unsqueeze(1)
+            minimum_points_per_simplex=4
+            simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
+            distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
         else:
             distributed_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
             # distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0)
@@ -1931,6 +1983,10 @@ class PointNetModule(torch.nn.Module):
             simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
             distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
             # print("nr of simeplexes which have very low number of points ", simplexes_with_few_points.sum())
+
+
+
+
 
         if self.with_debug_output:
             print("distributed_reduced before the last layer has shape ", distributed_reduced.shape)
@@ -2350,6 +2406,36 @@ class GnGelu1x1(torch.nn.Module):
         lv = self.linear(lv)
         ls.set_values(lv)
         return lv, ls
+
+class GnTanh1x1(torch.nn.Module):
+    def __init__(self, out_channels, bias, with_debug_output, with_error_checking):
+        super(GnTanh1x1, self).__init__()
+        self.out_channels=out_channels
+        # self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.norm= None
+        self.tanh = torch.nn.Tanh()
+        self.linear=None
+        self.use_bias=bias
+    def forward(self, lv, ls):
+
+        #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv.shape[1])
+            self.linear= torch.nn.Linear(lv.shape[1], self.out_channels, bias=self.use_bias).to("cuda") 
+            with torch.no_grad():
+                torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_in', nonlinearity='tanh')
+                # n = 1*self.out_channels
+                # self.linear.weight.data.normal_(0, np.sqrt(2. / n))
+                # if self.linear.bias is not None:
+                #     torch.nn.init.zeros_(self.linear.bias)
+        lv, ls=self.norm(lv,ls)
+        # lv=self.relu(lv)
+        lv=self.tanh(lv)
+        ls.set_values(lv)
+        lv = self.linear(lv)
+        ls.set_values(lv)
+        return lv, ls
+
 
 class Gn1x1Gelu(torch.nn.Module):
     def __init__(self, out_channels, bias, with_debug_output, with_error_checking):
