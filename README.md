@@ -26,6 +26,9 @@ For training start the script:
 $ python/lnn_train.py 
 ```
 
+   [EasyPBR]: <https://github.com/RaduAlexandru/easy_pbr>
+   [DataLoaders]: <https://github.com/RaduAlexandru/data_loaders>
+
 
 
 
