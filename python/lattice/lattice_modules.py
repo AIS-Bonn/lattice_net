@@ -1194,7 +1194,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         # print("gamma is ", self.gamma)
         # print("beta is ", self.beta)
 
-        sliced_bottleneck_rowified+= self.gamma* max_vals + self.beta #max vals broadcasts to all the vertices in the simplex and substracts the max from them
+        sliced_bottleneck_rowified-= self.gamma* max_vals + self.beta #max vals broadcasts to all the vertices in the simplex and substracts the max from them
         # sliced_bottleneck_rowified=sliced_bottleneck_rowified.view(1,nr_positions, nr_vertices_per_simplex* val_dim_of_each_vertex)
         # sliced_bottleneck_rowified=sliced_bottleneck_rowified.transpose(1,2)
         # sliced_bottleneck_rowified=self.gn_middle(sliced_bottleneck_rowified) 
