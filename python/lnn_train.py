@@ -91,8 +91,8 @@ def run():
     #create loss function
     # loss_fn=GeneralizedSoftDiceLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled() ) 
     loss_fn=LovaszSoftmax(ignore_index=loader_train.label_mngr().get_idx_unlabeled())
-    # class_weights_tensor=model.compute_class_weights(loader_train.label_mngr().class_frequencies(), loader_train.label_mngr().get_idx_unlabeled())
-    secondary_fn=torch.nn.NLLLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled())  #combination of nll and dice  https://arxiv.org/pdf/1809.10486.pdf
+    class_weights_tensor=model.compute_class_weights(loader_train.label_mngr().class_frequencies(), loader_train.label_mngr().get_idx_unlabeled())
+    secondary_fn=torch.nn.NLLLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled(), weights=class_weights_tensor)  #combination of nll and dice  https://arxiv.org/pdf/1809.10486.pdf
 
     while True:
 
@@ -118,10 +118,10 @@ def run():
                         TIME_END("forward")
                         # loss_dice = 0.3*loss_fn(pred_logsoftmax, target) #seems to work quite good with 0.3 of dice and 0.7 of CE. Trying now to lovasz
                         # loss_dice = 0.5*loss_fn(pred_logsoftmax, target)
-                        loss_dice = 0.8*loss_fn(pred_logsoftmax, target)
+                        loss_dice = 0.5*loss_fn(pred_logsoftmax, target)
                         # loss_dice = 0.0
                         #print("pred_softmax has shape ", pred_softmax.shape, "target is ", target.shape)
-                        loss_ce = 0.2*secondary_fn(pred_logsoftmax, target)
+                        loss_ce = 0.5*secondary_fn(pred_logsoftmax, target)
                         # loss_ce = 0.0
                         loss = loss_dice+loss_ce
                         # loss += 0.1*delta_weight_error_sum #TODO is not clear how much it improves iou if at all
