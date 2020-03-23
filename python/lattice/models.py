@@ -19,6 +19,9 @@ from lattice.lattice_py import LatticePy
 from lattice.lattice_funcs import *
 from lattice.lattice_modules import *
 
+from functools import reduce
+from torch.nn.modules.module import _addindent
+
 
 #
 
@@ -480,7 +483,7 @@ class LNN(torch.nn.Module):
                 main_str += ', {:,} params'.format(total_params)
             return main_str, total_params
 
-        string, count = repr(self.model)
+        string, count = repr(self)
         if file is not None:
             print(string, file=file)
         return count

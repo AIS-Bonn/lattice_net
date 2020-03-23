@@ -92,7 +92,7 @@ def run():
     # loss_fn=GeneralizedSoftDiceLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled() ) 
     loss_fn=LovaszSoftmax(ignore_index=loader_train.label_mngr().get_idx_unlabeled())
     class_weights_tensor=model.compute_class_weights(loader_train.label_mngr().class_frequencies(), loader_train.label_mngr().get_idx_unlabeled())
-    secondary_fn=torch.nn.NLLLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled(), weights=class_weights_tensor)  #combination of nll and dice  https://arxiv.org/pdf/1809.10486.pdf
+    secondary_fn=torch.nn.NLLLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled(), weight=class_weights_tensor)  #combination of nll and dice  https://arxiv.org/pdf/1809.10486.pdf
 
     while True:
 
@@ -126,6 +126,8 @@ def run():
                         loss = loss_dice+loss_ce
                         # loss += 0.1*delta_weight_error_sum #TODO is not clear how much it improves iou if at all
                         # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
+
+                        #model.summary()
 
                         #if its the first time we do a forward on the model we need to create here the optimizer because only now are all the tensors in the model instantiated
                         if first_time:
