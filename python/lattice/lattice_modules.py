@@ -1673,7 +1673,7 @@ class GroupNormLatticeModule(torch.nn.Module):
 
         self.gn = torch.nn.GroupNorm(nr_groups, nr_params).to("cuda") #having 32 groups is the best as explained in the GroupNormalization paper
         # self.gn = torch.nn.InstanceNorm1d(nr_params, affine=affine).to("cuda")
-        self.bn=torch.nn.BatchNorm1d(num_features=nr_params, momentum=0.1, affine=affine).to("cuda")
+        #self.bn=torch.nn.BatchNorm1d(num_features=nr_params, momentum=0.1, affine=affine).to("cuda")
     def forward(self,lattice_values, lattice_py):
 
         #group norm which only does group norm over the whole values, of course this only work when they are not the same size as the capacity
@@ -1684,14 +1684,14 @@ class GroupNormLatticeModule(torch.nn.Module):
             sys.exit("lattice should be 2 dimensional, nr_vertices x val_full_dim")
 
         #group norm wants the tensor to be N, C, L  (nr_batches, channels, nr_samples)
-        #lattice_values=lattice_values.unsqueeze(0)
-        #lattice_values=lattice_values.transpose(1,2)
-        #lattice_values=self.gn(lattice_values)
-        #lattice_values=lattice_values.transpose(1,2)
-        #lattice_values=lattice_values.squeeze(0)
+        lattice_values=lattice_values.unsqueeze(0)
+        lattice_values=lattice_values.transpose(1,2)
+        lattice_values=self.gn(lattice_values)
+        lattice_values=lattice_values.transpose(1,2)
+        lattice_values=lattice_values.squeeze(0)
 
         #do actually a bn just for testing
-        lattice_values=self.bn(lattice_values)
+        #lattice_values=self.bn(lattice_values)
 
         lattice_py.set_values(lattice_values)
 
