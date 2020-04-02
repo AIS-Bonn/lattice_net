@@ -21,8 +21,8 @@ from callbacks.phase import *
 #semantickitt on infcuda2
 
 
-# config_file="lnn_eval_semantic_kitti.cfg"
-config_file="lnn_eval_scannet.cfg"
+config_file="lnn_eval_semantic_kitti.cfg"
+# config_file="lnn_eval_scannet.cfg"
 
 torch.manual_seed(0)
 
@@ -70,7 +70,7 @@ def run():
 
     cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
-        ViewerCallback(),
+        # ViewerCallback(),
         # VisdomCallback(),
         StateCallback() #changes the iter nr epoch nr,
     ])
@@ -79,15 +79,15 @@ def run():
     loader_test.set_mode_test()
     if isinstance(loader_test, DataLoaderSemanticKitti):
         loader_test.set_sequence("all") #for smenantic kitti in case the train one only trains on only one sequence we still want to test on all
-    if isinstance(loader_test, DataLoaderScanNet):
-        loader_test.set_mode_validation() #scannet doesnt have a ground truth for the test set so we use the validation set
+    # if isinstance(loader_test, DataLoaderScanNet):
+        # loader_test.set_mode_validation() #scannet doesnt have a ground truth for the test set so we use the validation set
     loader_test.start()
     #create phases
     phases= [
         Phase('test', loader_test, grad=False)
     ]
     #model 
-    model=LNN_skippy_efficient(loader_test.label_mngr().nr_classes(), model_params, False, False).to("cuda")
+    model=LNN(loader_train.label_mngr().nr_classes(), model_params, False, False).to("cuda")
 
     predictions_list=[]
     scores_list=[]
@@ -123,7 +123,7 @@ def run():
                             #need to rerun forward with the new parameters to get an accurate prediction
                             pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
 
-                        cb.after_forward_pass(pred_softmax=pred_softmax, target=target, cloud=cloud, loss=0, phase=phase, lr=0) #visualizes the prediction 
+                        cb.after_forward_pass(pred_softmax=pred_logsoftmax, target=target, cloud=cloud, loss=0, loss_dice=0, phase=phase, lr=0) #visualizes the prediction 
                         pbar.update(1)
 
                         if eval_params.do_write_predictions():
@@ -158,78 +158,83 @@ def run():
                                 os.makedirs(path_before_file, exist_ok=True)
                                 to_save_path=os.path.join(path_before_file, basename )
                                 print("saving in ", to_save_path)
-                                pred_path=to_save_path+"_pred.ply"
-                                gt_path=to_save_path+"_gt.ply"
+                                # pred_path=to_save_path+"_pred.ply"
+                                # gt_path=to_save_path+"_gt.ply"
                                 # print("writing prediction to ", pred_path)
                                 # write_prediction(pred_softmax, cloud, pred_path)
-                                write_gt(cloud, gt_path)
+                                # write_gt(cloud, gt_path)
 
 
                                 #write labels file (just a file containing for each point the predicted label)
                                 l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+                                l_pred = l_pred.reshape((-1))
+                                l_pred = l_pred.astype(np.uint32)
                                 labels_file= os.path.join(path_before_file, (basename+".label") )                
-                                with open(labels_file, 'w') as f:
-                                    for i in range(l_pred.shape[0]):
-                                        line= str(l_pred[i]) + "\n"
-                                        f.write(line)
-                                #write GT labels file (just a file containing for each point the predicted label)
-                                gt = np.squeeze(cloud.L_gt)
-                                labels_file= os.path.join(path_before_file, (basename+".gt") )                
-                                with open(labels_file, 'w') as f:
-                                    for i in range(gt.shape[0]):
-                                        line= str(gt[i]) + "\n"
-                                        f.write(line)
+                                l_pred.tofile(labels_file)
+                                # with open(labels_file, 'w') as f:
+                                    # for i in range(l_pred.shape[0]):
+                                        # line= str(l_pred[i]) + "\n"
+                                        # f.write(line)
 
-                                #check the predictions from tangentconv and get how much different we are from it. We want to show an image of the biggest change in accuracy
-                                #we want the difference to gt to be small and the difference to tangent conv to be big
-                                tangentconv_path="/home/user/rosu/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21"
-                                cloud_path_without_seq=os.path.abspath(os.path.join(os.path.dirname(cloud_path_full), "../"))
-                                cloud_path_with_seq=os.path.relpath( cloud_path_full, cloud_path_without_seq  )
-                                seq=os.path.dirname(cloud_path_with_seq)
-                                path_to_tangentconv_pred=os.path.join(tangentconv_path, seq,  (basename + ".label")  )
-                                print("path_to_tangentconv_pred", path_to_tangentconv_pred)
+                                
+                                # #write GT labels file (just a file containing for each point the predicted label)
+                                # gt = np.squeeze(cloud.L_gt)
+                                # labels_file= os.path.join(path_before_file, (basename+".gt") )                
+                                # with open(labels_file, 'w') as f:
+                                #     for i in range(gt.shape[0]):
+                                #         line= str(gt[i]) + "\n"
+                                #         f.write(line)
 
-                                f = open(path_to_tangentconv_pred, "r")
-                                tangentconv_labels = np.fromfile(f, dtype=np.uint32)
+                                # #check the predictions from tangentconv and get how much different we are from it. We want to show an image of the biggest change in accuracy
+                                # #we want the difference to gt to be small and the difference to tangent conv to be big
+                                # tangentconv_path="/home/user/rosu/data/semantic_kitti/predictions_from_related_work/tangent_conv_semantic_kitti_single_frame_final_predictions_11_21"
+                                # cloud_path_without_seq=os.path.abspath(os.path.join(os.path.dirname(cloud_path_full), "../"))
+                                # cloud_path_with_seq=os.path.relpath( cloud_path_full, cloud_path_without_seq  )
+                                # seq=os.path.dirname(cloud_path_with_seq)
+                                # path_to_tangentconv_pred=os.path.join(tangentconv_path, seq,  (basename + ".label")  )
+                                # print("path_to_tangentconv_pred", path_to_tangentconv_pred)
 
-                                #compute score 
-                                l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
-                                gt = np.squeeze(cloud.L_gt)
-                                # print("gt shape", gt.shape)
-                                # print("l_pref shape", l_pred.shape)
-                                # print("tangentconv_labels shape", tangentconv_labels.shape)
-                                point_is_valid = gt!=0
-                                nr_valid_points=point_is_valid.sum()
-                                point_is_different_than_gt = gt != l_pred
-                                diff_to_gt = (np.logical_and(point_is_different_than_gt, point_is_valid)).sum()
-                                point_is_different_than_tangentconv = tangentconv_labels != l_pred
-                                diff_to_tangentconv = (np.logical_and(point_is_different_than_tangentconv, point_is_valid)).sum()
-                                # print("diff to gt  is ", diff_to_gt)
-                                # print("diff to tangentconv  is ", diff_to_tangentconv)
-                                score=diff_to_tangentconv-diff_to_gt ##we try to maximize this score
-                                score /=nr_valid_points #normalize by the number of points becuase otherwise the score will be squeed towards grabbing point clouds that are just gigantic because they have more points
-                                print("score is ", score)
+                                # f = open(path_to_tangentconv_pred, "r")
+                                # tangentconv_labels = np.fromfile(f, dtype=np.uint32)
 
-                                #store the score and the path in a list
-                                predictions_list.append(cloud_path_head)
-                                scores_list.append(score)
-                                # print("predictions_list",predictions_list)
-                                # print("score_lists",scores_list)
+                                # #compute score 
+                                # l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+                                # gt = np.squeeze(cloud.L_gt)
+                                # # print("gt shape", gt.shape)
+                                # # print("l_pref shape", l_pred.shape)
+                                # # print("tangentconv_labels shape", tangentconv_labels.shape)
+                                # point_is_valid = gt!=0
+                                # nr_valid_points=point_is_valid.sum()
+                                # point_is_different_than_gt = gt != l_pred
+                                # diff_to_gt = (np.logical_and(point_is_different_than_gt, point_is_valid)).sum()
+                                # point_is_different_than_tangentconv = tangentconv_labels != l_pred
+                                # diff_to_tangentconv = (np.logical_and(point_is_different_than_tangentconv, point_is_valid)).sum()
+                                # # print("diff to gt  is ", diff_to_gt)
+                                # # print("diff to tangentconv  is ", diff_to_tangentconv)
+                                # score=diff_to_tangentconv-diff_to_gt ##we try to maximize this score
+                                # score /=nr_valid_points #normalize by the number of points becuase otherwise the score will be squeed towards grabbing point clouds that are just gigantic because they have more points
+                                # print("score is ", score)
 
-                                #sort based on score https://stackoverflow.com/a/6618543
-                                predictions_sorted=[predictions_list for _,predictions_list in sorted(zip(scores_list,predictions_list))]
-                                scores_sorted=np.sort(scores_list)
-                                # print("predictions_sorted",predictions_sorted)
-                                # print("scores_sorted",scores_sorted)
-                                # print("predictions_list",predictions_list)
-                                # print("score_lists",scores_list)
+                                # #store the score and the path in a list
+                                # predictions_list.append(cloud_path_head)
+                                # scores_list.append(score)
+                                # # print("predictions_list",predictions_list)
+                                # # print("score_lists",scores_list)
 
-                                #write the sorted predictions to file 
-                                best_predictions_file=os.path.join(eval_params.output_predictions_path(), "best_preds.txt")
-                                with open(best_predictions_file, 'w') as f:
-                                    for i in range(len(predictions_sorted)):
-                                        line= predictions_sorted[i] +  "    score: " +  str(scores_sorted[i]) + "\n"
-                                        f.write(line)
+                                # #sort based on score https://stackoverflow.com/a/6618543
+                                # predictions_sorted=[predictions_list for _,predictions_list in sorted(zip(scores_list,predictions_list))]
+                                # scores_sorted=np.sort(scores_list)
+                                # # print("predictions_sorted",predictions_sorted)
+                                # # print("scores_sorted",scores_sorted)
+                                # # print("predictions_list",predictions_list)
+                                # # print("score_lists",scores_list)
+
+                                # #write the sorted predictions to file 
+                                # best_predictions_file=os.path.join(eval_params.output_predictions_path(), "best_preds.txt")
+                                # with open(best_predictions_file, 'w') as f:
+                                #     for i in range(len(predictions_sorted)):
+                                #         line= predictions_sorted[i] +  "    score: " +  str(scores_sorted[i]) + "\n"
+                                #         f.write(line)
 
 
                 if phase.loader.is_finished():
