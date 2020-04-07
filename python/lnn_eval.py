@@ -87,7 +87,7 @@ def run():
         Phase('test', loader_test, grad=False)
     ]
     #model 
-    model=LNN(loader_train.label_mngr().nr_classes(), model_params, False, False).to("cuda")
+    model=LNN(loader_test.label_mngr().nr_classes(), model_params, False, False).to("cuda")
 
     predictions_list=[]
     scores_list=[]
@@ -111,7 +111,7 @@ def run():
                     with torch.set_grad_enabled(is_training):
                         cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
                         positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
-                        pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+                        pred_logsoftmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
                       
 
                         #if its the first time we do a forward on the model we need to load here the checkpoint
@@ -121,7 +121,7 @@ def run():
                             # now that all the parameters are created we can fill them with a model from a file
                             model.load_state_dict(torch.load(eval_params.checkpoint_path()))
                             #need to rerun forward with the new parameters to get an accurate prediction
-                            pred_softmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+                            pred_logsoftmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
 
                         cb.after_forward_pass(pred_softmax=pred_logsoftmax, target=target, cloud=cloud, loss=0, loss_dice=0, phase=phase, lr=0) #visualizes the prediction 
                         pbar.update(1)
@@ -166,7 +166,7 @@ def run():
 
 
                                 #write labels file (just a file containing for each point the predicted label)
-                                l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+                                l_pred=pred_logsoftmax.detach().argmax(axis=1).cpu().numpy()
                                 l_pred = l_pred.reshape((-1))
                                 l_pred = l_pred.astype(np.uint32)
                                 labels_file= os.path.join(path_before_file, (basename+".label") )                
