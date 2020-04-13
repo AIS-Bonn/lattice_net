@@ -27,8 +27,8 @@ from optimizers.over9000.radam import *
 
 
 # config_file="lnn_train_shapenet.cfg"
-config_file="lnn_train_semantic_kitti.cfg"
-# config_file="lnn_train_scannet.cfg"
+#config_file="lnn_train_semantic_kitti.cfg"
+config_file="lnn_train_scannet.cfg"
 
 torch.manual_seed(0)
 # torch.autograd.set_detect_anomaly(True)
@@ -137,8 +137,8 @@ def run():
                             #optimizer=torch.optim.SGD(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay(), momentum=0.9, nesterov=True)
                             # optimizer=AdaBound(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay()) #starts as adam, becomes sgd epoch 175, reduced lr twice, got train iou of 82.5 and test iou of 74.5
                             # optimizer=AdaMod(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay()) #does warmup like radam but all along the training after  epoch 70, reaches train iou of 83.3 and test iou of 74.8 and converges a lot faster than the adabound
-                            #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True, factor=0.1)
-                            scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=3)
+                            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
+                            #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=3)
 
                         cb.after_forward_pass(pred_softmax=pred_logsoftmax, target=target, cloud=cloud, loss=loss.item(), loss_dice=loss_dice.item(), phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
                         pbar.update(1)

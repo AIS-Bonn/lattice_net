@@ -21,8 +21,8 @@ from callbacks.phase import *
 #semantickitt on infcuda2
 
 
-config_file="lnn_eval_semantic_kitti.cfg"
-# config_file="lnn_eval_scannet.cfg"
+#config_file="lnn_eval_semantic_kitti.cfg"
+config_file="lnn_eval_scannet.cfg"
 
 torch.manual_seed(0)
 
@@ -33,6 +33,9 @@ model_params=ModelParams.create(config_file)
 def write_prediction(pred_softmax, cloud, pred_path):
     mesh_pred=cloud.clone()
     l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+    #l_pred=l_pred.unsqueeze(1)
+    l_pred = np.expand_dims(l_pred, axis=1)
+    #print("l_pred has shape ", l_pred.shape)
     mesh_pred.color_from_label_indices(l_pred)
     mesh_pred.L_pred=l_pred
     mesh_pred.save_to_file(pred_path)
@@ -112,6 +115,13 @@ def run():
                         cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
                         positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
                         pred_logsoftmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+
+
+                        #debug 
+                        #l_pred=pred_logsoftmax.detach().argmax(axis=1).cpu().numpy()
+                        #nr_zeros= l_pred ==0
+                        #nr_zeros=nr_zeros.sum()
+                        #print("nr_zeros is ", nr_zeros)
                       
 
                         #if its the first time we do a forward on the model we need to load here the checkpoint
@@ -132,12 +142,19 @@ def run():
                                 print("saving in ", to_save_path)
                                 pred_path=to_save_path+"_pred.ply"
                                 gt_path=to_save_path+"_gt.ply"
-                                write_prediction(pred_softmax, cloud, pred_path)
-                                write_gt(cloud, gt_path)
+                                #write_prediction(pred_logsoftmax, cloud, pred_path)
+                                #write_gt(cloud, gt_path)
 
 
                                 print("got cloud with name ", cloud.name)
-                                l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy()
+                                l_pred=pred_logsoftmax.detach().argmax(axis=1).cpu().numpy()
+                                
+                                #debug 
+                                nr_zeros= l_pred ==0
+                                nr_zeros=nr_zeros.sum()
+                                print("nr_zeros is ", nr_zeros)
+                                print("pred_logsoftmax has shape ", pred_logsoftmax.shape)
+
                                 cloud.L_pred=l_pred
                                 path_for_eval=os.path.join(eval_params.output_predictions_path(), "for_evaluation")
                                 os.makedirs(path_for_eval, exist_ok=True)
