@@ -12,7 +12,7 @@ set(PYTORCH_PATH "/opt/pytorch")
 set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${PYTORCH_PATH}")
 set(CMAKE_CXX_STANDARD 17) #we need c++17 because this solves alignment issues with eigen http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1409
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 
