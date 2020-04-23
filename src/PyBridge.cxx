@@ -113,7 +113,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def("clone_lattice", &Lattice::clone_lattice)
     .def("keys_to_verts", &Lattice::keys_to_verts)
     .def("elevate", &Lattice::elevate)
-    .def("deelevate", &Lattice::deelevate)
+    // .def("deelevate", &Lattice::deelevate)
     .def("color_no_neighbours", &Lattice::color_no_neighbours)
     .def("increase_sigmas", &Lattice::increase_sigmas)
     .def("set_sigma", &Lattice::set_sigma)

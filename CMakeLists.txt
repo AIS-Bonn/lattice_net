@@ -84,10 +84,10 @@ set(DEPS_SRC
 configure_file(${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/jitify_options.hpp.in ${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/jitify_options.hpp)
 install(FILES "${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/jitify_options.hpp" DESTINATION ${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/)
 # set(CUDA_NVCC_FLAGS "-gencode arch=compute_30 -code=sm_30" CACHE STRING "nvcc flags" FORCE)
-set(CUDA_NVCC_FLAGS "-arch=sm_60" CACHE STRING "nvcc flags" FORCE)
-message("NVCC flags are ", ${CUDA_NVCC_FLAGS})
-set(CUDA_VERBOSE_BUILD ON CACHE BOOL "nvcc verbose" FORCE) 
-# set(LIB_TYPE SHARED)
+#disabling a certain nvcc warning is done through https://stackoverflow.com/questions/14831051/how-to-disable-a-specific-nvcc-compiler-warnings
+set(CUDA_NVCC_FLAGS "-arch=sm_60 -Xcudafe "--diag_suppress=integer_sign_change" " CACHE STRING "nvcc flags" FORCE)
+# message("NVCC flags are ", ${CUDA_NVCC_FLAGS})
+# set(CUDA_VERBOSE_BUILD ON CACHE BOOL "nvcc verbose" FORCE) 
 cuda_add_library(latticenet_cu  SHARED  ${CMAKE_SOURCE_DIR}/src/Lattice.cu 
                                         ${CMAKE_SOURCE_DIR}/src/HashTable.cu  
                                         ${CMAKE_SOURCE_DIR}/src/ModelParams.cxx

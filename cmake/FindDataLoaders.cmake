@@ -10,7 +10,7 @@ execute_process(
     print( next(p for p in sys.path if 'site-packages' in p))"
   OUTPUT_VARIABLE PYTHON_SITE
   OUTPUT_STRIP_TRAILING_WHITESPACE)
-message("--------------------PYTHON is at ", ${PYTHON_SITE})
+message("--------------------PYTHON is at " ${PYTHON_SITE})
 #Get only the first line of the egg_link because that is pointing towards the easypbrsrc
 execute_process (
     # COMMAND bash -c "date +'%F %T'" "${PYTHON_SITE}/easypbr.egg-link"
@@ -18,7 +18,7 @@ execute_process (
     OUTPUT_VARIABLE DATALOADERS_SRC_PATH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-message("DATALOADERS source is ", ${DATALOADERS_SRC_PATH})
+message("DATALOADERS source is " ${DATALOADERS_SRC_PATH})
 
 #DEBUG
 # set(EASYPBR_SRC_PATH "/media/rosu/Data/phd/c_ws/src/easy_pbr")
@@ -44,6 +44,6 @@ find_library(DATALOADERS_LIBRARY
     HINTS ${DATALOADERS_SRC_PATH}
     DOC "The DataLoaders lib directory"
     NO_DEFAULT_PATH)
-message("--------------------DATALOADERS lib dir is at ", ${DATALOADERS_LIBRARY})
+message("--------------------DATALOADERS lib dir is at " ${DATALOADERS_LIBRARY})
 
 

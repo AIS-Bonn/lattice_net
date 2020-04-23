@@ -1,10 +1,12 @@
 #pragma once
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_runtime_api.h>
-#include "device_launch_parameters.h" //needed for threadIdx and blockDim 
-#include <device_functions.h> //for __syncthreads
+#if !defined(__CUDACC_RTC__)
+    #include <cuda.h>
+    #include <cuda_runtime.h>
+    #include <cuda_runtime_api.h>
+    #include "device_launch_parameters.h" //needed for threadIdx and blockDim 
+#endif
+// #include <device_functions.h> //for __syncthreads
 
 //adapted from https://github.com/MiguelMonteiro/permutohedral_lattice/blob/master/src/PermutohedralLatticeGPU.cuh
 class HashTableGPU { 
@@ -27,6 +29,7 @@ public:
     // int* m_filled; //it doesnt actually store the number of filled elemnts but rather is more like an upper limit to the number of elements we inserted in the hashtable. tthe way the hashtable works is that when keys are inserted they lock a certain entry. However if they find a already locked entry, they skip and they insert the key somewhere else. This may lead to duplicate keys. M_filled counts also the duplicate keys. One approach would be that during cleanhashtable we do also an atomic min to check what was the minimum entry index, this will actually be our nr of filled elements
 
 
+    #if defined(__CUDACC_RTC__)
 
     //cuda kernels 
     __device__ unsigned int hash(int *key) {
@@ -514,6 +517,8 @@ public:
         return -1;
 
     }
+
+    #endif
 
 
    

@@ -9,11 +9,13 @@
     #include "lattice_net/jitify_helper/jitify_helper.cuh"
 #endif
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_runtime_api.h>
-#include "device_launch_parameters.h" //needed for threadIdx and blockDim 
-#include <device_functions.h> //for __syncthreads
+#if !defined(__CUDACC_RTC__)
+    #include <cuda.h>
+    #include <cuda_runtime.h>
+    #include <cuda_runtime_api.h>
+    #include "device_launch_parameters.h" //needed for threadIdx and blockDim 
+#endif
+// #include <device_functions.h> //for __syncthreads
 // #include <curand_kernel.h> //for curand_uniform https://gist.github.com/NicholasShatokhin/3769635
 
 #ifndef __CUDACC_RTC__ 
@@ -541,6 +543,9 @@ public:
    
 
 };
+
+
+#if defined(__CUDACC_RTC__)
 
 //elevated a vector from m_pos_dim to a m_pos_dim+1 space
 template<int pos_dim>
@@ -3522,5 +3527,5 @@ gather_backwards_with_precomputation(const int nr_positions, float* grad_sliced_
 }
 
 
-
+#endif
 

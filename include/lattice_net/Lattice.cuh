@@ -17,7 +17,7 @@
 #include "jitify/jitify.hpp"
 //my stuff
 // #include "surfel_renderer/lattice/kernels/HashTableGPU.cuh"
-#include <Eigen/Core>
+#include <Eigen/Dense>
 
 // #define BLOCK_SIZE 64 //TODO no actually need for it. It can be a parameter. And the one kernel that needs to read this inside it's code can just use BLOCKdim.x
 
@@ -83,9 +83,9 @@ public:
     std::shared_ptr<Lattice> clone_lattice();
     Eigen::MatrixXd keys_to_verts();
     Eigen::MatrixXd elevate(torch::Tensor& positions_raw);
-    Eigen::MatrixXd deelevate(const torch::Tensor& keys);
+    // Eigen::MatrixXd deelevate(const torch::Tensor& keys);
     Eigen::MatrixXd color_no_neighbours();
-    Eigen::MatrixXd create_E_matrix(const int pos_dim);
+    // Eigen::MatrixXd create_E_matrix(const int pos_dim);
     void increase_sigmas(const float stepsize);
 
     //getters

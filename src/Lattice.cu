@@ -640,7 +640,7 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts(){
     coarse_lattice->m_name="coarse_lattice";
     coarse_lattice->m_lvl=m_lvl+1;
     coarse_lattice->m_sigmas_tensor=m_sigmas_tensor.clone()*2.0; //the sigma for the coarser one is double. This is done so if we slice at this lattice we scale the positions with the correct sigma
-    for(int i=0; i<m_sigmas.size(); i++){
+    for(size_t i=0; i<m_sigmas.size(); i++){
         coarse_lattice->m_sigmas[i]=m_sigmas[i]*2.0;
     } 
     // coarse_lattice->m_splatting_indices_tensor=torch::zeros({nr_positions*(m_pos_dim+1)}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0)  ); //we need them for when we slice the finer vertices form this coarse lattice
@@ -677,7 +677,7 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts_naive(torch::Tensor& posit
     coarse_lattice->m_lvl=m_lvl+1;
     coarse_lattice->m_sigmas_tensor=m_sigmas_tensor.clone()*2.0; //the sigma for the coarser one is double. This is done so if we slice at this lattice we scale the positions with the correct sigma
     coarse_lattice->m_sigmas=m_sigmas;
-    for(int i=0; i<m_sigmas.size(); i++){
+    for(size_t i=0; i<m_sigmas.size(); i++){
         coarse_lattice->m_sigmas[i]=m_sigmas[i]*2.0;
     } 
     // coarse_lattice->m_splatting_indices_tensor=m_splatting_indices_tensor.clone(); //we need them for when we slice the finer vertices form this coarse lattice
@@ -1436,43 +1436,43 @@ Eigen::MatrixXd Lattice::elevate(torch::Tensor& positions_raw){
     return elevated_eigen;
 }
 
-Eigen::MatrixXd Lattice::deelevate(const torch::Tensor& keys){
+// Eigen::MatrixXd Lattice::deelevate(const torch::Tensor& keys){
 
-    //get keys as eigen matrix
-    Tensor keys_valid=keys.slice(0, 0, nr_lattice_vertices()).clone();
-    EigenMatrixXfRowMajor keys_eigen_row_major=tensor2eigen(keys_valid.to(at::kFloat).unsqueeze(0));
-    Eigen::MatrixXd keys_eigen(keys_eigen_row_major.rows(), m_pos_dim+1); //reconstruct the full key
-    for (int i=0; i < keys_eigen.rows(); i++) {
-        float sum=0;
-        for (int j=0; j < m_pos_dim; j++) {
-            keys_eigen(i,j)=keys_eigen_row_major(i,j);
-            sum+=keys_eigen_row_major(i,j);
-        }
-        keys_eigen(i,m_pos_dim)=sum;
-    }
-
-
-    //create E matrix 
-    Eigen::MatrixXd E=create_E_matrix(m_pos_dim);
-    //inverse it 
-    Eigen::MatrixXd E_inv=E.completeOrthogonalDecomposition().pseudoInverse();
-    //multiply by inverse
-    //scale by inv stddev 
-    float invStdDev = (m_pos_dim + 1) * sqrt(2.0f / 3);
-    //scale my sigmas
-    Eigen::MatrixXd deelevated_vertices(keys_eigen_row_major.rows(),3);
-    for (int i=0; i < keys_eigen_row_major.rows(); i++) {
-        Eigen::VectorXd key=keys_eigen.row(i);
-        Eigen::VectorXd vertex_deelevated= (E_inv*key).array()*invStdDev;
-        for (int j=0; j < m_sigmas.size(); j++) {
-            vertex_deelevated(j)=vertex_deelevated(j)*m_sigmas[j];
-        }
-        deelevated_vertices.row(i)=vertex_deelevated;
-    }
+//     //get keys as eigen matrix
+//     Tensor keys_valid=keys.slice(0, 0, nr_lattice_vertices()).clone();
+//     EigenMatrixXfRowMajor keys_eigen_row_major=tensor2eigen(keys_valid.to(at::kFloat).unsqueeze(0));
+//     Eigen::MatrixXd keys_eigen(keys_eigen_row_major.rows(), m_pos_dim+1); //reconstruct the full key
+//     for (int i=0; i < keys_eigen.rows(); i++) {
+//         float sum=0;
+//         for (int j=0; j < m_pos_dim; j++) {
+//             keys_eigen(i,j)=keys_eigen_row_major(i,j);
+//             sum+=keys_eigen_row_major(i,j);
+//         }
+//         keys_eigen(i,m_pos_dim)=sum;
+//     }
 
 
-    return deelevated_vertices;    
-}
+//     //create E matrix 
+//     Eigen::MatrixXd E=create_E_matrix(m_pos_dim);
+//     //inverse it 
+//     Eigen::MatrixXd E_inv=E.completeOrthogonalDecomposition().pseudoInverse();
+//     //multiply by inverse
+//     //scale by inv stddev 
+//     float invStdDev = (m_pos_dim + 1) * sqrt(2.0f / 3);
+//     //scale my sigmas
+//     Eigen::MatrixXd deelevated_vertices(keys_eigen_row_major.rows(),3);
+//     for (int i=0; i < keys_eigen_row_major.rows(); i++) {
+//         Eigen::VectorXd key=keys_eigen.row(i);
+//         Eigen::VectorXd vertex_deelevated= (E_inv*key).array()*invStdDev;
+//         for (int j=0; j < m_sigmas.size(); j++) {
+//             vertex_deelevated(j)=vertex_deelevated(j)*m_sigmas[j];
+//         }
+//         deelevated_vertices.row(i)=vertex_deelevated;
+//     }
+
+
+//     return deelevated_vertices;    
+// }
 
 Eigen::MatrixXd Lattice::color_no_neighbours(){
     CHECK(m_lattice_rowified.size(0)==nr_lattice_vertices()) << "the lattice rowified should have rows for each vertex lattice. However we have a lattice rowified of size " << m_lattice_rowified.sizes() << " and nr of vertices is " << nr_lattice_vertices();
@@ -1495,36 +1495,36 @@ Eigen::MatrixXd Lattice::color_no_neighbours(){
 
     return C;
 }
-Eigen::MatrixXd Lattice::create_E_matrix(const int pos_dim){
+// Eigen::MatrixXd Lattice::create_E_matrix(const int pos_dim){
 
-    //page 30 of Andrew Adams thesis
-    Eigen::MatrixXf E_left(pos_dim+1, pos_dim );
-    Eigen::MatrixXf E_right(pos_dim, pos_dim );
-    E_left.setZero();
-    E_right.setZero();
-    //E left is has at the bottom a square matrix which has an upper triangular part of ones. Afterwards the whole E_left gets appended another row on top of all ones
-    E_left.bottomRows(pos_dim).triangularView<Eigen::Upper>().setOnes();
-    //the diagonal of the bottom square is linearly incresing from [-1, -m_pos_dim]
-    E_left.bottomRows(pos_dim).diagonal().setLinSpaced(pos_dim,1,pos_dim);
-    E_left.bottomRows(pos_dim).diagonal()= -E_left.bottomRows(pos_dim).diagonal();
-    //E_left has the first row all set to ones
-    E_left.row(0).setOnes();
-    // VLOG(1) << "E left is \n" << E_left;
-    //E right is just a diagonal matrix with entried in the diag set to 1/sqrt((d+1)(d+2)). Take into account that the d in the paper starts at 1 and we start at 0 so we add a +1 to diag_idx
-    for(int diag_idx=0; diag_idx<pos_dim; diag_idx++){
-        E_right(diag_idx, diag_idx) =  1.0 / (sqrt((diag_idx + 1) * (diag_idx + 2))) ;
-    }
-    // VLOG(1) << "E right is \n" << E_right;
+//     //page 30 of Andrew Adams thesis
+//     Eigen::MatrixXf E_left(pos_dim+1, pos_dim );
+//     Eigen::MatrixXf E_right(pos_dim, pos_dim );
+//     E_left.setZero();
+//     E_right.setZero();
+//     //E left is has at the bottom a square matrix which has an upper triangular part of ones. Afterwards the whole E_left gets appended another row on top of all ones
+//     E_left.bottomRows(pos_dim).triangularView<Eigen::Upper>().setOnes();
+//     //the diagonal of the bottom square is linearly incresing from [-1, -m_pos_dim]
+//     E_left.bottomRows(pos_dim).diagonal().setLinSpaced(pos_dim,1,pos_dim);
+//     E_left.bottomRows(pos_dim).diagonal()= -E_left.bottomRows(pos_dim).diagonal();
+//     //E_left has the first row all set to ones
+//     E_left.row(0).setOnes();
+//     // VLOG(1) << "E left is \n" << E_left;
+//     //E right is just a diagonal matrix with entried in the diag set to 1/sqrt((d+1)(d+2)). Take into account that the d in the paper starts at 1 and we start at 0 so we add a +1 to diag_idx
+//     for(int diag_idx=0; diag_idx<pos_dim; diag_idx++){
+//         E_right(diag_idx, diag_idx) =  1.0 / (sqrt((diag_idx + 1) * (diag_idx + 2))) ;
+//     }
+//     // VLOG(1) << "E right is \n" << E_right;
 
-    //rotate into H_d
-    Eigen::MatrixXf E = E_left*E_right;
+//     //rotate into H_d
+//     Eigen::MatrixXf E = E_left*E_right;
 
-    return E.cast<double>();
-}
+//     return E.cast<double>();
+// }
 
 void Lattice::increase_sigmas(const float stepsize){
         // m_sigmas.clear();
-    for(int i=0; i<m_sigmas.size(); i++){
+    for(size_t i=0; i<m_sigmas.size(); i++){
         m_sigmas[i]+=stepsize;
     }
 
@@ -1817,7 +1817,7 @@ void Lattice::set_sigma(const float sigma){
     int nr_sigmas=m_sigmas_val_and_extent.size();
     CHECK(nr_sigmas==1) << "We are summing we have onyl one sigma. This method is intended to affect only one and not two sigmas independently";
 
-    for(int i=0; i<m_sigmas.size(); i++){
+    for(size_t i=0; i<m_sigmas.size(); i++){
         m_sigmas[i]=sigma;
     }
 

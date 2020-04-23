@@ -63,12 +63,20 @@ def run():
     lattice=LatticePy()
     lattice.create(config_path, "splated_lattice")
 
-    cb = CallbacksGroup([
+    # cb = CallbacksGroup([
         # LatticeSigmaCallback() #TODO
         # ViewerCallback(),
         # VisdomCallback(),
-        StateCallback() #changes the iter nr epoch nr,
-    ])
+        # StateCallback() #changes the iter nr epoch nr,
+    # ])
+    cb_list = []
+    # cb_list.append(VisdomCallback())
+    cb_list.append(StateCallback())
+    if(train_params.with_viewer()):
+        cb_list.append(ViewerCallback())
+    cb = CallbacksGroup(cb_list)
+
+
     #create loaders
     loader_train=create_loader(train_params.dataset_name(), config_path)
     loader_train.set_mode_train()
