@@ -10,18 +10,18 @@ import time
 
 from easypbr  import *
 from dataloaders import *
-from lattice.lattice_py import LatticePy
-from lattice.diceloss import GeneralizedSoftDiceLoss
-from lattice.lovasz_loss import LovaszSoftmax
-from lattice.models import *
+from latticenet_py.lattice.lattice_py import LatticePy
+from latticenet_py.lattice.diceloss import GeneralizedSoftDiceLoss
+from latticenet_py.lattice.lovasz_loss import LovaszSoftmax
+from latticenet_py.lattice.models import *
 
-from callbacks.callback import *
-from callbacks.viewer_callback import *
-from callbacks.visdom_callback import *
-from callbacks.state_callback import *
-from callbacks.phase import *
+from latticenet_py.callbacks.callback import *
+from latticenet_py.callbacks.viewer_callback import *
+from latticenet_py.callbacks.visdom_callback import *
+from latticenet_py.callbacks.state_callback import *
+from latticenet_py.callbacks.phase import *
 
-from optimizers.over9000.radam import *
+# from optimizers.over9000.radam import *
 # from optimizers.pytorch_optimizer.torch_optimizer.adabound import *
 # from optimizers.pytorch_optimizer.torch_optimizer.adamod import *
 

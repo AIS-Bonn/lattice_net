@@ -120,7 +120,7 @@ PYBIND11_MODULE(latticenet, m) {
     ;
 
       //TrainParams
-    py::class_<TrainParams, std::shared_ptr<TrainParams>   > (m, "TrainParams")
+    py::class_<TrainParams, std::shared_ptr<TrainParams>   > (m, "TrainParams", py::module_local())
     .def_static("create", &TrainParams::create<const std::string> ) //for templated methods like this one we need to explicitly instantiate one of the arguments
     .def("dataset_name",  &TrainParams::dataset_name )
     .def("with_viewer",  &TrainParams::with_viewer )
@@ -135,7 +135,7 @@ PYBIND11_MODULE(latticenet, m) {
     ;
 
     //EvalParams
-    py::class_<EvalParams, std::shared_ptr<EvalParams>   > (m, "EvalParams")
+    py::class_<EvalParams, std::shared_ptr<EvalParams>   > (m, "EvalParams", py::module_local())
     .def_static("create", &EvalParams::create<const std::string> ) //for templated methods like this one we need to explicitly instantiate one of the arguments
     .def("dataset_name",  &EvalParams::dataset_name )
     .def("with_viewer",  &EvalParams::with_viewer )
@@ -145,7 +145,7 @@ PYBIND11_MODULE(latticenet, m) {
     ;
 
     //ModelParams
-    py::class_<ModelParams, std::shared_ptr<ModelParams>   > (m, "ModelParams")
+    py::class_<ModelParams, std::shared_ptr<ModelParams>   > (m, "ModelParams", py::module_local())
     .def_static("create", &ModelParams::create<const std::string> ) //for templated methods like this one we need to explicitly instantiate one of the arguments
     .def("positions_mode",  &ModelParams::positions_mode )
     .def("values_mode",  &ModelParams::values_mode )

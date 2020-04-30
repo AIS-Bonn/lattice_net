@@ -3,15 +3,14 @@ from torch.autograd import Function
 from torch import Tensor
 
 import sys
-# sys.path.append('/media/rosu/Data/phd/c_ws/devel/lib/') #contains the modules of pycom
-# sys.path.append('/media/rosu/Data/phd/c_ws/build/surfel_renderer/') #contains the modules of pycom
-from easypbr  import *
-from latticenet  import *
+from easypbr  import Profiler
+from latticenet  import HashTable
+from latticenet  import Lattice
 import numpy as np
 import time
 import math
 import torch_scatter
-from lattice.lattice_py import LatticePy
+from latticenet_py.lattice.lattice_py import LatticePy
 # from inplace_abn import InPlaceABN
 
 #Just to have something close to the macros we have in c++

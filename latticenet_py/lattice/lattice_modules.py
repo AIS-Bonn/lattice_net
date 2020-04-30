@@ -4,16 +4,14 @@ from torch import Tensor
 from torch.nn import functional as F
 
 import sys
-# sys.path.append('/media/rosu/Data/phd/c_ws/devel/lib/') #contains the modules of pycom
-# sys.path.append('/media/rosu/Data/phd/c_ws/build/surfel_renderer/') #contains the modules of pycom
-from easypbr  import *
-from latticenet  import *
+from latticenet  import HashTable
+from latticenet  import Lattice
 import numpy as np
 import time
 import math
 import torch_scatter
-from lattice.lattice_py import LatticePy
-from lattice.lattice_funcs import *
+from latticenet_py.lattice.lattice_py import LatticePy
+from latticenet_py.lattice.lattice_funcs import *
 
 
 class DropoutLattice(torch.nn.Module):
