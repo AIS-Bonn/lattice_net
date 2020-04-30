@@ -477,14 +477,15 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
 
     CHECK(filter_bank.defined()) << "Filter bank is undefined";
-    CHECK(filter_bank.dim()==2) << "Filter bank should have dimension 2, corresponding with (filter_extent * val_dim+1) x nr_filters.  However it has dimension: " << filter_bank.dim();
+    CHECK(filter_bank.dim()==2) << "Filter bank should have dimension 2, corresponding with  nr_filters x (filter_extent * val_dim+1).  However it has dimension: " << filter_bank.dim();
     // CHECK(filter_bank.size(0)== 2*(m_pos_dim+1)+1 ) <<"Filter extent should cover nr of vertices corresponding to a 1 hop neighborhood. Bigger neighbourhoods are not yet implemented. That means it should be 2*(m_pos_dim+1)+1 which would be" << 2*(m_pos_dim+1)+1 << "however the filter_bank.size(1) is " << filter_bank.size(1);
     // CHECK(filter_bank.size(2) == m_val_dim+1) << "Filters should convolve over all the values of this lattice so the m_val_dim+1 which is " << m_val_dim+1 << "which is " << "should be equal to filter_bank.size(2) which is " << filter_bank.size(2);
 
-    int nr_filters=filter_bank.size(1) ;
-    int filter_extent=filter_bank.size(0) / m_val_full_dim;
+    int nr_filters=filter_bank.size(0) ;
+    int filter_extent=filter_bank.size(1) / m_val_full_dim;
     // VLOG(1) << "filter_bank sizes is" << filter_bank.sizes();
     // VLOG(1) << "val full dim is " << m_val_full_dim;
+    // VLOG(1) << "filter extent is " << filter_extent;
     CHECK(filter_extent == get_filter_extent(1) ) << "Filters should convolve over all the neighbours in the 1 hop plus the center vertex lattice. So the filter extent should be " << get_filter_extent(1) << ". However it is" << filter_extent;
 
     //this lattice should be coarser (so a higher lvl) or at least at the same lvl as the lattice neigbhours (which is a finer lvl therefore the lattice_neigbhours.m_lvl is lower)
@@ -541,6 +542,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
     // VLOG(1) << "calling im2row with lattice neighbours which have vlaues of norm " << lattice_neighbours->m_hash_table->m_values_tensor.norm();
     // VLOG(4) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
+    // VLOG(1) << "calling im2row with filter extent is " << filter_extent;
     m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
 
     // m_impl->test_row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex);
@@ -555,7 +557,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
 
     //multiply each patch with the filter bank
-    Tensor convolved= m_lattice_rowified.mm(filter_bank);
+    Tensor convolved= m_lattice_rowified.mm(filter_bank.t());
     // VLOG(1) << "finished multiplication";
     // VLOG(1) << "current values has shape" << m_hash_table->m_values_tensor.sizes();
     // VLOG(1) << "convolved_hash_table.values has shape" << convolved_lattice->m_hash_table->m_values_tensor.sizes();
@@ -609,7 +611,7 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
         // debug_kernel=true;
     }
 
-    VLOG(3) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
+    // VLOG(3) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
     m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
 
     return m_lattice_rowified;
