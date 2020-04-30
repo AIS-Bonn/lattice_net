@@ -237,7 +237,11 @@ void Lattice::splat_standalone(torch::Tensor& positions_raw, torch::Tensor& valu
     int nr_positions=positions_raw.size(1);
     m_pos_dim=positions_raw.size(2);
     m_val_dim=values.size(2);
-    m_val_full_dim=m_val_dim+1;
+    if(with_homogeneous_coord){
+        m_val_full_dim=m_val_dim+1;
+    }else{
+        m_val_full_dim=m_val_dim;
+    }
 
 
     //if it's not initialized to the correct values we intialize the hashtable
@@ -480,6 +484,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     int nr_filters=filter_bank.size(1) ;
     int filter_extent=filter_bank.size(0) / m_val_full_dim;
     // VLOG(1) << "filter_bank sizes is" << filter_bank.sizes();
+    // VLOG(1) << "val full dim is " << m_val_full_dim;
     CHECK(filter_extent == get_filter_extent(1) ) << "Filters should convolve over all the neighbours in the 1 hop plus the center vertex lattice. So the filter extent should be " << get_filter_extent(1) << ". However it is" << filter_extent;
 
     //this lattice should be coarser (so a higher lvl) or at least at the same lvl as the lattice neigbhours (which is a finer lvl therefore the lattice_neigbhours.m_lvl is lower)
@@ -535,7 +540,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     }
 
     // VLOG(1) << "calling im2row with lattice neighbours which have vlaues of norm " << lattice_neighbours->m_hash_table->m_values_tensor.norm();
-    VLOG(4) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
+    // VLOG(4) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
     m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
 
     // m_impl->test_row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex);

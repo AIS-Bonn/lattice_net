@@ -1251,7 +1251,7 @@ splatCacheNaive(const int nr_positions, float *values, int* splatting_indices, f
             float weight = splatting_weights[ idx * (pos_dim + 1) + color];
             float *valOut = hash_table.m_values + splatting_idx * val_full_dim;
 
-            printf("idx is %d, color is %d my_value is %f and weight is %f \n", idx, color, *my_value, weight );
+            // printf("idx is %d, color is %d my_value is %f and weight is %f \n", idx, color, *my_value, weight );
 
             //acumulate the values
             for (int j = 0; j < val_dim; j++) {
@@ -1276,7 +1276,7 @@ splatCacheNaive(const int nr_positions, float *values, int* splatting_indices, f
 
         
         }else{
-            printf("idx is %d, has an invalid splatting_idx at position %d and the splatting idx is %d \n", idx, idx * (pos_dim + 1) + color, splatting_idx );
+            // printf("idx is %d, has an invalid splatting_idx at position %d and the splatting idx is %d \n", idx, idx * (pos_dim + 1) + color, splatting_idx );
 
         }
 

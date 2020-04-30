@@ -49,8 +49,21 @@ class SplatLattice(Function):
         # lattice=Lattice.create(config_file)
         # lattice=LatticePy()
         # lattice.create(config_file, "splated_lattice")
+
+        print("values at splatting has shape", values.shape)
+        lattice_py.set_val_full_dim(values.shape[2])
+        if (with_homogeneous_coord):
+            lattice_py.set_val_dim(values.shape[2]-1)
+        else:
+            lattice_py.set_val_dim(values.shape[2])
+        print("lattice py has val full dim " , lattice_py.val_full_dim() )
+
+
         lattice_py.begin_splat()
         lattice_py.splat_standalone(positions, values, with_homogeneous_coord)
+
+        #store the positions that created this lattice
+        lattice_py.set_positions(positions)
 
         # lattice=Inher()
         # return *(lattice.lattice.to_tensors() )
@@ -236,6 +249,7 @@ class ConvIm2RowLattice(Function):
         ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
         ctx.val_full_dim= lattice_py.lattice.val_full_dim()
+        # print("save for backwards the val full dim of ", ctx.val_full_dim)
         ctx.with_homogeneous_coord=with_homogeneous_coord
         ctx.with_debug_output=with_debug_output
         ctx.with_error_checking=with_error_checking
@@ -279,10 +293,14 @@ class ConvIm2RowLattice(Function):
         nr_filters=ctx.nr_filters
         dilation=ctx.dilation
         val_full_dim=ctx.val_full_dim
+        # print("got from the saved ctx a val full dim of ", val_full_dim)
+        # print("got from the saved ctx a nr filters of ", nr_filters)
+        # lattice_py.set_val_full_dim(val_full_dim)
 
         # lattice_rowified=lattice_py.lattice_rowified()   
         filter_bank, lattice_values, lattice_neighbours_values =ctx.saved_tensors
         filter_extent=int(filter_bank.shape[0]/val_full_dim)
+        # print("got from the saved ctx values of shaoe ", lattice_values.shape)
 
         #reconstruct lattice_rowified 
         lattice_py.set_values(lattice_values)
@@ -334,6 +352,8 @@ class ConvIm2RowLattice(Function):
             filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_full_dim) # nr_filters x filter_extent x val_fim  
             filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
             filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_full_dim)
+            # print("filter bank backwards is ", filter_bank_backwards.shape)
+            # print("grad attice value sis ", grad_lattice_values.shape)
             lattice_py.set_values(grad_lattice_values)
             grad_lattice_py=lattice_py.convolve_im2row_standalone(filter_bank_backwards, dilation, with_homogeneous_coord, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours, True)
             grad_lattice=grad_lattice_py.values()
