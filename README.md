@@ -23,7 +23,7 @@ $ make
 ### Training 
 For training start the script: 
 ```sh
-$ python/lnn_train.py 
+$ latticenet_py/lnn_train.py 
 ```
 
    [EasyPBR]: <https://github.com/RaduAlexandru/easy_pbr>
