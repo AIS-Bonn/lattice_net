@@ -139,7 +139,7 @@ class ConvLatticeModule(torch.nn.Module):
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
     def reset_parameters(self, filter_extent):
-        torch.nn.init.kaiming_uniform_(self.weight, mode='fan_in', nonlinearity='relu') #pytorch uses default leaky relu but we use relu as here https://github.com/szagoruyko/binary-wide-resnet/blob/master/wrn_mcdonnell.py and as in here https://github.com/pytorch/vision/blob/19315e313511fead3597e23075552255d07fcb2a/torchvision/models/resnet.py#L156
+        torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu') #pytorch uses default leaky relu but we use relu as here https://github.com/szagoruyko/binary-wide-resnet/blob/master/wrn_mcdonnell.py and as in here https://github.com/pytorch/vision/blob/19315e313511fead3597e23075552255d07fcb2a/torchvision/models/resnet.py#L156
         if self.bias is not None:
             fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
             bound = 1 / math.sqrt(fan_in)
@@ -162,7 +162,7 @@ class ConvLatticeModule(torch.nn.Module):
             self.first_time=False
             filter_extent=lattice_structure.lattice.get_filter_extent(self.neighbourhood_size)
             val_full_dim=lattice_structure.lattice.val_full_dim()
-            self.weight = torch.nn.Parameter( torch.empty( self.nr_filters, filter_extent * val_full_dim ).to("cuda") ) #works for ConvIm2RowLattice
+            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_full_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
             if self.use_bias:
                 self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
             # if(self.with_homogeneous_coord):
@@ -197,7 +197,7 @@ class CoarsenLatticeModule(torch.nn.Module):
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
     def reset_parameters(self, filter_extent):
-        torch.nn.init.kaiming_uniform_(self.weight, mode='fan_in', nonlinearity='relu')
+        torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu')
         
 
         #use the same weight init as here  https://github.com/kevinzakka/densenet/blob/master/model.py and like the one from the original paper https://github.com/liuzhuang13/DenseNet/blob/master/models/densenet.lua#L138-L156
@@ -212,8 +212,7 @@ class CoarsenLatticeModule(torch.nn.Module):
             self.first_time=False
             filter_extent=lattice_fine_structure.lattice.get_filter_extent(self.neighbourhood_size) 
             val_full_dim=lattice_fine_structure.lattice.val_full_dim()
-            # self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_full_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
-            self.weight = torch.nn.Parameter( torch.empty( self.nr_filters, filter_extent * val_full_dim ).to("cuda") ) #works for ConvIm2RowLattice
+            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_full_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
             # self.bias = torch.nn.Parameter(torch.empty( self.nr_filters).to("cuda") )
             with torch.no_grad():
                 self.reset_parameters(filter_extent)
@@ -241,7 +240,7 @@ class FinefyLatticeModule(torch.nn.Module):
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
     def reset_parameters(self, filter_extent):
-        torch.nn.init.kaiming_uniform_(self.weight, mode='fan_in', nonlinearity='relu')
+        torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu')
         # if self.bias is not None:
             # fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
             # bound = 1 / math.sqrt(fan_in)
@@ -259,8 +258,7 @@ class FinefyLatticeModule(torch.nn.Module):
             self.first_time=False
             filter_extent=lattice_fine_structure.lattice.get_filter_extent(self.neighbourhood_size) 
             val_full_dim=lattice_coarse_structure.lattice.val_full_dim()
-            # self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_full_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
-            self.weight = torch.nn.Parameter( torch.empty( self.nr_filters, filter_extent * val_full_dim ).to("cuda") ) #works for ConvIm2RowLattice
+            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_full_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
             # self.bias = torch.nn.Parameter(torch.empty( self.nr_filters).to("cuda") )
             with torch.no_grad():
                 self.reset_parameters(filter_extent)

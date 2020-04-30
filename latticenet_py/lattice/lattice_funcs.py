@@ -245,8 +245,8 @@ class ConvIm2RowLattice(Function):
         ctx.lattice_neighbours_structure=lattice_neighbours_structure
         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
         ctx.with_homogeneous_coord=with_homogeneous_coord
-        ctx.filter_extent=int(filter_bank.shape[1]/lattice_values.shape[1])
-        ctx.nr_filters= int(filter_bank.shape[0])#i hope it doesnt leak any memory
+        ctx.filter_extent=int(filter_bank.shape[0]/lattice_values.shape[1])
+        ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
         ctx.val_full_dim= lattice_py.lattice.val_full_dim()
         # print("save for backwards the val full dim of ", ctx.val_full_dim)
@@ -299,7 +299,7 @@ class ConvIm2RowLattice(Function):
 
         # lattice_rowified=lattice_py.lattice_rowified()   
         filter_bank, lattice_values, lattice_neighbours_values =ctx.saved_tensors
-        filter_extent=int(filter_bank.shape[1]/val_full_dim)
+        filter_extent=int(filter_bank.shape[0]/val_full_dim)
         # print("got from the saved ctx values of shaoe ", lattice_values.shape)
 
         #reconstruct lattice_rowified 
@@ -322,13 +322,7 @@ class ConvIm2RowLattice(Function):
             grad_lattice= grad_lattice_rowified[:, -val_full_dim: ] #rowim is just getting the last columns of the grad_lattice_rowified because those values correspond to the center lattice vertex
             # print("grad lattic has shape: ", grad_lattice.shape)
         else:
-            
-            # lattice_rpwified=N x filter_extent*val_ful_dim 
-            # grad_lattice-values= N x nr_filters
-            # I need something like nr_filters x filter_extent*val_ful_dim 
-
-            # grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
-            grad_filter=grad_lattice_values.transpose(0,1).mm(lattice_rowified)
+            grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
 
             #grad with respect to the input lattice
             #grad_input_lattice should have size m_hash_table_capacity x (m_val_dim+1)
@@ -354,19 +348,10 @@ class ConvIm2RowLattice(Function):
 
 
             # #attempt 4 for grad_lattice
-            # filter_bank_backwards=filter_bank.transpose(0,1) # creates a nr_filters x filter_extent * val_fim  
-            # filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_full_dim) # nr_filters x filter_extent x val_fim  
-            # filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
-            # filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_full_dim)
-
-            #before we went from  a filter bank of filter_extent*val_fim  x nr_filters   to one of (filter_extent*nr_filters) x val_full_dim
-            #to do the same now we need to go from  nr_filters x filter_extent*val_fim  to a  val_full_dim x  filter_extent*nr_filters
-            filter_bank_backwards=filter_bank.transpose(0,1) # creates a filter_extent * val_fim  * nr_filters
-            filter_bank_backwards=filter_bank_backwards.view(filter_extent,val_full_dim, nr_filters) # filter_extent x val_fim  x nr_filters
-            filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it val_full_dim x filter_extent x nr_filters  #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
-            filter_bank_backwards=filter_bank_backwards.reshape(val_full_dim, filter_extent*nr_filters )
-
-
+            filter_bank_backwards=filter_bank.transpose(0,1) # creates a nr_filters x filter_extent * val_fim  
+            filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_full_dim) # nr_filters x filter_extent x val_fim  
+            filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
+            filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_full_dim)
             # print("filter bank backwards is ", filter_bank_backwards.shape)
             # print("grad attice value sis ", grad_lattice_values.shape)
             lattice_py.set_values(grad_lattice_values)
@@ -489,8 +474,8 @@ class CoarsenLattice(Function):
         ctx.lattice_fine_structure=lattice_fine_structure
         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
         ctx.with_homogeneous_coord=with_homogeneous_coord
-        ctx.filter_extent=int(filter_bank.shape[1]/lattice_fine_values.shape[1])
-        ctx.nr_filters= int(filter_bank.shape[0])#i hope it doesnt leak any memory
+        ctx.filter_extent=int(filter_bank.shape[0]/lattice_fine_values.shape[1])
+        ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
         ctx.val_full_dim= lattice_fine_structure.lattice.val_full_dim()
         ctx.with_debug_output=with_debug_output
@@ -526,7 +511,7 @@ class CoarsenLattice(Function):
         val_full_dim=ctx.val_full_dim
   
         filter_bank, lattice_fine_values =ctx.saved_tensors
-        filter_extent=int(filter_bank.shape[1]/val_full_dim)
+        filter_extent=int(filter_bank.shape[0]/val_full_dim)
 
         #reconstruct lattice_rowified 
         lattice_fine_structure.set_values(lattice_fine_values)
@@ -537,22 +522,12 @@ class CoarsenLattice(Function):
 
         # return grad_lattice_values, grad_lattice_structure
         # return None, None, None, None, None
-        # grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
-        grad_filter=grad_lattice_values.transpose(0,1).mm(lattice_rowified)
+        grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
 
-        # filter_bank_backwards=filter_bank.transpose(0,1) # creates a nr_filters x filter_extent * val_fim  
-        # filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_full_dim) # nr_filters x filter_extent x val_fim  
-        # filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
-        # filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_full_dim)
-
-        #before we went from  a filter bank of filter_extent*val_fim  x nr_filters   to one of (filter_extent*nr_filters) x val_full_dim
-        #to do the same now we need to go from  nr_filters x filter_extent*val_fim  to a  val_full_dim x  filter_extent*nr_filters
-        filter_bank_backwards=filter_bank.transpose(0,1) # creates a filter_extent * val_fim  * nr_filters
-        filter_bank_backwards=filter_bank_backwards.view(filter_extent,val_full_dim, nr_filters) # filter_extent x val_fim  x nr_filters
-        filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it val_full_dim x filter_extent x nr_filters  #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
-        filter_bank_backwards=filter_bank_backwards.reshape(val_full_dim, filter_extent*nr_filters )
-
-
+        filter_bank_backwards=filter_bank.transpose(0,1) # creates a nr_filters x filter_extent * val_fim  
+        filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_full_dim) # nr_filters x filter_extent x val_fim  
+        filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
+        filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_full_dim)
         if with_debug_output:
             print("coarsened backwards: saved for backwards a coarsened lattice py with nr of keys", coarsened_lattice_py.nr_lattice_vertices())
         coarsened_lattice_py.set_values(grad_lattice_values)
@@ -729,8 +704,8 @@ class FinefyLattice(Function):
         ctx.lattice_coarse_structure=lattice_coarse_structure
         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
         ctx.with_homogeneous_coord=with_homogeneous_coord
-        ctx.filter_extent=int(filter_bank.shape[1]/lattice_coarse_values.shape[1])
-        ctx.nr_filters= int(filter_bank.shape[0])#i hope it doesnt leak any memory
+        ctx.filter_extent=int(filter_bank.shape[0]/lattice_coarse_values.shape[1])
+        ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
         ctx.val_full_dim= lattice_coarse_structure.lattice.val_full_dim()
         ctx.with_debug_output=with_debug_output
@@ -762,7 +737,7 @@ class FinefyLattice(Function):
         with_debug_output=ctx.with_debug_output
         with_error_checking=ctx.with_error_checking
         filter_bank, lattice_coarse_values =ctx.saved_tensors
-        filter_extent=int(filter_bank.shape[1]/val_full_dim)
+        filter_extent=int(filter_bank.shape[0]/val_full_dim)
 
         #reconstruct lattice_rowified 
         lattice_coarse_structure.set_values(lattice_coarse_values)
@@ -773,22 +748,12 @@ class FinefyLattice(Function):
 
         # return grad_lattice_values, grad_lattice_structure
         # return None, None, None, None, None
-        # grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
-        grad_filter=grad_lattice_values.transpose(0,1).mm(lattice_rowified)
+        grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
 
-        # filter_bank_backwards=filter_bank.transpose(0,1) # creates a nr_filters x filter_extent * val_fim  
-        # filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_full_dim) # nr_filters x filter_extent x val_fim  
-        # filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
-        # filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_full_dim)
-
-
-        #before we went from  a filter bank of filter_extent*val_fim  x nr_filters   to one of (filter_extent*nr_filters) x val_full_dim
-        #to do the same now we need to go from  nr_filters x filter_extent*val_fim  to a  val_full_dim x  filter_extent*nr_filters
-        filter_bank_backwards=filter_bank.transpose(0,1) # creates a filter_extent * val_fim  * nr_filters
-        filter_bank_backwards=filter_bank_backwards.view(filter_extent,val_full_dim, nr_filters) # filter_extent x val_fim  x nr_filters
-        filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it val_full_dim x filter_extent x nr_filters  #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
-        filter_bank_backwards=filter_bank_backwards.reshape(val_full_dim, filter_extent*nr_filters )
-
+        filter_bank_backwards=filter_bank.transpose(0,1) # creates a nr_filters x filter_extent * val_fim  
+        filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_full_dim) # nr_filters x filter_extent x val_fim  
+        filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
+        filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_full_dim)
         # print("finefy backwards: saved for backwards a coarsened lattice py with nr of keys", coarsened_lattice_py.nr_lattice_vertices())
         lattice_fine_structure.set_values(grad_lattice_values)
         if with_debug_output:
