@@ -51,11 +51,11 @@ class SplatLattice(Function):
         # lattice.create(config_file, "splated_lattice")
 
         print("values at splatting has shape", values.shape)
-        lattice_py.set_val_full_dim(values.shape[2])
+        lattice_py.set_val_dim(values.shape[1])
         if (with_homogeneous_coord):
-            lattice_py.set_val_dim(values.shape[2]-1)
+            lattice_py.set_val_full_dim(values.shape[1]+1)
         else:
-            lattice_py.set_val_dim(values.shape[2])
+            lattice_py.set_val_full_dim(values.shape[1])
         print("lattice py has val full dim " , lattice_py.val_full_dim() )
 
 
@@ -1037,10 +1037,10 @@ class SliceLattice(Function):
             # print("lattice_py. has nr vertices", lattice_py.nr_lattice_vertices() )
             # print("lattice values has shape", lattice_py.values().shape )
             # lattice_py.lattice.splat_standalone(positions, grad_sliced_values, False)
-            if(lattice_py.val_full_dim() is not grad_sliced_values.shape[2]):
+            if(lattice_py.val_full_dim() is not grad_sliced_values.shape[1]):
                 sys.exit("for some reason the values stored in the lattice are not the same dimension as the gradient. What?")
-            lattice_py.set_val_dim(grad_sliced_values.shape[2])
-            lattice_py.set_val_full_dim(grad_sliced_values.shape[2])
+            lattice_py.set_val_dim(grad_sliced_values.shape[1])
+            lattice_py.set_val_full_dim(grad_sliced_values.shape[1])
             # print("lattice has val dim set to ", lattice_py.val_dim())
             # print("lattice has val_full dim set to ", lattice_py.val_full_dim())
             # lattice_py.lattice.splat_standalone(positions, grad_sliced_values, False) 
@@ -1089,63 +1089,6 @@ class SliceLattice(Function):
         return lattice_values, None, None, None, None, None, None
         # return torch.rand_like(lattice_values), None
 
-
-class SliceElevatedVertsLattice(Function):
-    @staticmethod
-    def forward(ctx, lattice_values_to_slice_from, lattice_structure_to_slice_from, lattice_structure_elevated_verts, with_debug_output, with_error_checking):
-
-        #attempt 2
-        lattice_structure_to_slice_from.set_values(lattice_values_to_slice_from)
-
-        sliced_lattice=lattice_structure_elevated_verts.slice_elevated_verts(lattice_structure_to_slice_from)
-
-
-        ctx.save_for_backward( lattice_structure_elevated_verts.splatting_indices().clone(), lattice_structure_elevated_verts.splatting_weights().clone() )
-        ctx.lattice_structure_to_slice_from = lattice_structure_to_slice_from
-        ctx.lattice_structure_elevated_verts = lattice_structure_elevated_verts
-        ctx.nr_verts_to_slice_from=lattice_structure_to_slice_from.nr_lattice_vertices()
-        ctx.with_debug_output=with_debug_output
-        ctx.with_error_checking=with_error_checking
-
-        return sliced_lattice.values(), sliced_lattice
-
-
-
-       
-    @staticmethod
-    def backward(ctx, grad_sliced_values, grad_lattice_structure):
-
-        splatting_indices, splatting_weights =ctx.saved_tensors
-        lattice_structure_to_slice_from = ctx.lattice_structure_to_slice_from
-        lattice_structure_elevated_verts = ctx.lattice_structure_elevated_verts
-        nr_verts_to_slice_from=ctx.nr_verts_to_slice_from
-        with_debug_output=ctx.with_debug_output
-        with_error_checking=ctx.with_error_checking
-
-        lattice_structure_elevated_verts.set_splatting_indices(splatting_indices)
-        lattice_structure_elevated_verts.set_splatting_weights(splatting_weights)
-
-      
-        # lattice_structure_to_slice_from.begin_splat_modify_only_values()
-
-        lattice_structure_to_slice_from.set_val_dim(grad_sliced_values.shape[1])
-        lattice_structure_to_slice_from.set_val_full_dim(grad_sliced_values.shape[1])
-        lattice_structure_elevated_verts.set_val_dim(grad_sliced_values.shape[1])
-        lattice_structure_elevated_verts.set_val_full_dim(grad_sliced_values.shape[1])
-
-        lattice_structure_elevated_verts.lattice.slice_backwards_elevated_verts_with_precomputation(lattice_structure_to_slice_from.lattice, grad_sliced_values, nr_verts_to_slice_from) 
-        lattice_values=lattice_structure_to_slice_from.values().clone() #we get a pointer to the values so they don't dissapear when we realease the lettice
-      
-        ctx.lattice_structure_to_slice_from=0 # release the pointer to this so it gets cleaned up
-        ctx.lattice_structure_elevated_verts=0 # release the pointer to this so it gets cleaned up
-
-        if with_debug_output:
-            print("SLICE backwards, returning grad lattice_values of norm", lattice_values.norm())
-            print("SLICE backwards, returning grad lattice_values of sum", lattice_values.sum())
-
-        # return lattice_new, None
-        return lattice_values, None, None, None, None
-        # return torch.rand_like(lattice_values), None
 
 class SliceClassifyLattice(Function):
     @staticmethod
@@ -1368,106 +1311,6 @@ class GatherLattice(Function):
 
         return lattice_values, None, None, None, None, None
 
-class GatherElevatedLattice(Function):
-    @staticmethod
-    def forward(ctx, lattice_structure, lv_to_gather_from, ls_to_gather_from,  with_debug_output, with_error_checking):
-       
-
-        #attempt 2
-        ls_to_gather_from.set_values(lv_to_gather_from)
-        ls_to_gather_from.set_val_dim(lv_to_gather_from.shape[1])
-        ls_to_gather_from.set_val_full_dim(lv_to_gather_from.shape[1])
-
-
-        gathered_values=lattice_structure.gather_elevated_standalone_no_precomputation(ls_to_gather_from)
-
-
-        # ctx.save_for_backward(positions, lattice_structure.splatting_indices(), lattice_structure.splatting_weights() )
-        ctx.save_for_backward(lattice_structure.splatting_indices().clone(), lattice_structure.splatting_weights().clone() )
-        ctx.lattice_structure = lattice_structure
-        ctx.ls_to_gather_from = ls_to_gather_from
-        ctx.val_full_dim=lv_to_gather_from.shape[1]
-        ctx.with_debug_output=with_debug_output
-        ctx.with_error_checking=with_error_checking
-
-
-        #sanity check that we sliced enough values
-        if with_error_checking:
-            print("after gathering we recreate the splatting indices and they should all be valid")
-            indices=lattice_structure.splatting_indices()
-            indices=indices.detach()
-            indices=indices[lattice_structure.nr_lattice_vertices()*lattice_structure.pos_dim()]
-            nr_invalid=(indices==-1).sum()
-            print("nr invalid is ", nr_invalid)
-            if(nr_invalid.item()>500):
-                sys.exit("there are too many positions which end up in empty space...")
-
-
-        return gathered_values
-
-
-
-       
-    @staticmethod
-    def backward(ctx, grad_sliced_values):
-        
-        with_debug_output=ctx.with_debug_output
-        with_error_checking=ctx.with_error_checking
-
-        if with_debug_output:
-            print("gather backwards")
-            print("input gather backwards is grad_sliced_values which has shape", grad_sliced_values.shape)
-            print("input gather backwards is grad_sliced_values which has norm", grad_sliced_values.norm())
-            print("input gather backwards is grad_sliced_values which has max", grad_sliced_values.max())
-            print("input gather backwards is grad_sliced_values which has min", grad_sliced_values.min())
-
-
-        splatting_indices, splatting_weights =ctx.saved_tensors
-        lattice_py = ctx.lattice_structure
-        ls_gathered_from = ctx.ls_to_gather_from
-        val_full_dim=ctx.val_full_dim
-
-
-        lattice_py.set_splatting_indices(splatting_indices)
-        lattice_py.set_splatting_weights(splatting_weights)
-
-
-        lattice_py.set_val_full_dim(val_full_dim)
-        lattice_py.lattice.gather_backwards_elevated_standalone_with_precomputation(ls_gathered_from.lattice, grad_sliced_values) 
-        lattice_values=ls_gathered_from.values() #we get a pointer to the values so they don't dissapear when we realease the lettice
-      
-        # print("at the end of gather the values has shape ", lattice_py.values().shape)
-
-
-        ctx.lattice_structure=0 # release the pointer to this so it gets cleaned up
-        ctx.ls_gathered_from=0
-        # print("WE ARE NOT RELEASING THE LATTICE")
-
-       
-        # print("GATHER backwards, returning grad lattice_values", lattice_values)
-        if with_debug_output:
-            print("GATHER backwards, returning grad lattice_values of shape", lattice_values.shape)
-            print("GATHER backwards, returning grad lattice_values of sum", lattice_values.sum())
-            print("GATHER backwards, returning grad lattice_values of norm", lattice_values.norm())
-            print("GATHER backwards, returning grad lattice_values of min", lattice_values.min())
-            print("GATHER backwards, returning grad lattice_values of max", lattice_values.max())
-
-        # sys.exit("debug gather backwards")
-
-        return None, lattice_values, None, None, None, None
-# class CloneLattice(Function):
-#     @staticmethod
-#     def forward(ctx, lattice_py):
-#         cloned_lattice_py=lattice_py.clone_lattice()
-
-#         cloned_lattice_py.set_values(torch.rand(1))
-#         cloned_lattice_py.data=cloned_lattice_py.values()
-
-#         return cloned_lattice_py
-
-#     @staticmethod
-#     def backward(ctx, grad_cloned_lattice):
-#         return grad_cloned_lattice
 
 
 class CloneLattice(Function):

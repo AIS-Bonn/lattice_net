@@ -121,6 +121,7 @@ def run():
                     with torch.set_grad_enabled(is_training):
                         cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
                         positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
+
                         TIME_START("forward")
                         pred_logsoftmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
                         TIME_END("forward")

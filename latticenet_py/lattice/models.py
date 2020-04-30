@@ -205,7 +205,7 @@ class LNN(torch.nn.Module):
         #stepdown densenetmodule is too slow as it requires to copy the whole pointcloud when it concatenas. For semantic kitti this is just too much
         # self.stepdown = StepDownModuleDensenetNoBottleneck(16, 3, nr_classes, self.with_debug_output, self.with_error_checking)
        
-        self.logsoftmax=torch.nn.LogSoftmax(dim=2)
+        self.logsoftmax=torch.nn.LogSoftmax(dim=1)
         # self.softmax=torch.nn.Softmax(dim=2)
 
 
@@ -349,7 +349,7 @@ class LNN(torch.nn.Module):
 
         # delta_weight_error_sum=torch.tensor(0).to("cuda")
 
-        logsoftmax=logsoftmax.squeeze(0)
+        # logsoftmax=logsoftmax
         # softmax=softmax.squeeze(0)
         sv=sv.squeeze(0)
 
@@ -373,44 +373,43 @@ class LNN(torch.nn.Module):
         with torch.set_grad_enabled(False):
 
             if self.model_params.positions_mode()=="xyz":
-                positions_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
+                positions_tensor=torch.from_numpy(cloud.V).float().to("cuda")
             elif self.model_params.positions_mode()=="xyz+rgb":
-                xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
-                rgb_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
-                positions_tensor=torch.cat((xyz_tensor,rgb_tensor),2)
+                xyz_tensor=torch.from_numpy(cloud.V).float().to("cuda")
+                rgb_tensor=torch.from_numpy(cloud.C).float().to("cuda")
+                positions_tensor=torch.cat((xyz_tensor,rgb_tensor),1)
             elif self.model_params.positions_mode()=="xyz+intensity":
-                xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
-                intensity_tensor=torch.from_numpy(cloud.I).unsqueeze(0).float().to("cuda")
-                positions_tensor=torch.cat((xyz_tensor,intensity_tensor),2)
+                xyz_tensor=torch.from_numpy(cloud.V).float().to("cuda")
+                intensity_tensor=torch.from_numpy(cloud.I).float().to("cuda")
+                positions_tensor=torch.cat((xyz_tensor,intensity_tensor),1)
             else:
                 err="positions mode of ", self.model_params.positions_mode() , " not implemented"
                 sys.exit(err)
 
 
             if self.model_params.values_mode()=="none":
-                values_tensor=torch.zeros(1, positions_tensor.shape[1], 1) #not really necessary but at the moment I have no way of passing an empty value array
+                values_tensor=torch.zeros(positions_tensor.shape[0], 1) #not really necessary but at the moment I have no way of passing an empty value array
             elif self.model_params.values_mode()=="intensity":
-                values_tensor=torch.from_numpy(cloud.I).unsqueeze(0).float().to("cuda")
+                values_tensor=torch.from_numpy(cloud.I).float().to("cuda")
             elif self.model_params.values_mode()=="rgb":
-                values_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
+                values_tensor=torch.from_numpy(cloud.C).float().to("cuda")
             elif self.model_params.values_mode()=="rgb+height":
-                rgb_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
-                height_tensor=torch.from_numpy(cloud.V[:,1]).unsqueeze(0).unsqueeze(2).float().to("cuda")
-                values_tensor=torch.cat((rgb_tensor,height_tensor),2)
+                rgb_tensor=torch.from_numpy(cloud.C).float().to("cuda")
+                height_tensor=torch.from_numpy(cloud.V[:,1]).unsqueeze(1).float().to("cuda")
+                values_tensor=torch.cat((rgb_tensor,height_tensor),1)
             elif self.model_params.values_mode()=="rgb+xyz":
-                rgb_tensor=torch.from_numpy(cloud.C).unsqueeze(0).float().to("cuda")
-                xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
-                values_tensor=torch.cat((rgb_tensor,xyz_tensor),2)
+                rgb_tensor=torch.from_numpy(cloud.C).float().to("cuda")
+                xyz_tensor=torch.from_numpy(cloud.V).float().to("cuda")
+                values_tensor=torch.cat((rgb_tensor,xyz_tensor),1)
             elif self.model_params.values_mode()=="height":
-                height_tensor=torch.from_numpy(cloud.V[:,1]).unsqueeze(0).unsqueeze(2).float().to("cuda")
+                height_tensor=torch.from_numpy(cloud.V[:,1]).unsqueeze(1).float().to("cuda")
                 values_tensor=height_tensor
             elif self.model_params.values_mode()=="xyz":
-                xyz_tensor=torch.from_numpy(cloud.V).unsqueeze(0).float().to("cuda")
+                xyz_tensor=torch.from_numpy(cloud.V).float().to("cuda")
                 values_tensor=xyz_tensor
             else:
                 err="values mode of ", self.model_params.values_mode() , " not implemented"
                 sys.exit(err)
-
 
 
             target=cloud.L_gt
