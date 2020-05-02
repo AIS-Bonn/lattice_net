@@ -31,7 +31,7 @@ TIME_END = lambda name: profiler_end(name)
 
 class CreateVerts(Function):
     @staticmethod
-    def forward(ctx, lattice_py, positions, with_debug_output, with_error_checking):
+    def forward(ctx, lattice_py, positions):
 
         lattice_py.just_create_verts(positions)
 
@@ -106,7 +106,7 @@ class SplatLattice(Function):
 class DistributeLattice(Function):
     @staticmethod
     # def forward(ctx, lattice_py, positions, values, dummy_weight):
-    def forward(ctx, lattice_py, positions, values, experiment, with_debug_output, with_error_checking):
+    def forward(ctx, lattice_py, positions, values, experiment):
         # lattice_distributed=lattice_py.clone_lattice()
         # lattice_distributed.begin_splat()
         # lattice_distributed.distribute(positions, values)
@@ -186,11 +186,9 @@ class BlurLattice(Function):
 
 class ConvIm2RowLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_values, lattice_py, filter_bank, dilation, lattice_neighbours_values=None, lattice_neighbours_structure=None, use_center_vertex_from_lattice_neighbours=False, with_debug_output=True, with_error_checking=True):
+    def forward(ctx, lattice_values, lattice_py, filter_bank, dilation, lattice_neighbours_values=None, lattice_neighbours_structure=None, use_center_vertex_from_lattice_neighbours=False):
         #in the case we have lattice_neighbours, this one will be the coarse one and the lattice neighbours will be the finer one
 
-        if with_debug_output:
-            print("lattice neigbhour values is ", lattice_neighbours_values)
         # print("lattice values is ", lattice_values)
         # print("lattice neighbour values required grad is ", lattice_neighbours_values.requires_grad)
         # print("lattice values required grad is ", lattice_values.requires_grad)
@@ -204,15 +202,15 @@ class ConvIm2RowLattice(Function):
         convolved_lattice_py=lattice_py.convolve_im2row_standalone(filter_bank, dilation, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours)
         # TIME_END("convolution_itself")
         # print("conv forwards: convolved lattice has values ", convolved_lattice_py.values())
-        if with_error_checking:
-            nr_zeros=(convolved_lattice_py.values()==0).sum().item()
-            print("conv forwards: convolved lattice has nr of values which are zero  ", nr_zeros  )
-            if(nr_zeros>10):
-                sys.exit("something went wrong. We have way to many zeros after doing the convolution")
-            nr_zero_rows_rowified= ( lattice_py.lattice_rowified().sum(1)==0 ).sum().item()
-            print("conv forwards: lattice rowified has nr of rows which are zero  ", nr_zero_rows_rowified  )
-            if(nr_zero_rows_rowified>0):
-                sys.exit("Why are they vertices that have no neigbhours")
+        # if with_error_checking:
+        #     nr_zeros=(convolved_lattice_py.values()==0).sum().item()
+        #     print("conv forwards: convolved lattice has nr of values which are zero  ", nr_zeros  )
+        #     if(nr_zeros>10):
+        #         sys.exit("something went wrong. We have way to many zeros after doing the convolution")
+        #     nr_zero_rows_rowified= ( lattice_py.lattice_rowified().sum(1)==0 ).sum().item()
+        #     print("conv forwards: lattice rowified has nr of rows which are zero  ", nr_zero_rows_rowified  )
+        #     if(nr_zero_rows_rowified>0):
+        #         sys.exit("Why are they vertices that have no neigbhours")
 
         values=convolved_lattice_py.values()
         # print("inside ConvIm2RowLattice output lattice values is ", values.shape)
@@ -245,19 +243,12 @@ class ConvIm2RowLattice(Function):
         ctx.dilation=dilation
         ctx.val_dim= lattice_py.lattice.val_dim()
         # print("save for backwards the val full dim of ", ctx.val_full_dim)
-        ctx.with_debug_output=with_debug_output
-        ctx.with_error_checking=with_error_checking
 
         return values, convolved_lattice_py
 
     @staticmethod
     def backward(ctx, grad_lattice_values, grad_lattice_structure):
         
-        with_debug_output=ctx.with_debug_output
-        with_error_checking=ctx.with_error_checking
-
-        if with_debug_output:
-            print("backwards conv")
         #the forward pass was done with lattice_in_rows*filter_bank, afterwards the homogeneous coordinate was just copied so the gradient for that will be 0
         #out=lattice_in_rows*filter_bank
         # this is WRONG https://math.stackexchange.com/questions/1866757/not-understanding-derivative-of-a-matrix-matrix-product
@@ -366,12 +357,6 @@ class ConvIm2RowLattice(Function):
         #grad wrt to bias
         # grad_bias = grad_lattice_values.sum(0)
 
-        #debug 
-        if with_debug_output:
-            print("grad_lattice has norm: ", grad_lattice.norm())
-            # print("grad_lattice_2 has norm: ", grad_lattice_2.norm())
-            print("grad_filter has norm: ", grad_filter.norm())
-            # print("grad_bias has norm: ", grad_bias.norm())
 
 
         ctx.lattice_py=0 #release this object so it doesnt leak
@@ -391,18 +376,11 @@ class ConvIm2RowLattice(Function):
 
 class CoarsenLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_fine_values, lattice_fine_structure, filter_bank, use_center_vertex_from_lattice_neighbours, with_debug_output, with_error_checking):
-        if with_debug_output:
-            print("coarsening forward")
-            print("coarseing forward got lattice fine values of norm", lattice_fine_values.norm())
+    def forward(ctx, lattice_fine_values, lattice_fine_structure, filter_bank, use_center_vertex_from_lattice_neighbours):
         lattice_fine_structure.set_values(lattice_fine_values)
-        if with_debug_output:
-            print("setting values to the fine structure, the values have norm", lattice_fine_structure.values().norm() )
 
         #create a structure for the coarse lattice, the values of the coarse vertices will be zero
         positions=lattice_fine_structure.positions()
-        if with_debug_output:
-            print("coarsening in a naive, way getting the positions that created the previous lattice which are of shape", positions.shape)
 
         # print("fine lattice has keys", lattice_fine_structure.keys()) 
         #coarsened_lattice_py=lattice_fine_structure.create_coarse_verts()
@@ -412,8 +390,6 @@ class CoarsenLattice(Function):
         # print("coarsened has keys", coarsened_lattice_py.keys()) 
 
 
-        if with_debug_output:
-            print("after creating the coarse_verts the fine structure has values with norm", lattice_fine_structure.values().norm() )
 
         #convolve at this lattice vertices with the neighbours from lattice_fine
         # TIME_START("convolution_itself")
@@ -421,18 +397,18 @@ class CoarsenLattice(Function):
         convolved_lattice_py=coarsened_lattice_py.convolve_im2row_standalone(filter_bank, dilation, lattice_fine_structure, use_center_vertex_from_lattice_neighbours)
         # TIME_END("convolution_itself")
         # print("coarsening forwards: convolved lattice has values ", convolved_lattice_py.values())
-        if with_error_checking:
-            nr_zeros=(convolved_lattice_py.values()==0).sum().item()
-            vals_debug=convolved_lattice_py.values().clone()
-            vals_summed_debug=vals_debug.sum(1)
-            nr_zeros_rows=(vals_summed_debug==0).sum().item()
-            print("coarsening forwards: convolved lattice has nr of values which are zero  ", nr_zeros  )
-            print("coarsening forwards: convolved lattice has nr of rows which are zero  ", nr_zeros_rows  )
-            nr_zero_rows_rowified= ( coarsened_lattice_py.lattice_rowified().sum(1)==0 ).sum().item()
-            # print("summing the lattice rowified along the rows is ", coarsened_lattice_py.lattice_rowified().sum(1)  )
-            print("coarsening forwards: lattice rowified has nr of rows which are zero  ", nr_zero_rows_rowified  )
-            if(nr_zero_rows_rowified>100):
-                sys.exit("Why are they so many vertices that have no neigbhours")
+        # if with_error_checking:
+        #     nr_zeros=(convolved_lattice_py.values()==0).sum().item()
+        #     vals_debug=convolved_lattice_py.values().clone()
+        #     vals_summed_debug=vals_debug.sum(1)
+        #     nr_zeros_rows=(vals_summed_debug==0).sum().item()
+        #     print("coarsening forwards: convolved lattice has nr of values which are zero  ", nr_zeros  )
+        #     print("coarsening forwards: convolved lattice has nr of rows which are zero  ", nr_zeros_rows  )
+        #     nr_zero_rows_rowified= ( coarsened_lattice_py.lattice_rowified().sum(1)==0 ).sum().item()
+        #     # print("summing the lattice rowified along the rows is ", coarsened_lattice_py.lattice_rowified().sum(1)  )
+        #     print("coarsening forwards: lattice rowified has nr of rows which are zero  ", nr_zero_rows_rowified  )
+        #     if(nr_zero_rows_rowified>100):
+        #         sys.exit("Why are they so many vertices that have no neigbhours")
 
 
         # if(nr_zeros>10):
@@ -445,9 +421,6 @@ class CoarsenLattice(Function):
         #for debug
         # print("coarsening made a lattice with lattice_rowified", coarsened_lattice_py.lattice_rowified())
 
-        if with_debug_output:
-            print("saving coarsened_lattice_rowified of norm ", coarsened_lattice_py.lattice_rowified().norm() )
-            print("saving coarsened_lattice_rowified of shape ", coarsened_lattice_py.lattice_rowified().shape )
         # ctx.save_for_backward(filter_bank, coarsened_lattice_py.lattice_rowified() ) 
         ctx.save_for_backward(filter_bank, lattice_fine_values ) 
         ctx.coarsened_lattice_py=coarsened_lattice_py
@@ -457,8 +430,6 @@ class CoarsenLattice(Function):
         ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
         ctx.val_dim= lattice_fine_structure.lattice.val_dim()
-        ctx.with_debug_output=with_debug_output
-        ctx.with_error_checking=with_error_checking
 
 
        
@@ -473,12 +444,7 @@ class CoarsenLattice(Function):
     @staticmethod
     def backward(ctx, grad_lattice_values, grad_lattice_structure):
         
-        with_debug_output=ctx.with_debug_output
-        with_error_checking=ctx.with_error_checking
 
-        if with_debug_output:
-            print("coarsening backwards")
-            print("coarsening backwards input grad lattice values has size ", grad_lattice_values.shape)
 
         coarsened_lattice_py=ctx.coarsened_lattice_py
         lattice_fine_structure=ctx.lattice_fine_structure
@@ -495,8 +461,6 @@ class CoarsenLattice(Function):
         lattice_fine_structure.set_values(lattice_fine_values)
         lattice_rowified= coarsened_lattice_py.im2row(filter_extent, lattice_fine_structure, dilation, use_center_vertex_from_lattice_neighbours, False)
 
-        if with_debug_output:
-            print("got from saved_tensors coarsened_lattice_rowified of norm ", lattice_rowified.norm() )
 
         # return grad_lattice_values, grad_lattice_structure
         # return None, None, None, None, None
@@ -506,14 +470,8 @@ class CoarsenLattice(Function):
         filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_dim) # nr_filters x filter_extent x val_fim  
         filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
         filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_dim)
-        if with_debug_output:
-            print("coarsened backwards: saved for backwards a coarsened lattice py with nr of keys", coarsened_lattice_py.nr_lattice_vertices())
         coarsened_lattice_py.set_values(grad_lattice_values)
-        if with_debug_output:
-            print("before setting the val_dim, fine structure has val_dim set to ", lattice_fine_structure.val_dim())
         lattice_fine_structure.set_val_dim(nr_filters) #setting val full dim to nr of filters because we will convolve the values of grad_lattice values and those have a row of size nr_filters
-        if with_debug_output:
-            print("after setting the val_dim, fine structure has val_dim set to ", lattice_fine_structure.val_dim())
         #one hast o convolve at the fine positions, having the neighbour as the coarse ones because they are the ones with the errors
         grad_lattice_py=lattice_fine_structure.convolve_im2row_standalone(filter_bank_backwards, dilation,  coarsened_lattice_py, use_center_vertex_from_lattice_neighbours, True)
         grad_lattice=grad_lattice_py.values()
@@ -533,14 +491,7 @@ class CoarsenLattice(Function):
         ctx.lattice_fine_structure=0
         # print("WE are not releasing the coarse lattice")
 
-        #debug 
-        if with_debug_output:
-            print("grad_lattice has norm: ", grad_lattice.norm())
-            print("grad_filter has norm: ", grad_filter.norm())
-            # print("grad_bias has norm: ", grad_bias.norm())
-            print("grad_lattice has shape: ", grad_lattice.shape)
-            print("grad_filter has shape: ", grad_filter.shape)
-            # print("grad_bias has shape: ", grad_bias.shape )
+       
 
         # sys.exit("exit after the coarsening backwards")
 
@@ -550,27 +501,16 @@ class CoarsenLattice(Function):
 
 class CoarsenAndReturnLatticeRowified(Function):
     @staticmethod
-    def forward(ctx, lattice_fine_values, lattice_fine_structure, use_center_vertex_from_lattice_neighbours, with_debug_output, with_error_checking):
-        if with_debug_output:
-            print("coarsening and returning lattice rowified forward")
-            print("coarseing and returning lattice rowified forward got lattice fine values of norm", lattice_fine_values.norm())
+    def forward(ctx, lattice_fine_values, lattice_fine_structure, use_center_vertex_from_lattice_neighbours):
         lattice_fine_structure.set_values(lattice_fine_values)
-        if with_debug_output:
-            print("setting values to the fine structure, the values have norm", lattice_fine_structure.values().norm() )
 
         #create a structure for the coarse lattice, the values of the coarse vertices will be zero
         positions=lattice_fine_structure.positions()
-        if with_debug_output:
-            print("coarsening in a naive, way getting the positions that created the previous lattice which are of shape", positions.shape)
 
         # print("fine lattice has keys", lattice_fine_structure.keys()) 
         # coarsened_lattice_py=lattice_fine_structure.create_coarse_verts()
         coarsened_lattice_py=lattice_fine_structure.create_coarse_verts_naive(positions)
 
-        if with_debug_output:
-            print("after creating the coarse_verts the fine structure has values with norm", lattice_fine_structure.values().norm() )
-
-        print("COARSEN AND RETURN LATTICE ROWIFIED, lattice fine values has val full dim of shape ", lattice_fine_values.shape[1]) 
 
 
         val_dim=lattice_fine_values.shape[1]
@@ -587,8 +527,6 @@ class CoarsenAndReturnLatticeRowified(Function):
         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
         ctx.val_dim= lattice_fine_structure.lattice.val_dim()
         ctx.filter_extent=filter_extent
-        ctx.with_debug_output=with_debug_output
-        ctx.with_error_checking=with_error_checking
        
 
         return coarse_lattice_rowified, coarsened_lattice_py
@@ -596,12 +534,7 @@ class CoarsenAndReturnLatticeRowified(Function):
     @staticmethod
     def backward(ctx, grad_lattice_rowified, grad_lattice_structure):
         
-        with_debug_output=ctx.with_debug_output
-        with_error_checking=ctx.with_error_checking
 
-        if with_debug_output:
-            print("CoarsenAndReturnLatticeRowified backwards")
-            print("CoarsenAndReturnLatticeRowified backwards input grad lattice values has size ", grad_lattice_rowified.shape)
 
         coarsened_lattice_py=ctx.coarsened_lattice_py
         lattice_fine_structure=ctx.lattice_fine_structure
@@ -629,10 +562,6 @@ class CoarsenAndReturnLatticeRowified(Function):
         ctx.coarsened_lattice_py=0
         ctx.lattice_fine_structure=0
 
-        #debug 
-        if with_debug_output:
-            print("grad_lattice has norm: ", grad_lattice.norm())
-            print("grad_lattice has shape: ", grad_lattice.shape)
 
         # sys.exit("exit after the coarsening backwards")
 
@@ -640,9 +569,7 @@ class CoarsenAndReturnLatticeRowified(Function):
 
 class FinefyLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_coarse_values, lattice_coarse_structure, lattice_fine_structure,  filter_bank, use_center_vertex_from_lattice_neighbours, with_debug_output, with_error_checking):
-        if with_debug_output:
-            print("finefy forward")
+    def forward(ctx, lattice_coarse_values, lattice_coarse_structure, lattice_fine_structure,  filter_bank, use_center_vertex_from_lattice_neighbours):
         lattice_coarse_structure.set_values(lattice_coarse_values)
         lattice_fine_structure.set_val_dim(lattice_coarse_structure.val_dim())
 
@@ -684,8 +611,6 @@ class FinefyLattice(Function):
         ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
         ctx.val_dim= lattice_coarse_structure.lattice.val_dim()
-        ctx.with_debug_output=with_debug_output
-        ctx.with_error_checking=with_error_checking
 
        
         # ctx.save_for_backward(filter_bank, bias, lattice_py.lattice_rowified().clone(), lattice_fine_values ) 
@@ -709,8 +634,6 @@ class FinefyLattice(Function):
         nr_filters=ctx.nr_filters
         dilation=ctx.dilation
         val_dim=ctx.val_dim
-        with_debug_output=ctx.with_debug_output
-        with_error_checking=ctx.with_error_checking
         filter_bank, lattice_coarse_values =ctx.saved_tensors
         filter_extent=int(filter_bank.shape[0]/val_dim)
 
@@ -718,8 +641,6 @@ class FinefyLattice(Function):
         lattice_coarse_structure.set_values(lattice_coarse_values)
         lattice_rowified= lattice_fine_structure.im2row(filter_extent, lattice_coarse_structure, dilation, use_center_vertex_from_lattice_neighbours, False)
 
-        if with_debug_output:
-            print("got from saved_tensors coarsened_lattice_rowified of norm ", lattice_rowified.norm() )
 
         # return grad_lattice_values, grad_lattice_structure
         # return None, None, None, None, None
@@ -731,11 +652,7 @@ class FinefyLattice(Function):
         filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_dim)
         # print("finefy backwards: saved for backwards a coarsened lattice py with nr of keys", coarsened_lattice_py.nr_lattice_vertices())
         lattice_fine_structure.set_values(grad_lattice_values)
-        if with_debug_output:
-            print("before setting the val_dim, fine structure has val_dim set to ", lattice_fine_structure.val_dim())
         lattice_coarse_structure.set_val_dim(lattice_fine_structure.val_dim()) #setting val full dim to nr of filters because we will convolve the values of grad_lattice values and those have a row of size nr_filters
-        if with_debug_output:
-            print("after setting the val_dim, fine structure has val_dim set to ", lattice_fine_structure.val_dim())
         #one hast o convolve at the fine positions, having the neighbour as the coarse ones because they are the ones with the errors
         grad_lattice_py=lattice_coarse_structure.convolve_im2row_standalone(filter_bank_backwards, dilation,  lattice_fine_structure, use_center_vertex_from_lattice_neighbours, True)
         grad_lattice=grad_lattice_py.values()
@@ -755,14 +672,7 @@ class FinefyLattice(Function):
         ctx.lattice_fine_structure=0
         # print("FINEFY BACKWARD WE ARE NOT RELEASING THE LATTICE BECAUSE WE ARE RUNNING GRAD_CHECK")
 
-        #debug 
-        if with_debug_output:
-            print("grad_lattice has norm: ", grad_lattice.norm())
-            print("grad_filter has norm: ", grad_filter.norm())
-            # print("grad_bias has norm: ", grad_bias.norm())
-            print("grad_lattice has shape: ", grad_lattice.shape)
-            print("grad_filter has shape: ", grad_filter.shape)
-            # print("grad_bias has shape: ", grad_bias.shape )
+       
 
 
         return grad_lattice, None, None, grad_filter, None, None, None #THe good one
@@ -902,7 +812,7 @@ class FinefyLattice(Function):
 
 class SliceLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_values, lattice_structure, positions, with_debug_output, with_error_checking):
+    def forward(ctx, lattice_values, lattice_structure, positions):
 
         # sliced_values=lattice_py.slice_standalone_no_precomputation(positions, with_homogeneous_coord)
         # # import ipdb; ipdb.set_trace()
@@ -914,11 +824,6 @@ class SliceLattice(Function):
         # #sliced_values has no grad_fn
         # # sliced_values.grad_fn=self.backward
 
-        # return sliced_values
-        if with_debug_output:
-            print("slice forward received a lattice structure with values ", lattice_structure.values())
-            print("slice forward received a lattice structure with nr of vertices", lattice_structure.nr_lattice_vertices())
-            print("slice forward received a lattice structure with values of shape", lattice_structure.values().shape)
 
 
         #attempt 2
@@ -931,20 +836,18 @@ class SliceLattice(Function):
 
         ctx.save_for_backward(positions, lattice_structure.sliced_values_hom(), lattice_structure.splatting_indices(), lattice_structure.splatting_weights() )
         ctx.lattice_structure = lattice_structure
-        ctx.with_debug_output=with_debug_output
-        ctx.with_error_checking=with_error_checking
 
 
-        #sanity check that we sliced enough values
-        if with_error_checking:
-            print("after slicing we recreate the splatting indices and they should all be valid")
-            indices=lattice_structure.splatting_indices()
-            indices=indices.detach()
-            indices=indices[lattice_structure.nr_lattice_vertices()*lattice_structure.pos_dim()]
-            nr_invalid=(indices==-1).sum()
-            print("nr invalid is ", nr_invalid)
-            if(nr_invalid.item()>500):
-                sys.exit("there are too many positions which end up in empty space...")
+        # #sanity check that we sliced enough values
+        # if with_error_checking:
+        #     print("after slicing we recreate the splatting indices and they should all be valid")
+        #     indices=lattice_structure.splatting_indices()
+        #     indices=indices.detach()
+        #     indices=indices[lattice_structure.nr_lattice_vertices()*lattice_structure.pos_dim()]
+        #     nr_invalid=(indices==-1).sum()
+        #     print("nr invalid is ", nr_invalid)
+        #     if(nr_invalid.item()>500):
+        #         sys.exit("there are too many positions which end up in empty space...")
 
 
         return sliced_values
@@ -955,14 +858,7 @@ class SliceLattice(Function):
     @staticmethod
     def backward(ctx, grad_sliced_values):
         
-        with_debug_output=ctx.with_debug_output
-        with_error_checking=ctx.with_error_checking
 
-        if with_debug_output:
-            print("slice backwards")
-            print("input slice backwards is grad_sliced_values ", grad_sliced_values)
-            print("input slice backwards is grad_sliced_values which has shape", grad_sliced_values.shape)
-            print("input slice backwards is grad_sliced_values which has norm", grad_sliced_values.norm())
 
 
         #attempt2
@@ -983,12 +879,7 @@ class SliceLattice(Function):
         lattice_py.set_splatting_weights(splatting_weights)
 
 
-        # values_forward_vertices=lattice_py.lattice.svalues().clone()
-        # print("values_forward vertice is ", values_forward_vertices)
-        # lattice_py.begin_splat_modify_only_values()
-        if with_debug_output:
-            print("slice backwards has a lattice_py with indices", lattice_py.splatting_indices())
-            print("slice backwards has a lattice_py with weights", lattice_py.splatting_weights())
+ 
         #divide by the homogeneous coordinate
         # grad_sliced_values/=lattice_py.lattice.values()[:, 3:4]
         # lattice_py.splat_standalone(positions, grad_sliced_values)
@@ -999,8 +890,6 @@ class SliceLattice(Function):
         # print("grad_sliced_values max is", grad_sliced_values.max())
         # print("grad_sliced_values has shape", grad_sliced_values.shape)
     # torch::Tensor slice_backwards_standalone_with_precomputation(torch::Tensor& positions_raw, const torch::Tensor& values_forward_vertices, const torch::Tensor& grad_sliced_values);
-        if with_debug_output:
-            print("slice backwards with_homogeneous coord")
         # print("splatting in the backward step")
         # print("splatting in the backward step val dim is", lattice_py.val_dim())
         # print("splatting in the backward step val_full dim is", lattice_py.val_full_dim())
@@ -1047,12 +936,6 @@ class SliceLattice(Function):
         #the gradient of loss wrt to the sliced value will get multiplied by the gradient of the sliced value with rest to the vertex values
         #then each vertex will acumulate the gradients
 
-        # print("SLICE backwards, returning grad lattice_values", lattice_values)
-        if with_debug_output:
-            print("SLICE backwards, returning grad lattice_values ", lattice_values)
-            print("SLICE backwards, returning grad lattice_values of norm", lattice_values.norm())
-            print("SLICE backwards, returning grad lattice_values of sum", lattice_values.sum())
-            print("SLICE backwards, returning grad lattice_values of shape", lattice_values.shape)
 
         # return lattice_new, None
         return lattice_values, None, None, None, None, None, None
@@ -1061,13 +944,9 @@ class SliceLattice(Function):
 
 class SliceClassifyLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_values, lattice_structure, positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, with_debug_output, with_error_checking):
+    def forward(ctx, lattice_values, lattice_structure, positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes):
 
 
-        if with_debug_output:
-            print("slice clasify forward received a lattice structure with values ", lattice_structure.values())
-            print("slice clasify forward received a lattice structure with nr of vertices", lattice_structure.nr_lattice_vertices())
-            print("slice clasify forward received a lattice structure with values of shape", lattice_structure.values().shape)
         
         # print("linear_clasify_weight has shape ", linear_clasify_weight.shape)
         # sys.exit("stop for debugging")
@@ -1090,22 +969,20 @@ class SliceClassifyLattice(Function):
         # ctx.save_for_backward(positions, initial_values, lattice_structure.splatting_indices(), lattice_structure.splatting_weights(), delta_weights, linear_clasify_weight, linear_clasify_bias )
         ctx.save_for_backward(positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias )
         ctx.lattice_structure = lattice_structure
-        ctx.with_debug_output=with_debug_output
-        ctx.with_error_checking=with_error_checking
         ctx.val_dim=lattice_values.shape[1]
         ctx.nr_classes=nr_classes
 
 
-        #sanity check that we sliced enough values
-        if with_error_checking:
-            print("after slicing we recreate the splatting indices and they should all be valid")
-            indices=lattice_structure.splatting_indices()
-            indices=indices.detach()
-            indices=indices[lattice_structure.nr_lattice_vertices()*lattice_structure.pos_dim()]
-            nr_invalid=(indices==-1).sum()
-            print("nr invalid is ", nr_invalid)
-            if(nr_invalid.item()>500):
-                sys.exit("there are too many positions which end up in empty space...")
+        # #sanity check that we sliced enough values
+        # if with_error_checking:
+        #     print("after slicing we recreate the splatting indices and they should all be valid")
+        #     indices=lattice_structure.splatting_indices()
+        #     indices=indices.detach()
+        #     indices=indices[lattice_structure.nr_lattice_vertices()*lattice_structure.pos_dim()]
+        #     nr_invalid=(indices==-1).sum()
+        #     print("nr invalid is ", nr_invalid)
+        #     if(nr_invalid.item()>500):
+        #         sys.exit("there are too many positions which end up in empty space...")
 
 
         return class_logits
@@ -1116,14 +993,7 @@ class SliceClassifyLattice(Function):
     @staticmethod
     def backward(ctx, grad_class_logits):
         
-        with_debug_output=ctx.with_debug_output
-        with_error_checking=ctx.with_error_checking
-
-        if with_debug_output:
-            print("slice clasify backwards")
-            print("input slice clasify backwards is grad_class_logits ", grad_class_logits)
-            print("input slice clasify backwards is grad_class_logits which has shape", grad_class_logits.shape)
-            print("input slice clasify backwards is grad_class_logits which has norm", grad_class_logits.norm())
+       
 
 
         # positions, initial_values, splatting_indices, splatting_weights, delta_weights, linear_clasify_weight, linear_clasify_bias =ctx.saved_tensors
@@ -1165,16 +1035,6 @@ class SliceClassifyLattice(Function):
         # print("SLICING CLASIFY BACKWARDS DOESNT RELEASE THE LATTICE AT THE MOMENT BEUCASE I AM DOING GRAD_CHECK")
 
         
-        if with_debug_output:
-            # print("SLICE backwards, returning grad lattice_values ", lattice_values)
-            print("SLICE backwards, returning grad lattice_values of norm", grad_lattice_values.norm())
-            # print("SLICE backwards, returning grad lattice_values of shape", grad_lattice_values.shape)
-            print("SLICE backwards, returning grad_delta_weights of norm", grad_delta_weights.norm())
-            # print("SLICE backwards, returning grad delta_weights of shape", grad_delta_weights.shape)
-            print("SLICE backwards, returning grad_linear_clasify_weight of norm", grad_linear_clasify_weight.norm())
-            # print("SLICE backwards, returning grad linear_clasify_weight of shape", grad_linear_clasify_weight.shape)
-            # print("SLICE backwards, returning grad_linear_clasify_weight", grad_linear_clasify_weight )
-            print("SLICE backwards, returnign", grad_lattice_values )
 
         # sys.exit("stop for debugging")
 
@@ -1182,12 +1042,8 @@ class SliceClassifyLattice(Function):
 
 class GatherLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_values, lattice_structure, positions,  with_debug_output, with_error_checking):
+    def forward(ctx, lattice_values, lattice_structure, positions):
        
-        # return sliced_values
-        if with_debug_output:
-            print("gather forward received a lattice structure with nr of vertices", lattice_structure.nr_lattice_vertices())
-            print("gather forward received a lattice structure with values of shape", lattice_structure.values().shape)
 
 
         #attempt 2
@@ -1212,20 +1068,18 @@ class GatherLattice(Function):
         # ctx.save_for_backward(positions, lattice_structure.splatting_indices().clone(), lattice_structure.splatting_weights().clone() )
         ctx.lattice_structure = lattice_structure
         ctx.val_dim=lattice_values.shape[1]
-        ctx.with_debug_output=with_debug_output
-        ctx.with_error_checking=with_error_checking
 
 
-        #sanity check that we sliced enough values
-        if with_error_checking:
-            print("after gathering we recreate the splatting indices and they should all be valid")
-            indices=lattice_structure.splatting_indices()
-            indices=indices.detach()
-            indices=indices[lattice_structure.nr_lattice_vertices()*lattice_structure.pos_dim()]
-            nr_invalid=(indices==-1).sum()
-            print("nr invalid is ", nr_invalid)
-            if(nr_invalid.item()>500):
-                sys.exit("there are too many positions which end up in empty space...")
+        # #sanity check that we sliced enough values
+        # if with_error_checking:
+        #     print("after gathering we recreate the splatting indices and they should all be valid")
+        #     indices=lattice_structure.splatting_indices()
+        #     indices=indices.detach()
+        #     indices=indices[lattice_structure.nr_lattice_vertices()*lattice_structure.pos_dim()]
+        #     nr_invalid=(indices==-1).sum()
+        #     print("nr invalid is ", nr_invalid)
+        #     if(nr_invalid.item()>500):
+        #         sys.exit("there are too many positions which end up in empty space...")
 
 
         return gathered_values
@@ -1236,13 +1090,6 @@ class GatherLattice(Function):
     @staticmethod
     def backward(ctx, grad_sliced_values):
         
-        with_debug_output=ctx.with_debug_output
-        with_error_checking=ctx.with_error_checking
-
-        if with_debug_output:
-            print("gather backwards")
-            print("input gather backwards is grad_sliced_values which has shape", grad_sliced_values.shape)
-            print("input gather backwards is grad_sliced_values which has norm", grad_sliced_values.norm())
 
 
         # positions,splatting_indices, splatting_weights =ctx.saved_tensors
@@ -1270,11 +1117,6 @@ class GatherLattice(Function):
         # print("WE ARE NOT RELEASING THE LATTICE")
 
        
-        # print("GATHER backwards, returning grad lattice_values", lattice_values)
-        if with_debug_output:
-            print("GATHER backwards, returning grad lattice_values of norm", lattice_values.norm())
-            print("GATHER backwards, returning grad lattice_values of sum", lattice_values.sum())
-            print("GATHER backwards, returning grad lattice_values of shape", lattice_values.shape)
 
         return lattice_values, None, None, None, None, None
 

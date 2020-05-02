@@ -95,7 +95,7 @@ def run():
         Phase('test', loader_test, grad=False)
     ]
     #model 
-    model=LNN(loader_train.label_mngr().nr_classes(), model_params, False, False).to("cuda")
+    model=LNN(loader_train.label_mngr().nr_classes(), model_params).to("cuda")
     #create loss function
     #loss_fn=GeneralizedSoftDiceLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled() ) 
     loss_fn=LovaszSoftmax(ignore_index=loader_train.label_mngr().get_idx_unlabeled())

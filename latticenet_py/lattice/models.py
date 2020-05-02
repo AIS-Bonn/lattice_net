@@ -26,11 +26,11 @@ from torch.nn.modules.module import _addindent
 #
 
 class LNN(torch.nn.Module):
-    def __init__(self, nr_classes, model_params, with_debug_output, with_error_checking):
+    def __init__(self, nr_classes, model_params):
         super(LNN, self).__init__()
         self.nr_classes=nr_classes
-        self.with_debug_output=with_debug_output
-        self.with_error_checking=with_error_checking
+        # self.with_debug_output=with_debug_output
+        # self.with_error_checking=with_error_checking
 
         #a bit more control
         self.model_params=model_params
@@ -53,13 +53,13 @@ class LNN(torch.nn.Module):
 
 
 
-        self.distribute=DistributeLatticeModule(experiment, self.with_debug_output, self.with_error_checking) 
+        self.distribute=DistributeLatticeModule(experiment) 
         self.distribute_cap=DistributeCapLatticeModule() 
         #self.distributed_transform=DistributedTransform( [32], self.with_debug_output, self.with_error_checking)  
         self.pointnet_layers=model_params.pointnet_layers()
         self.start_nr_filters=model_params.pointnet_start_nr_channels()
         print("pointnet layers is ", self.pointnet_layers)
-        self.point_net=PointNetModule( self.pointnet_layers, self.start_nr_filters, experiment, self.with_debug_output, self.with_error_checking)  
+        self.point_net=PointNetModule( self.pointnet_layers, self.start_nr_filters, experiment)  
         # self.start_nr_filters=model_params.pointnet_start_nr_channels()
         # self.point_net=PointNetDenseModule( growth_rate=16, nr_layers=2, nr_outputs_last_layer=self.start_nr_filters, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking) 
 
@@ -97,10 +97,10 @@ class LNN(torch.nn.Module):
                     # should_use_dropout=True # TODO Dropout works best with shapenet but probably should be disabled for semantic kitti
                     should_use_dropout=False
                     print("adding down_resnet_block with dropout", should_use_dropout )
-                    self.resnet_blocks_per_down_lvl_list[i].append( ResnetBlock(cur_channels_count, [1,1], [False,False], should_use_dropout, self.with_debug_output, self.with_error_checking) )
+                    self.resnet_blocks_per_down_lvl_list[i].append( ResnetBlock(cur_channels_count, [1,1], [False,False], should_use_dropout) )
                 else:
                     print("adding down_bottleneck_block with nr of filters", cur_channels_count )
-                    self.resnet_blocks_per_down_lvl_list[i].append( BottleneckBlock(cur_channels_count, [False,False,False], self.with_debug_output, self.with_error_checking) )
+                    self.resnet_blocks_per_down_lvl_list[i].append( BottleneckBlock(cur_channels_count, [False,False,False]) )
             skip_connection_channel_counts.append(cur_channels_count)
             nr_channels_after_coarsening=int(cur_channels_count*2*compression_factor)
             # nr_channels_after_coarsening=int(cur_channels_count)
@@ -109,7 +109,7 @@ class LNN(torch.nn.Module):
             # self.coarsens_list.append( GnReluExpandMax(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is actually the worse one...
             # self.coarsens_list.append( GnReluExpandAvg(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking))
             # self.coarsens_list.append( GnReluExpandBlur(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) 
-            self.coarsens_list.append( GnReluCoarsen(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
+            self.coarsens_list.append( GnReluCoarsen(nr_channels_after_coarsening)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             # self.coarsens_list.append( GnCoarsenGelu(nr_channels_after_coarsening, self.with_debug_output, self.with_error_checking)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             cur_channels_count=nr_channels_after_coarsening
             corsenings_channel_counts.append(cur_channels_count)
@@ -123,11 +123,8 @@ class LNN(torch.nn.Module):
         for j in range(self.nr_blocks_bottleneck):
                 print("adding bottleneck_resnet_block with nr of filters", cur_channels_count )
                 # self.resnet_blocks_bottleneck.append( ResnetBlock(cur_channels_count, [1,1], [False,False], True, self.with_debug_output, self.with_error_checking) )
-                self.resnet_blocks_bottleneck.append( BottleneckBlock(cur_channels_count, [False,False,False], self.with_debug_output, self.with_error_checking) )
+                self.resnet_blocks_bottleneck.append( BottleneckBlock(cur_channels_count, [False,False,False]) )
 
-        self.upsampling_method="finefy" #finefy, slice_elevated, slice_elevated_deform
-        # self.upsampling_method="slice_elevated" #finefy, slice_elevated, slice_elevated_deform
-        # self.upsampling_method="slice_elevated_deform" #finefy, slice_elevated, slice_elevated_deform
         self.do_concat_for_vertical_connection=True
         #######################
         #   Upsampling path   #
@@ -147,30 +144,8 @@ class LNN(torch.nn.Module):
             nr_chanels_finefy=int(cur_channels_count/2)
 
             #do it with finefy
-            if self.upsampling_method=="finefy":
-                print("adding bnReluFinefy which outputs nr of channels ", nr_chanels_finefy )
-                # self.finefy_list.append( BnReluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
-                # self.finefy_list.append( GnReluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
-                # seems that the relu in BnReluFinefy stops too much of the gradient from flowing up the network, altought we lose one non-linearity, a BnFinefy seems a lot more eneficial for the general flow of gradients as the network converges a lot faster
-                # self.finefy_list.append( GnFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
-                # self.finefy_list.append( GnFinefyGelu(nr_chanels_finefy, self.with_debug_output, self.with_error_checking))
-                self.finefy_list.append( GnReluFinefy(nr_chanels_finefy, self.with_debug_output, self.with_error_checking))
-                # self.finefy_list.append( GnGeluFinefy(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
-                # self.finefy_list.append( FinefyLatticeModule(nr_chanels_skip_connection, self.with_debug_output, self.with_error_checking))
-            elif self.upsampling_method=="slice_elevated":
-                # sys.exit("Not implemented because we switched to the new groupnorm and this is still using batchnorm")
-                # self.up_activation_list.append( Gn(self.with_debug_output, self.with_error_checking) ) #one cna aply the gn relu before the slice because it's more efficient. Slicing doesnt change the mean of hte tensor too much and relu gives the same results weather it's before or after
-                self.finefy_list.append( SliceElevatedVertsLatticeModule(self.with_debug_output, self.with_error_checking)  )
-                # self.finefy_list.append( SliceElevatedVertsLatticeModule(True, True)  )
-                # self.up_match_dim_list.append( Conv1x1(nr_chanels_skip_connection,False, self.with_debug_output, self.with_error_checking) )
-                self.up_match_dim_list.append( GnRelu1x1(nr_chanels_skip_connection,False, self.with_debug_output, self.with_error_checking) )
-            elif self.upsampling_method=="slice_elevated_deform":
-                # self.finefy_list.append( SliceDeformElevatedLatticeModule(self.with_debug_output, self.with_error_checking)  )
-                self.finefy_list.append( SliceDeformElevatedLatticeModule(True, True)  )
-                self.up_match_dim_list.append( Conv1x1(nr_chanels_skip_connection,False, self.with_debug_output, self.with_error_checking) )
-               
-            else:
-                sys.exit("Upsampling methos is not known")
+            print("adding bnReluFinefy which outputs nr of channels ", nr_chanels_finefy )
+            self.finefy_list.append( GnReluFinefy(nr_chanels_finefy ))
 
             #after finefy we do a concat with the skip connection so the number of channels doubles
             if self.do_concat_for_vertical_connection:
@@ -185,10 +160,10 @@ class LNN(torch.nn.Module):
                 # self.resnet_blocks_per_up_lvl_list[i].append( ResnetBlock(cur_channels_count, [1,1], [False,is_last_conv], self.with_debug_output, self.with_error_checking) )
                 if i>=self.nr_downsamples-self.nr_levels_up_with_normal_resnet:
                     print("adding up_resnet_block with nr of filters", cur_channels_count ) 
-                    self.resnet_blocks_per_up_lvl_list[i].append( ResnetBlock(cur_channels_count, [1,1], [False,is_last_conv], False, self.with_debug_output, self.with_error_checking) )
+                    self.resnet_blocks_per_up_lvl_list[i].append( ResnetBlock(cur_channels_count, [1,1], [False,is_last_conv], False) )
                 else:
                     print("adding up_bottleneck_block with nr of filters", cur_channels_count ) 
-                    self.resnet_blocks_per_up_lvl_list[i].append( BottleneckBlock(cur_channels_count, [False,False,is_last_conv], self.with_debug_output, self.with_error_checking) )
+                    self.resnet_blocks_per_up_lvl_list[i].append( BottleneckBlock(cur_channels_count, [False,False,is_last_conv] ) )
 
         # self.last_bottleneck=GnRelu1x1(self.start_nr_filters, True, self.with_debug_output, self.with_error_checking)
 
@@ -199,7 +174,7 @@ class LNN(torch.nn.Module):
         # self.slice_deform_full=SliceDeformFullLatticeModule(nr_classes=nr_classes, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
         # self.slice_fast_pytorch=SliceFastPytorchLatticeModule(nr_classes=nr_classes, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
         # self.slice_fast_bottleneck_pytorch=SliceFastBottleneckPytorchLatticeModule(nr_classes=nr_classes, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
-        self.slice_fast_cuda=SliceFastCUDALatticeModule(nr_classes=nr_classes, dropout_prob=dropout_last_layer, experiment=experiment, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
+        self.slice_fast_cuda=SliceFastCUDALatticeModule(nr_classes=nr_classes, dropout_prob=dropout_last_layer, experiment=experiment)
         # self.slice_classify=SliceClassifyLatticeModule(nr_classes=nr_classes, dropout_prob=dropout_last_layer, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
         # self.stepdown = StepDownModule([], nr_classes, dropout_last_layer, self.with_debug_output, self.with_error_checking)
         #stepdown densenetmodule is too slow as it requires to copy the whole pointcloud when it concatenas. For semantic kitti this is just too much
@@ -301,8 +276,8 @@ class LNN(torch.nn.Module):
             # print("after finefy lv is " , lv.shape)
 
 
-            if self.upsampling_method=="slice_elevated" or self.upsampling_method=="slice_elevated_deform": #if we are not using finefy, we are just slicing, so now we have to reduce the nr of channels
-                lv, ls = self.up_match_dim_list[i](lv, ls) 
+            # if self.upsampling_method=="slice_elevated" or self.upsampling_method=="slice_elevated_deform": #if we are not using finefy, we are just slicing, so now we have to reduce the nr of channels
+                # lv, ls = self.up_match_dim_list[i](lv, ls) 
 
             #concat or adding for the vertical connection
             if self.do_concat_for_vertical_connection: 
