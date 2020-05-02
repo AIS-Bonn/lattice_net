@@ -23,8 +23,8 @@ class LatticePy(torch.Tensor):
         self.lattice.begin_splat()
     def begin_splat_modify_only_values(self):
         self.lattice.begin_splat_modify_only_values()
-    def splat_standalone(self, positions, values, with_homogeneous_coord):
-        self.lattice.splat_standalone(positions, values, with_homogeneous_coord)
+    def splat_standalone(self, positions, values ):
+        self.lattice.splat_standalone(positions, values )
     def distribute(self, positions, values):
         self.lattice.distribute(positions, values)
     def blur_standalone(self):
@@ -55,7 +55,7 @@ class LatticePy(torch.Tensor):
 
     #     return convolved_lattice_py
 
-    def convolve_im2row_standalone(self, filter_bank, dilation, with_homogeneous_coord, lattice_neighbours=None, use_center_vertex_from_lattice_neighbours=True, flip_neighbours=False):
+    def convolve_im2row_standalone(self, filter_bank, dilation, lattice_neighbours=None, use_center_vertex_from_lattice_neighbours=True, flip_neighbours=False):
         # print("running convolve")
         # if lattice_neighbours is not None:
             # print("lattice py doing convolve with lattic eneighbours")
@@ -63,9 +63,9 @@ class LatticePy(torch.Tensor):
             # print("lattice_py, doing convolve with lattice neighbous being none ")
 
         if lattice_neighbours is None:
-            convolved_lattice=self.lattice.convolve_im2row_standalone(filter_bank, dilation, with_homogeneous_coord, self.lattice, use_center_vertex_from_lattice_neighbours, flip_neighbours)
+            convolved_lattice=self.lattice.convolve_im2row_standalone(filter_bank, dilation, self.lattice, use_center_vertex_from_lattice_neighbours, flip_neighbours)
         else:
-            convolved_lattice=self.lattice.convolve_im2row_standalone(filter_bank, dilation, with_homogeneous_coord, lattice_neighbours.lattice, use_center_vertex_from_lattice_neighbours, flip_neighbours)
+            convolved_lattice=self.lattice.convolve_im2row_standalone(filter_bank, dilation, lattice_neighbours.lattice, use_center_vertex_from_lattice_neighbours, flip_neighbours)
         # print("finished convolve")
         convolved_lattice_py=LatticePy()
         convolved_lattice_py.lattice=convolved_lattice
@@ -102,8 +102,8 @@ class LatticePy(torch.Tensor):
         # print("lattice_py. created a coarsened lattice with values of shape ", coarsened_lattice_py.values().shape)
         return coarsened_lattice_py
     
-    def slice_standalone_no_precomputation(self, positions, with_homogeneous_coord):
-        return self.lattice.slice_standalone_no_precomputation(positions, with_homogeneous_coord)
+    def slice_standalone_no_precomputation(self, positions ):
+        return self.lattice.slice_standalone_no_precomputation(positions )
 
     def slice_elevated_verts(self, lattice_to_slice_from):
         sliced_lattice = self.lattice.slice_elevated_verts(lattice_to_slice_from.lattice) 
@@ -156,8 +156,8 @@ class LatticePy(torch.Tensor):
     #getters 
     def val_dim(self):
         return self.lattice.val_dim()
-    def val_full_dim(self):
-        return self.lattice.val_full_dim()
+    # def val_full_dim(self):
+        # return self.lattice.val_full_dim()
     def pos_dim(self):
         return self.lattice.pos_dim()
     def keys(self):
@@ -184,14 +184,14 @@ class LatticePy(torch.Tensor):
     #setters
     def set_val_dim(self, val_dim):
         self.lattice.set_val_dim(val_dim)
-    def set_val_full_dim(self, val_dim):
-        self.lattice.set_val_full_dim(val_dim)
+    # def set_val_full_dim(self, val_dim):
+        # self.lattice.set_val_full_dim(val_dim)
     def set_values(self, new_values):
         # self.lattice.m_hash_table.set_values(new_values)
         if not new_values.is_contiguous():
             new_values=new_values.contiguous()
         self.lattice.m_hash_table.m_values_tensor=new_values
-        self.set_val_full_dim(new_values.shape[1])
+        self.set_val_dim(new_values.shape[1])
         self.lattice.m_hash_table.update_impl()
         #this tensor needs to have a shape so that the sizes of the forwards and backard pass match
     def set_positions(self, positions):

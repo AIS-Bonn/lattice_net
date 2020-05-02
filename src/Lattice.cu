@@ -57,7 +57,7 @@ Lattice::Lattice(const std::string config_file):
     m_hash_table( new HashTable() ),
     m_pos_dim(-1),
     m_val_dim(-1),
-    m_val_full_dim(-1),
+    // m_val_full_dim(-1),
     m_lvl(1)
     {
 
@@ -71,7 +71,7 @@ Lattice::Lattice(const std::string config_file, const std::string name):
     m_hash_table( new HashTable() ),
     m_pos_dim(-1),
     m_val_dim(-1),
-    m_val_full_dim(-1),
+    // m_val_full_dim(-1),
     m_name(name)
     {
 
@@ -92,13 +92,13 @@ Lattice::Lattice(Lattice* other):
     m_hash_table( new HashTable() ),
     m_pos_dim(-1),
     m_val_dim(-1),
-    m_val_full_dim(-1),
+    // m_val_full_dim(-1),
     m_lvl(1)
     {
         m_lvl=other->m_lvl;
         m_pos_dim=other->m_pos_dim;
         m_val_dim=other->m_val_dim;
-        m_val_full_dim=other->m_val_full_dim;
+        // m_val_full_dim=other->m_val_full_dim;
         m_hash_table_capacity=other->m_hash_table_capacity;
         m_sigmas=other->m_sigmas;
         m_sigmas_tensor=other->m_sigmas_tensor.clone();
@@ -186,7 +186,6 @@ void Lattice::set_and_check_input(torch::Tensor& positions_raw, torch::Tensor& v
     //set position and check that the sigmas were set correctly
     m_pos_dim=positions_raw.size(1);
     m_val_dim=values.size(1);
-    m_val_full_dim=m_val_dim+1;
     CHECK(m_sigmas.size()==m_pos_dim) <<"One must set sigmas for each dimension of the positions. Use set_sigmas. m_sigmas is " << m_sigmas.size() << " m_pos dim is " <<m_pos_dim;
 }
 
@@ -232,16 +231,11 @@ void Lattice::begin_splat(){
 
 
 
-void Lattice::splat_standalone(torch::Tensor& positions_raw, torch::Tensor& values, const bool with_homogeneous_coord){
+void Lattice::splat_standalone(torch::Tensor& positions_raw, torch::Tensor& values ){
     set_and_check_input(positions_raw, values);
     int nr_positions=positions_raw.size(0);
     m_pos_dim=positions_raw.size(1);
     m_val_dim=values.size(1);
-    if(with_homogeneous_coord){
-        m_val_full_dim=m_val_dim+1;
-    }else{
-        m_val_full_dim=m_val_dim;
-    }
 
 
     //if it's not initialized to the correct values we intialize the hashtable
@@ -283,8 +277,8 @@ void Lattice::splat_standalone(torch::Tensor& positions_raw, torch::Tensor& valu
     TIME_END("scale_by_sigma");
 
     TIME_START("splat");
-    m_impl->splat_standalone(positions.data_ptr<float>(), values.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, m_val_full_dim,
-                            m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), with_homogeneous_coord, *(m_hash_table->m_impl) );
+    m_impl->splat_standalone(positions.data_ptr<float>(), values.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, 
+                            m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(),  *(m_hash_table->m_impl) );
 
     // m_impl->splat_standalone(positions.data_ptr<float>(), values.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, 
                             // m_splatting_indices_and_weights_tensor.data_ptr<float>(), *(m_hash_table.m_impl) );
@@ -295,7 +289,7 @@ void Lattice::splat_standalone(torch::Tensor& positions_raw, torch::Tensor& valu
 }
 
 
-void Lattice::just_create_verts(torch::Tensor& positions_raw, const bool with_homogeneous_coord){
+void Lattice::just_create_verts(torch::Tensor& positions_raw ){
     // set_and_check_input(positions_raw, values);
     int nr_positions=positions_raw.size(0);
     m_pos_dim=positions_raw.size(1);
@@ -322,6 +316,7 @@ void Lattice::just_create_verts(torch::Tensor& positions_raw, const bool with_ho
         m_splatting_weights_tensor = torch::zeros({nr_positions*(m_pos_dim+1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
     }
     // m_splatting_indices_and_weights_tensor = torch::zeros({nr_positions*(m_pos_dim+1), 2 });
+    //TODO do i need to enable this filling of -1
     // m_splatting_indices_tensor.fill_(-1);
     // m_splatting_weights_tensor.fill_(-1);
 
@@ -338,8 +333,8 @@ void Lattice::just_create_verts(torch::Tensor& positions_raw, const bool with_ho
     // TIME_END("scale_by_sigma");
 
     // TIME_START("just_create_verts");
-    m_impl->just_create_verts(positions.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, m_val_full_dim,
-                            m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), with_homogeneous_coord, *(m_hash_table->m_impl) );
+    m_impl->just_create_verts(positions.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, 
+                            m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
 
     // m_impl->splat_standalone(positions.data_ptr<float>(), values.data_ptr<float>(), nr_positions, m_pos_dim, m_val_dim, 
                             // m_splatting_indices_and_weights_tensor.data_ptr<float>(), *(m_hash_table.m_impl) );
@@ -355,7 +350,6 @@ void Lattice::distribute(torch::Tensor& positions_raw, torch::Tensor& values){
     int nr_positions=positions_raw.size(0);
     m_pos_dim=positions_raw.size(1);
     m_val_dim=values.size(1);
-    m_val_full_dim=m_val_dim+1;
 
 
     // if( !m_distributed_tensor.defined() || m_distributed_tensor.size(0)!=nr_positions ){
@@ -429,51 +423,51 @@ Tensor Lattice::create_splatting_mask(const torch::Tensor& nr_points_per_simplex
 
 
 
-std::shared_ptr<Lattice> Lattice::blur_standalone(){
+// std::shared_ptr<Lattice> Lattice::blur_standalone(){
 
-    std::shared_ptr<Lattice> blurred_lattice=create(this); //create a lattice with no config but takes the config from this one
-    blurred_lattice->m_name="blurred_lattice";
+//     std::shared_ptr<Lattice> blurred_lattice=create(this); //create a lattice with no config but takes the config from this one
+//     blurred_lattice->m_name="blurred_lattice";
    
-    blurred_lattice->m_hash_table->m_values_tensor=m_hash_table->m_values_tensor.clone();
-    blurred_lattice->m_tmp_blurred_values_tensor =m_hash_table->m_values_tensor.clone();
-    blurred_lattice->m_hash_table->m_values_tensor=blurred_lattice->m_hash_table->m_values_tensor.to("cuda");
-    blurred_lattice->m_tmp_blurred_values_tensor=blurred_lattice->m_tmp_blurred_values_tensor.to("cuda");
-    // VLOG(1) << "updating impl";
-    blurred_lattice->m_hash_table->update_impl(); //updating the hash table pointer to point to the newly clones values tensor
+//     blurred_lattice->m_hash_table->m_values_tensor=m_hash_table->m_values_tensor.clone();
+//     blurred_lattice->m_tmp_blurred_values_tensor =m_hash_table->m_values_tensor.clone();
+//     blurred_lattice->m_hash_table->m_values_tensor=blurred_lattice->m_hash_table->m_values_tensor.to("cuda");
+//     blurred_lattice->m_tmp_blurred_values_tensor=blurred_lattice->m_tmp_blurred_values_tensor.to("cuda");
+//     // VLOG(1) << "updating impl";
+//     blurred_lattice->m_hash_table->update_impl(); //updating the hash table pointer to point to the newly clones values tensor
 
 
-    TIME_START("blur");
-    for (int remainder=0; remainder >= 0 && remainder <= m_pos_dim; remainder++) {
+//     TIME_START("blur");
+//     for (int remainder=0; remainder >= 0 && remainder <= m_pos_dim; remainder++) {
 
-        if(remainder==0){
-            //if it's the first time we do a blur along an axis we blur the values from the current hashtable and store them in the blurred_lattice hash_table_values
-            m_impl->blur_standalone(m_hash_table_capacity, m_pos_dim, m_val_full_dim, 
-                blurred_lattice->m_hash_table->m_values_tensor.data_ptr<float>(), remainder, *(m_hash_table->m_impl) );
-            // m_impl->blur_standalone(m_hash_table_capacity, m_pos_dim, m_val_dim, blurred_lattice->m_tmp_blurred_values_tensor, remainder, *(m_hash_table.m_impl) );
-            m_hash_table->update_impl(); //when swapping we are changing ptr, but this need to be propagated to the cuda implementation too
-        }else{
-            //if the m_tmp_blurred_values_tensor is not defined or not the correct size we allocate it
-            // if()
+//         if(remainder==0){
+//             //if it's the first time we do a blur along an axis we blur the values from the current hashtable and store them in the blurred_lattice hash_table_values
+//             m_impl->blur_standalone(m_hash_table_capacity, m_pos_dim, m_val_full_dim, 
+//                 blurred_lattice->m_hash_table->m_values_tensor.data_ptr<float>(), remainder, *(m_hash_table->m_impl) );
+//             // m_impl->blur_standalone(m_hash_table_capacity, m_pos_dim, m_val_dim, blurred_lattice->m_tmp_blurred_values_tensor, remainder, *(m_hash_table.m_impl) );
+//             m_hash_table->update_impl(); //when swapping we are changing ptr, but this need to be propagated to the cuda implementation too
+//         }else{
+//             //if the m_tmp_blurred_values_tensor is not defined or not the correct size we allocate it
+//             // if()
 
-            //if its the second or above time we do a blur, we blur from the values of the blur lattice and store in the m_tmp_blurred_values_tensor and then we swap. In the end we remove the m_tmp_blurred_values_tensor
-            blurred_lattice->m_impl->blur_standalone(m_hash_table_capacity, m_pos_dim, m_val_full_dim, 
-                blurred_lattice->m_tmp_blurred_values_tensor.data_ptr<float>(), remainder, *(blurred_lattice->m_hash_table->m_impl) );
+//             //if its the second or above time we do a blur, we blur from the values of the blur lattice and store in the m_tmp_blurred_values_tensor and then we swap. In the end we remove the m_tmp_blurred_values_tensor
+//             blurred_lattice->m_impl->blur_standalone(m_hash_table_capacity, m_pos_dim, m_val_full_dim, 
+//                 blurred_lattice->m_tmp_blurred_values_tensor.data_ptr<float>(), remainder, *(blurred_lattice->m_hash_table->m_impl) );
 
-            std::swap(blurred_lattice->m_hash_table->m_values_tensor, blurred_lattice->m_tmp_blurred_values_tensor);
-            blurred_lattice->m_hash_table->update_impl(); //when swapping we are changing ptr, but this need to be propagated to the cuda implementation too
-        }
-    }
-    TIME_END("blur");
-    CUDA_CHECK_ERROR();
+//             std::swap(blurred_lattice->m_hash_table->m_values_tensor, blurred_lattice->m_tmp_blurred_values_tensor);
+//             blurred_lattice->m_hash_table->update_impl(); //when swapping we are changing ptr, but this need to be propagated to the cuda implementation too
+//         }
+//     }
+//     TIME_END("blur");
+//     CUDA_CHECK_ERROR();
 
-    //TODO finished blurring, we remove the m_tmp_blurred_values_tensor
+//     //TODO finished blurring, we remove the m_tmp_blurred_values_tensor
 
-    return blurred_lattice;
+//     return blurred_lattice;
 
-}
+// }
 
 
-std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filter_bank, const int dilation, const bool with_homogeneous_coord, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex_from_lattice_neigbhours, const bool flip_neighbours){
+std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filter_bank, const int dilation, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex_from_lattice_neigbhours, const bool flip_neighbours){
 
 
     CHECK(filter_bank.defined()) << "Filter bank is undefined";
@@ -482,7 +476,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     // CHECK(filter_bank.size(2) == m_val_dim+1) << "Filters should convolve over all the values of this lattice so the m_val_dim+1 which is " << m_val_dim+1 << "which is " << "should be equal to filter_bank.size(2) which is " << filter_bank.size(2);
 
     int nr_filters=filter_bank.size(1) ;
-    int filter_extent=filter_bank.size(0) / m_val_full_dim;
+    int filter_extent=filter_bank.size(0) / m_val_dim;
     // VLOG(1) << "filter_bank sizes is" << filter_bank.sizes();
     // VLOG(1) << "val full dim is " << m_val_full_dim;
     CHECK(filter_extent == get_filter_extent(1) ) << "Filters should convolve over all the neighbours in the 1 hop plus the center vertex lattice. So the filter extent should be " << get_filter_extent(1) << ". However it is" << filter_extent;
@@ -500,21 +494,15 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     int cur_hash_table_size=m_hash_table->m_values_tensor.size(0);
     // VLOG(1) << "cloning values tensor which has size" << cur_hash_table_size;
     // VLOG(1) << "cloning values tensor which has size" << cur_hash_table_size;
-    if(with_homogeneous_coord){
-        convolved_lattice->m_hash_table->m_values_tensor=torch::zeros({m_hash_table_capacity, nr_filters+1}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) ) ; // +1 because of homogeneous coordinates
-    }else{
+    // if(with_homogeneous_coord){
+        // convolved_lattice->m_hash_table->m_values_tensor=torch::zeros({m_hash_table_capacity, nr_filters+1}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) ) ; // +1 because of homogeneous coordinates
+    // }else{
         //no need to allocate because it will be directly set to be the whatever comes from the matrix mutliplicaiton between lattice_rowified and filter bank
-    }
+    // }
     // convolved_lattice->m_hash_table->m_values_tensor=convolved_lattice->m_hash_table->m_values_tensor.to("cuda");
 
     //m_val_dim and m_val_full_dim are equal now
-    if(with_homogeneous_coord){
-        convolved_lattice->m_val_dim=nr_filters;
-        convolved_lattice->m_val_full_dim=nr_filters+1;
-    }else{
-        convolved_lattice->m_val_dim=nr_filters;
-        convolved_lattice->m_val_full_dim=nr_filters;
-    }
+    convolved_lattice->m_val_dim=nr_filters;
     convolved_lattice->m_hash_table->update_impl(); //updating the hash table pointer to point to the newly clones values tensor
 
     //kernel bank is of size nr_filers x filter_extent x in_val_dim
@@ -524,9 +512,9 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
     // TIME_START("create_lattice_rowified");
     // VLOG(1) << "checking if lattice rowified has size: nr_vertices" << nr_vertices << " filter_extent " << filter_extent << " m_val_full_dim " << m_val_full_dim;
-    if( !m_lattice_rowified.defined() || m_lattice_rowified.size(0)!=nr_vertices || m_lattice_rowified.size(1)!=filter_extent*m_val_full_dim  ){
+    if( !m_lattice_rowified.defined() || m_lattice_rowified.size(0)!=nr_vertices || m_lattice_rowified.size(1)!=filter_extent*m_val_dim  ){
         // VLOG(1) << "Creating a lattice rowified with size: nr_vertices" << nr_vertices << " filter_extent " << filter_extent << " m_val_full_dim " << m_val_full_dim;
-        m_lattice_rowified=torch::zeros({nr_vertices, filter_extent*m_val_full_dim }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+        m_lattice_rowified=torch::zeros({nr_vertices, filter_extent*m_val_dim }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
     }else{
         m_lattice_rowified.fill_(0);
     }
@@ -541,7 +529,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
     // VLOG(1) << "calling im2row with lattice neighbours which have vlaues of norm " << lattice_neighbours->m_hash_table->m_values_tensor.norm();
     // VLOG(4) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
-    m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
+    m_impl->im2row(nr_vertices, m_pos_dim, m_val_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
 
     // m_impl->test_row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex);
     // TIME_END("im2row");
@@ -560,13 +548,8 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     // VLOG(1) << "current values has shape" << m_hash_table->m_values_tensor.sizes();
     // VLOG(1) << "convolved_hash_table.values has shape" << convolved_lattice->m_hash_table->m_values_tensor.sizes();
     // VLOG(1) << "convolved has shape" << convolved.sizes();
-    if(with_homogeneous_coord){
-        // store both the convolved output and the homogeneous coordinate from the previous lattice
-        convolved_lattice->m_hash_table->m_values_tensor.slice(1, 0, nr_filters) = convolved; //along dimension 0 (corresponding to the nr of columns) get from the column 0 the column nr_filters
-        convolved_lattice->m_hash_table->m_values_tensor.slice(1, nr_filters, nr_filters+1) = m_hash_table->m_values_tensor.slice(1, m_val_dim, m_val_full_dim); //TODO the clone is just in case but it shouldnt teoretically be needed
-    }else{
-        convolved_lattice->m_hash_table->m_values_tensor=convolved;
-    }
+
+    convolved_lattice->m_hash_table->m_values_tensor=convolved;
     convolved_lattice->m_hash_table->update_impl(); //very important
 
     // TIME_END("convolve_im2row");
@@ -597,8 +580,8 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
 
 
     // TIME_START("create_lattice_rowified");
-    if( !m_lattice_rowified.defined() || m_lattice_rowified.size(0)!=nr_vertices || m_lattice_rowified.size(1)!=filter_extent*m_val_full_dim  ){
-        m_lattice_rowified=torch::zeros({nr_vertices, filter_extent*m_val_full_dim }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+    if( !m_lattice_rowified.defined() || m_lattice_rowified.size(0)!=nr_vertices || m_lattice_rowified.size(1)!=filter_extent*m_val_dim  ){
+        m_lattice_rowified=torch::zeros({nr_vertices, filter_extent*m_val_dim }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
     }else{
         m_lattice_rowified.fill_(0);
     }
@@ -609,8 +592,8 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
         // debug_kernel=true;
     }
 
-    VLOG(3) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
-    m_impl->im2row(nr_vertices, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
+    VLOG(3) <<"calling im2row with m_val_dim of " << m_val_dim;
+    m_impl->im2row(nr_vertices, m_pos_dim, m_val_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
 
     return m_lattice_rowified;
 
@@ -630,10 +613,10 @@ torch::Tensor Lattice::row2im(const torch::Tensor& lattice_rowified,  const int 
     CHECK(nr_lattice_vertices()!=0) <<"Something went wrong because have zero lattice vertices";
 
 
-    m_val_full_dim=nr_filters;
+    m_val_dim=nr_filters;
     m_hash_table->update_impl();
 
-    m_impl->row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, do_test);
+    m_impl->row2im(m_hash_table_capacity, m_pos_dim, m_val_dim, dilation, lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, do_test);
 
     return m_hash_table->m_values_tensor;
 }
@@ -666,7 +649,7 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts(){
     int nr_vertices=coarse_lattice->nr_lattice_vertices();
     VLOG(3) << "after coarsening nr_verts of the coarse lattice is " << nr_vertices;
 
-    coarse_lattice->m_hash_table->m_values_tensor=torch::zeros({nr_vertices, m_val_full_dim}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  ); //we create exactly the values required for he vertices that were allocated
+    coarse_lattice->m_hash_table->m_values_tensor=torch::zeros({nr_vertices, m_val_dim}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  ); //we create exactly the values required for he vertices that were allocated
     coarse_lattice->m_hash_table->update_impl();
 
     return coarse_lattice;
@@ -716,7 +699,7 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts_naive(torch::Tensor& posit
     coarse_lattice->begin_splat();
     coarse_lattice->m_hash_table->update_impl();
 
-    coarse_lattice->just_create_verts(positions_raw, /*with_homogeneous_coord*/ false);
+    coarse_lattice->just_create_verts(positions_raw);
 
 
     //NO NEED  to create vertices because they will be create when the latice rowified gets multiplied with the filter
@@ -731,7 +714,7 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts_naive(torch::Tensor& posit
 }
 
 
-torch::Tensor Lattice::slice_standalone_no_precomputation(torch::Tensor& positions_raw, const bool with_homogeneous_coord){
+torch::Tensor Lattice::slice_standalone_no_precomputation(torch::Tensor& positions_raw){
 
     // set_and_check_input(positions_raw, values);
     CHECK(positions_raw.scalar_type()==at::kFloat) << "positions should be of type float";
@@ -756,8 +739,8 @@ torch::Tensor Lattice::slice_standalone_no_precomputation(torch::Tensor& positio
     TIME_END("scale_by_sigma")
 
     //initialize the output values to zero 
-    if( !m_sliced_values_hom_tensor.defined() || m_sliced_values_hom_tensor.size(0)!=nr_positions || m_sliced_values_hom_tensor.size(1)!=m_val_full_dim){
-        m_sliced_values_hom_tensor=torch::zeros({nr_positions, m_val_full_dim}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+    if( !m_sliced_values_hom_tensor.defined() || m_sliced_values_hom_tensor.size(0)!=nr_positions || m_sliced_values_hom_tensor.size(1)!=m_val_dim){
+        m_sliced_values_hom_tensor=torch::zeros({nr_positions, m_val_dim}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
     }else{
         m_sliced_values_hom_tensor.fill_(0);
     }
@@ -773,18 +756,11 @@ torch::Tensor Lattice::slice_standalone_no_precomputation(torch::Tensor& positio
 
 
     TIME_START("slice");
-    m_impl->slice_standalone_no_precomputation( positions.data_ptr<float>(), m_sliced_values_hom_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
+    m_impl->slice_standalone_no_precomputation( positions.data_ptr<float>(), m_sliced_values_hom_tensor.data_ptr<float>(), m_pos_dim, m_val_dim,  nr_positions, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
     TIME_END("slice");
 
-    if(with_homogeneous_coord){
-        //divide by the homogeneous coordinate (m_sliced_values_tensor has size N x hashtable capacity x (val+1) )
-        Tensor sliced_values_tensor=m_sliced_values_hom_tensor.slice(1, 0, m_val_full_dim-1).clone() / m_sliced_values_hom_tensor.slice(1, m_val_full_dim-1, m_val_full_dim); 
-        // VLOG(1) << "m_sliced_values_hom_tensor sizes: " << sliced_values_tensor.sizes();
-        // VLOG(1) << "sliced_values_tensor sizes: "<< sliced_values_tensor.sizes();
-        return sliced_values_tensor;
-    }else{
-        return m_sliced_values_hom_tensor.clone(); // I clone it just in case because I know this will be used also for the backwards pass
-    }
+
+    return m_sliced_values_hom_tensor.clone(); // I clone it just in case because I know this will be used also for the backwards pass
 
     // display_c10_cuda_mem_stat(0);
 
@@ -821,7 +797,7 @@ torch::Tensor Lattice::gather_standalone_no_precomputation(torch::Tensor& positi
     TIME_END("scale_by_sigma")
 
     //initialize the output values to zero 
-    int row_size_gathered=(m_pos_dim+1)*(m_val_full_dim+1); //we have m_pos_dim+1 vertices in a lattice and each has values of m_val_full_dim plus a barycentric coord
+    int row_size_gathered=(m_pos_dim+1)*(m_val_dim+1); //we have m_pos_dim+1 vertices in a lattice and each has values of m_val_full_dim plus a barycentric coord
     if( !m_gathered_values_tensor.defined() || m_gathered_values_tensor.size(0)!=nr_positions || m_gathered_values_tensor.size(1)!=row_size_gathered){
         m_gathered_values_tensor=torch::zeros({nr_positions, row_size_gathered}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
     }else{
@@ -839,7 +815,7 @@ torch::Tensor Lattice::gather_standalone_no_precomputation(torch::Tensor& positi
 
 
     TIME_START("gather");
-    m_impl->gather_standalone_no_precomputation( positions.data_ptr<float>(), m_gathered_values_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
+    m_impl->gather_standalone_no_precomputation( positions.data_ptr<float>(), m_gathered_values_tensor.data_ptr<float>(), m_pos_dim, m_val_dim,  nr_positions, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
     TIME_END("gather");
 
     return m_gathered_values_tensor;
@@ -872,7 +848,7 @@ torch::Tensor Lattice::gather_standalone_with_precomputation(torch::Tensor& posi
     // TIME_END("scale_by_sigma")
 
     //initialize the output values to zero 
-    int row_size_gathered=(m_pos_dim+1)*(m_val_full_dim+1); //we have m_pos_dim+1 vertices in a lattice and each has values of m_val_full_dim plus a barycentric coord
+    int row_size_gathered=(m_pos_dim+1)*(m_val_dim+1); //we have m_pos_dim+1 vertices in a lattice and each has values of m_val_full_dim plus a barycentric coord
     if( !m_gathered_values_tensor.defined() || m_gathered_values_tensor.size(0)!=nr_positions || m_gathered_values_tensor.size(1)!=row_size_gathered){
         m_gathered_values_tensor=torch::zeros({nr_positions, row_size_gathered}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
     }else{
@@ -895,7 +871,7 @@ torch::Tensor Lattice::gather_standalone_with_precomputation(torch::Tensor& posi
 
 
     // TIME_START("gather");
-    m_impl->gather_standalone_with_precomputation( positions.data_ptr<float>(), m_gathered_values_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim,  nr_positions, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
+    m_impl->gather_standalone_with_precomputation( positions.data_ptr<float>(), m_gathered_values_tensor.data_ptr<float>(), m_pos_dim, m_val_dim,  nr_positions, m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
     // TIME_END("gather");
 
     return m_gathered_values_tensor;
@@ -955,7 +931,7 @@ torch::Tensor Lattice::slice_classify_no_precomputation(torch::Tensor& positions
                                               linear_clasify_bias.data_ptr<float>(), 
                                               nr_classes,
                                               m_pos_dim, 
-                                              m_val_full_dim,  
+                                              m_val_dim,  
                                               nr_positions, 
                                               m_splatting_indices_tensor.data_ptr<int>(), 
                                               m_splatting_weights_tensor.data_ptr<float>(), 
@@ -1026,7 +1002,7 @@ torch::Tensor Lattice::slice_classify_with_precomputation(torch::Tensor& positio
                                               linear_clasify_bias.data_ptr<float>(), 
                                               nr_classes,
                                               m_pos_dim, 
-                                              m_val_full_dim,  
+                                              m_val_dim,  
                                               nr_positions, 
                                               m_splatting_indices_tensor.data_ptr<int>(), 
                                               m_splatting_weights_tensor.data_ptr<float>(), 
@@ -1079,7 +1055,7 @@ void Lattice::slice_backwards_standalone_with_precomputation_no_homogeneous(torc
     CHECK(m_val_dim!=-1) << "m_val_dim is -1. We have to splat something first so that the m_val_dim gets set.";
     int nr_positions=positions_raw.size(0);
     m_pos_dim=positions_raw.size(1);
-    CHECK(grad_sliced_values.dim()==2) <<"grad_sliced_values should be nr_positions x m_val_full_dim, so it should have 2 dimensions. However it has "<< grad_sliced_values.dim();
+    CHECK(grad_sliced_values.dim()==2) <<"grad_sliced_values should be nr_positions x m_val_dim, so it should have 2 dimensions. However it has "<< grad_sliced_values.dim();
 
     // m_hash_table->m_values_tensor=torch::zeros({m_hash_table_capacity, grad_sliced_values.size(2)});
     // m_hash_table->m_values_tensor=torch::zeros({m_hash_table_capacity, grad_sliced_values.size(2)}).to("cuda");
@@ -1098,7 +1074,7 @@ void Lattice::slice_backwards_standalone_with_precomputation_no_homogeneous(torc
 
 
     TIME_START("slice_back");
-    m_impl->slice_backwards_standalone_with_precomputation_no_homogeneous(grad_sliced_values.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim, nr_positions, *(m_hash_table->m_impl) );
+    m_impl->slice_backwards_standalone_with_precomputation_no_homogeneous(grad_sliced_values.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_dim, nr_positions, *(m_hash_table->m_impl) );
     TIME_END("slice_back");
 
     // VLOG(1) << "slice_backwards_standalone_with_precomputation_no_homogeneous at the finale we have  values vector of "<<m_hash_table->m_values_tensor;
@@ -1120,7 +1096,6 @@ void Lattice::slice_classify_backwards_with_precomputation(const torch::Tensor& 
     CHECK(m_val_dim!=-1) << "m_val_dim is -1. We have to splat something first so that the m_val_dim gets set.";
     int nr_positions=positions_raw.size(0);
     CHECK(grad_class_logits.dim()==2) <<"grad_class_logits should be  nr_positions x nr_classes, so it should have 2 dimensions. However it has "<< grad_class_logits.dim();
-    m_val_full_dim=initial_values.size(1);
     m_val_dim=initial_values.size(1);
 
 
@@ -1136,7 +1111,7 @@ void Lattice::slice_classify_backwards_with_precomputation(const torch::Tensor& 
 
 
     // TIME_START("slice_clasify_back");
-    m_impl->slice_classify_backwards_with_precomputation(grad_class_logits.data_ptr<float>(), initial_values.data_ptr<float>(),  m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim, nr_positions,
+    m_impl->slice_classify_backwards_with_precomputation(grad_class_logits.data_ptr<float>(), initial_values.data_ptr<float>(),  m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_dim, nr_positions,
     delta_weights.data_ptr<float>(), linear_clasify_weight.data_ptr<float>(), linear_clasify_bias.data_ptr<float>(), nr_classes, grad_lattice_values.data_ptr<float>(), grad_delta_weights.data_ptr<float>(), grad_linear_clasify_weight.data_ptr<float>(),grad_linear_clasify_bias.data_ptr<float>(),
      *(m_hash_table->m_impl) );
     // TIME_END("slice_clasify_back");
@@ -1147,7 +1122,7 @@ void Lattice::gather_backwards_standalone_with_precomputation(const torch::Tenso
 
     int nr_positions=positions_raw.size(0);
     m_pos_dim=positions_raw.size(1);
-    m_val_full_dim=grad_sliced_values.size(1)/(m_pos_dim+1)-1; //we will acumulate the gradient into the value tensor. And it should have the same val_dim as the values that were in the lattice_we_gathered from
+    m_val_dim=grad_sliced_values.size(1)/(m_pos_dim+1)-1; //we will acumulate the gradient into the value tensor. And it should have the same val_dim as the values that were in the lattice_we_gathered from
 
     // set_and_check_input(positions_raw, values);
     CHECK(positions_raw.scalar_type()==at::kFloat) << "positions should be of type float";
@@ -1155,7 +1130,7 @@ void Lattice::gather_backwards_standalone_with_precomputation(const torch::Tenso
     //set position and check that the sigmas were set correctly
     CHECK(m_sigmas.size()==m_pos_dim) <<"One must set sigmas for each dimension of the positions. Use set_sigmas. m_sigmas is " << m_sigmas.size() << " m_pos dim is " <<m_pos_dim;
     CHECK(m_val_dim!=-1) << "m_val_dim is -1. We have to splat something first so that the m_val_dim gets set.";
-    CHECK(grad_sliced_values.dim()==2) <<"grad_sliced_values should be nr_positions x ((m_val_full_dim+1)*(m_pos_dim+1)), so it should have 2 dimensions. However it has "<< grad_sliced_values.dim();
+    CHECK(grad_sliced_values.dim()==2) <<"grad_sliced_values should be nr_positions x ((m_val_dim+1)*(m_pos_dim+1)), so it should have 2 dimensions. However it has "<< grad_sliced_values.dim();
 
 
 
@@ -1164,9 +1139,9 @@ void Lattice::gather_backwards_standalone_with_precomputation(const torch::Tenso
     // m_hash_table->update_impl();
 
     //no need to reallocate the values, we just need to check that they have the correct size
-    if(m_hash_table->m_values_tensor.size(0) != nr_lattice_vertices() || m_hash_table->m_values_tensor.size(1)!=m_val_full_dim ){
+    if(m_hash_table->m_values_tensor.size(0) != nr_lattice_vertices() || m_hash_table->m_values_tensor.size(1)!=m_val_dim ){
         // LOG(WARNING) << "Reallocating the values tensor which might be quite slow.";
-        m_hash_table->m_values_tensor=torch::zeros({nr_lattice_vertices(), m_val_full_dim },  torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  );
+        m_hash_table->m_values_tensor=torch::zeros({nr_lattice_vertices(), m_val_dim },  torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  );
     }else{
         m_hash_table->m_values_tensor.fill_(0);
     }
@@ -1175,7 +1150,7 @@ void Lattice::gather_backwards_standalone_with_precomputation(const torch::Tenso
 
 
     // TIME_START("gather_back");
-    m_impl->gather_backwards_standalone_with_precomputation(grad_sliced_values.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_full_dim, nr_positions, *(m_hash_table->m_impl) );
+    m_impl->gather_backwards_standalone_with_precomputation(grad_sliced_values.data_ptr<float>(), m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), m_pos_dim, m_val_dim, nr_positions, *(m_hash_table->m_impl) );
     // TIME_END("gather_back");
 
 
@@ -1651,9 +1626,9 @@ int Lattice::get_filter_extent(const int neighborhood_size) {
 int Lattice::val_dim(){
     return m_val_dim;
 }
-int Lattice::val_full_dim(){
-    return m_val_full_dim;
-}
+// int Lattice::val_full_dim(){
+//     return m_val_full_dim;
+// }
 int Lattice::pos_dim(){
     return m_pos_dim;
 }
@@ -1668,9 +1643,9 @@ torch::Tensor Lattice::sigmas_tensor(){
 void Lattice::set_val_dim(const int val_dim){
     m_val_dim=val_dim;
 }
-void Lattice::set_val_full_dim(const int val_full_dim){
-    m_val_full_dim=val_full_dim;
-}
+// void Lattice::set_val_full_dim(const int val_full_dim){
+//     m_val_full_dim=val_full_dim;
+// }
 void Lattice::set_sigma(const float sigma){
     int nr_sigmas=m_sigmas_val_and_extent.size();
     CHECK(nr_sigmas==1) << "We are summing we have onyl one sigma. This method is intended to affect only one and not two sigmas independently";

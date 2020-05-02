@@ -45,22 +45,18 @@ class CreateVerts(Function):
 
 class SplatLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_py, positions, values, with_homogeneous_coord):
+    def forward(ctx, lattice_py, positions, values):
         # lattice=Lattice.create(config_file)
         # lattice=LatticePy()
         # lattice.create(config_file, "splated_lattice")
 
         print("values at splatting has shape", values.shape)
         lattice_py.set_val_dim(values.shape[1])
-        if (with_homogeneous_coord):
-            lattice_py.set_val_full_dim(values.shape[1]+1)
-        else:
-            lattice_py.set_val_full_dim(values.shape[1])
-        print("lattice py has val full dim " , lattice_py.val_full_dim() )
+        print("lattice py has val dim " , lattice_py.val_dim() )
 
 
         lattice_py.begin_splat()
-        lattice_py.splat_standalone(positions, values, with_homogeneous_coord)
+        lattice_py.splat_standalone(positions, values )
 
         #store the positions that created this lattice
         lattice_py.set_positions(positions)
@@ -190,7 +186,7 @@ class BlurLattice(Function):
 
 class ConvIm2RowLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_values, lattice_py, filter_bank, dilation, with_homogeneous_coord, lattice_neighbours_values=None, lattice_neighbours_structure=None, use_center_vertex_from_lattice_neighbours=False, with_debug_output=True, with_error_checking=True):
+    def forward(ctx, lattice_values, lattice_py, filter_bank, dilation, lattice_neighbours_values=None, lattice_neighbours_structure=None, use_center_vertex_from_lattice_neighbours=False, with_debug_output=True, with_error_checking=True):
         #in the case we have lattice_neighbours, this one will be the coarse one and the lattice neighbours will be the finer one
 
         if with_debug_output:
@@ -205,7 +201,7 @@ class ConvIm2RowLattice(Function):
 
         # print("inside ConvIm2RowLattice input lattice values is ", lattice_values.shape)
         # TIME_START("convolution_itself")
-        convolved_lattice_py=lattice_py.convolve_im2row_standalone(filter_bank, dilation, with_homogeneous_coord, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours)
+        convolved_lattice_py=lattice_py.convolve_im2row_standalone(filter_bank, dilation, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours)
         # TIME_END("convolution_itself")
         # print("conv forwards: convolved lattice has values ", convolved_lattice_py.values())
         if with_error_checking:
@@ -244,13 +240,11 @@ class ConvIm2RowLattice(Function):
         # ctx.convolved_lattice_py=convolved_lattice_py #seems like its a bad idea to store an output because in the backwards pass this object might not be in the same state as we expected it to
         ctx.lattice_neighbours_structure=lattice_neighbours_structure
         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
-        ctx.with_homogeneous_coord=with_homogeneous_coord
         ctx.filter_extent=int(filter_bank.shape[0]/lattice_values.shape[1])
         ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
-        ctx.val_full_dim= lattice_py.lattice.val_full_dim()
+        ctx.val_dim= lattice_py.lattice.val_dim()
         # print("save for backwards the val full dim of ", ctx.val_full_dim)
-        ctx.with_homogeneous_coord=with_homogeneous_coord
         ctx.with_debug_output=with_debug_output
         ctx.with_error_checking=with_error_checking
 
@@ -288,18 +282,17 @@ class ConvIm2RowLattice(Function):
         # print("got from backwards convolved lattice which has nr filled", convolved_lattice_py.lattice.m_hash_table.m_nr_filled_tensor)
         lattice_neighbours_structure=ctx.lattice_neighbours_structure
         use_center_vertex_from_lattice_neighbours=ctx.use_center_vertex_from_lattice_neighbours
-        with_homogeneous_coord=ctx.with_homogeneous_coord
         filter_extent=ctx.filter_extent
         nr_filters=ctx.nr_filters
         dilation=ctx.dilation
-        val_full_dim=ctx.val_full_dim
+        val_dim=ctx.val_dim
         # print("got from the saved ctx a val full dim of ", val_full_dim)
         # print("got from the saved ctx a nr filters of ", nr_filters)
         # lattice_py.set_val_full_dim(val_full_dim)
 
         # lattice_rowified=lattice_py.lattice_rowified()   
         filter_bank, lattice_values, lattice_neighbours_values =ctx.saved_tensors
-        filter_extent=int(filter_bank.shape[0]/val_full_dim)
+        filter_extent=int(filter_bank.shape[0]/val_dim)
         # print("got from the saved ctx values of shaoe ", lattice_values.shape)
 
         #reconstruct lattice_rowified 
@@ -309,77 +302,65 @@ class ConvIm2RowLattice(Function):
         lattice_rowified= lattice_py.im2row(filter_extent, lattice_neighbours_structure, dilation, use_center_vertex_from_lattice_neighbours, False)
 
         filter_bank_transposed=filter_bank.transpose(0,1) 
-        if(ctx.with_homogeneous_coord):
-            #grad with respect to the filte bank
-            grad_filter=filter_bank_transposed.mm(grad_lattice_values[:, 0:nr_filters ]  ) #we ignore the last column of the grad_convolved lattice because that corresponds to the homogeneous coordinate and this layer just acts a pass through for it. Intrisically we can thing of the homogeneous coordinate as getting convolved with another filter that is zero everywhere except for the homogenous coordinate of the centre pixel where it has value of 1. This filter would never get optimized so it mearly acts a passthrough therefore we just ignore it
 
-            #grad with respect to the input lattice
-            #grad_input_lattice should have size m_hash_table_capacity x (m_val_dim+1)
-            #filter_bank has size filter_extent*(m_val_dim+1) x nr_filters
-            #they seems that they do filter_bank.mm(grad_convolved_lattice) and then a col2im
-            #one posibiliy would be grad_convolved_lattice.slice(1, 0, nr_filters) .mm(filter_bank_tranpose_)
-            grad_lattice_rowified=grad_lattice_values[: , 0: nr_filters].mm(filter_bank_transposed ) #this will have shape m_hash_table_capacity x (filter_extent*(m_val_dim+1))
-            grad_lattice= grad_lattice_rowified[:, -val_full_dim: ] #rowim is just getting the last columns of the grad_lattice_rowified because those values correspond to the center lattice vertex
-            # print("grad lattic has shape: ", grad_lattice.shape)
-        else:
-            grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
+        grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
 
-            #grad with respect to the input lattice
-            #grad_input_lattice should have size m_hash_table_capacity x (m_val_dim+1)
-            #filter_bank has size filter_extent*(m_val_dim+1) x nr_filters
-            #they seems that they do filter_bank.mm(grad_convolved_lattice) and then a col2im
-            #one posibiliy would be grad_convolved_lattice.slice(1, 0, nr_filters) .mm(filter_bank_tranpose_)
-            # filter_bank, bias =ctx.saved_tensors
-            # filter_bank_transposed=filter_bank.transpose(0,1) 
-            # grad_lattice_rowified=grad_lattice_values.mm(filter_bank_transposed ) #this will have shape m_hash_table_capacity x (filter_extent*(m_val_dim+1))
-            # grad_lattice_prev= grad_lattice_rowified[:, -val_full_dim: ] #rowim is just getting the last columns of the grad_lattice_rowified because those values correspond to the center lattice vertex
+        #grad with respect to the input lattice
+        #grad_input_lattice should have size m_hash_table_capacity x (m_val_dim+1)
+        #filter_bank has size filter_extent*(m_val_dim+1) x nr_filters
+        #they seems that they do filter_bank.mm(grad_convolved_lattice) and then a col2im
+        #one posibiliy would be grad_convolved_lattice.slice(1, 0, nr_filters) .mm(filter_bank_tranpose_)
+        # filter_bank, bias =ctx.saved_tensors
+        # filter_bank_transposed=filter_bank.transpose(0,1) 
+        # grad_lattice_rowified=grad_lattice_values.mm(filter_bank_transposed ) #this will have shape m_hash_table_capacity x (filter_extent*(m_val_dim+1))
+        # grad_lattice_prev= grad_lattice_rowified[:, -val_full_dim: ] #rowim is just getting the last columns of the grad_lattice_rowified because those values correspond to the center lattice vertex
 
-            ##attempt2 for grad_lattice
-            # filter_bank_slice=filter_bank[-val_full_dim:, :].transpose(0,1) #we get the filter weights what will affect the center vertex, these correspond to the last val_ful_dim rows of the fitler bank
-            # grad_lattice=grad_lattice_values.mm(filter_bank_slice ) 
+        ##attempt2 for grad_lattice
+        # filter_bank_slice=filter_bank[-val_full_dim:, :].transpose(0,1) #we get the filter weights what will affect the center vertex, these correspond to the last val_ful_dim rows of the fitler bank
+        # grad_lattice=grad_lattice_values.mm(filter_bank_slice ) 
 
 
-            #attempt 3 for grad_lattice 
-            # N x nr_filters  *  nr_filters x val x filter_extent = N x val x filter_extent  And then do a row2im
-            # print("lattice rowified is ", lattice_rowified)
-            # torch.save(lattice_rowified, "lattice_rowified.pt")
-            # grad_lattice_rowified=grad_lattice_values.mm(filter_bank_transposed) 
-            # grad_lattice=lattice_py.row2im(grad_lattice_rowified, dilation, filter_extent, nr_filters, lattice_neighbours_structure, use_center_vertex)
+        #attempt 3 for grad_lattice 
+        # N x nr_filters  *  nr_filters x val x filter_extent = N x val x filter_extent  And then do a row2im
+        # print("lattice rowified is ", lattice_rowified)
+        # torch.save(lattice_rowified, "lattice_rowified.pt")
+        # grad_lattice_rowified=grad_lattice_values.mm(filter_bank_transposed) 
+        # grad_lattice=lattice_py.row2im(grad_lattice_rowified, dilation, filter_extent, nr_filters, lattice_neighbours_structure, use_center_vertex)
 
 
-            # #attempt 4 for grad_lattice
-            filter_bank_backwards=filter_bank.transpose(0,1) # creates a nr_filters x filter_extent * val_fim  
-            filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_full_dim) # nr_filters x filter_extent x val_fim  
-            filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
-            filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_full_dim)
-            # print("filter bank backwards is ", filter_bank_backwards.shape)
-            # print("grad attice value sis ", grad_lattice_values.shape)
-            lattice_py.set_values(grad_lattice_values)
-            grad_lattice_py=lattice_py.convolve_im2row_standalone(filter_bank_backwards, dilation, with_homogeneous_coord, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours, True)
-            grad_lattice=grad_lattice_py.values()
+        # #attempt 4 for grad_lattice
+        filter_bank_backwards=filter_bank.transpose(0,1) # creates a nr_filters x filter_extent * val_fim  
+        filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_dim) # nr_filters x filter_extent x val_fim  
+        filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
+        filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_dim)
+        # print("filter bank backwards is ", filter_bank_backwards.shape)
+        # print("grad attice value sis ", grad_lattice_values.shape)
+        lattice_py.set_values(grad_lattice_values)
+        grad_lattice_py=lattice_py.convolve_im2row_standalone(filter_bank_backwards, dilation, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours, True)
+        grad_lattice=grad_lattice_py.values()
 
-            # #how to tranpose the filter 
-            # filter_bank_test=torch.arange(1,29)
-            # filter_bank_test=filter_bank_test.view(14,2) #filter_extent * val_fim  x nr_filters
-            # print("filter_bank_test is ", filter_bank_test)
-            # filter_bank_test=filter_bank_test.transpose(0,1)  #nr_filters x filter_extent * val_fim  
-            # filter_bank_test=filter_bank_test.view(2,7,2) #nr_filters x filter_extent x val_fim  
-            # print("filter_bank_test is ", filter_bank_test)
-            # # filter_bank_test=filter_bank_test.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim  
-            # filter_bank_test=filter_bank_test.transpose(0,1)  #makes it filter_extent x nr_filters x val_fim  
-            # filter_bank_test=filter_bank_test.reshape(14,2)
-            # print("filter_bank_test is ", filter_bank_test)
+        # #how to tranpose the filter 
+        # filter_bank_test=torch.arange(1,29)
+        # filter_bank_test=filter_bank_test.view(14,2) #filter_extent * val_fim  x nr_filters
+        # print("filter_bank_test is ", filter_bank_test)
+        # filter_bank_test=filter_bank_test.transpose(0,1)  #nr_filters x filter_extent * val_fim  
+        # filter_bank_test=filter_bank_test.view(2,7,2) #nr_filters x filter_extent x val_fim  
+        # print("filter_bank_test is ", filter_bank_test)
+        # # filter_bank_test=filter_bank_test.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim  
+        # filter_bank_test=filter_bank_test.transpose(0,1)  #makes it filter_extent x nr_filters x val_fim  
+        # filter_bank_test=filter_bank_test.reshape(14,2)
+        # print("filter_bank_test is ", filter_bank_test)
 
-            # diff=grad_lattice-grad_lattice_2
-            # diff_val=diff.norm()
-            # print("diff is ", diff_val)
-            
+        # diff=grad_lattice-grad_lattice_2
+        # diff_val=diff.norm()
+        # print("diff is ", diff_val)
+        
 
-            # print("grad_lattice_rowified has shape ", grad_lattice_rowified.shape)
-            # print("grad_lattice_prev has shape ", grad_lattice_prev.shape)
-            # diff=grad_lattice-grad_lattice_prev
-            # diff=torch.abs(diff)
-            # print("diff is " , diff.sum())
+        # print("grad_lattice_rowified has shape ", grad_lattice_rowified.shape)
+        # print("grad_lattice_prev has shape ", grad_lattice_prev.shape)
+        # diff=grad_lattice-grad_lattice_prev
+        # diff=torch.abs(diff)
+        # print("diff is " , diff.sum())
 
 
         #grad wrt to bias
@@ -437,8 +418,7 @@ class CoarsenLattice(Function):
         #convolve at this lattice vertices with the neighbours from lattice_fine
         # TIME_START("convolution_itself")
         dilation=1
-        with_homogeneous_coord=False
-        convolved_lattice_py=coarsened_lattice_py.convolve_im2row_standalone(filter_bank, dilation, with_homogeneous_coord, lattice_fine_structure, use_center_vertex_from_lattice_neighbours)
+        convolved_lattice_py=coarsened_lattice_py.convolve_im2row_standalone(filter_bank, dilation, lattice_fine_structure, use_center_vertex_from_lattice_neighbours)
         # TIME_END("convolution_itself")
         # print("coarsening forwards: convolved lattice has values ", convolved_lattice_py.values())
         if with_error_checking:
@@ -473,11 +453,10 @@ class CoarsenLattice(Function):
         ctx.coarsened_lattice_py=coarsened_lattice_py
         ctx.lattice_fine_structure=lattice_fine_structure
         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
-        ctx.with_homogeneous_coord=with_homogeneous_coord
         ctx.filter_extent=int(filter_bank.shape[0]/lattice_fine_values.shape[1])
         ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
-        ctx.val_full_dim= lattice_fine_structure.lattice.val_full_dim()
+        ctx.val_dim= lattice_fine_structure.lattice.val_dim()
         ctx.with_debug_output=with_debug_output
         ctx.with_error_checking=with_error_checking
 
@@ -504,14 +483,13 @@ class CoarsenLattice(Function):
         coarsened_lattice_py=ctx.coarsened_lattice_py
         lattice_fine_structure=ctx.lattice_fine_structure
         use_center_vertex_from_lattice_neighbours=ctx.use_center_vertex_from_lattice_neighbours
-        with_homogeneous_coord=ctx.with_homogeneous_coord
         filter_extent=ctx.filter_extent
         nr_filters=ctx.nr_filters
         dilation=ctx.dilation
-        val_full_dim=ctx.val_full_dim
+        val_dim=ctx.val_dim
   
         filter_bank, lattice_fine_values =ctx.saved_tensors
-        filter_extent=int(filter_bank.shape[0]/val_full_dim)
+        filter_extent=int(filter_bank.shape[0]/val_dim)
 
         #reconstruct lattice_rowified 
         lattice_fine_structure.set_values(lattice_fine_values)
@@ -525,19 +503,19 @@ class CoarsenLattice(Function):
         grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
 
         filter_bank_backwards=filter_bank.transpose(0,1) # creates a nr_filters x filter_extent * val_fim  
-        filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_full_dim) # nr_filters x filter_extent x val_fim  
+        filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_dim) # nr_filters x filter_extent x val_fim  
         filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
-        filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_full_dim)
+        filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_dim)
         if with_debug_output:
             print("coarsened backwards: saved for backwards a coarsened lattice py with nr of keys", coarsened_lattice_py.nr_lattice_vertices())
         coarsened_lattice_py.set_values(grad_lattice_values)
         if with_debug_output:
-            print("before setting the val_full_dim, fine structure has val_full_dim set to ", lattice_fine_structure.val_full_dim())
-        lattice_fine_structure.set_val_full_dim(nr_filters) #setting val full dim to nr of filters because we will convolve the values of grad_lattice values and those have a row of size nr_filters
+            print("before setting the val_dim, fine structure has val_dim set to ", lattice_fine_structure.val_dim())
+        lattice_fine_structure.set_val_dim(nr_filters) #setting val full dim to nr of filters because we will convolve the values of grad_lattice values and those have a row of size nr_filters
         if with_debug_output:
-            print("after setting the val_full_dim, fine structure has val_full_dim set to ", lattice_fine_structure.val_full_dim())
+            print("after setting the val_dim, fine structure has val_dim set to ", lattice_fine_structure.val_dim())
         #one hast o convolve at the fine positions, having the neighbour as the coarse ones because they are the ones with the errors
-        grad_lattice_py=lattice_fine_structure.convolve_im2row_standalone(filter_bank_backwards, dilation, with_homogeneous_coord, coarsened_lattice_py, use_center_vertex_from_lattice_neighbours, True)
+        grad_lattice_py=lattice_fine_structure.convolve_im2row_standalone(filter_bank_backwards, dilation,  coarsened_lattice_py, use_center_vertex_from_lattice_neighbours, True)
         grad_lattice=grad_lattice_py.values()
 
         # grad_bias = grad_lattice_values.sum(0)
@@ -595,7 +573,7 @@ class CoarsenAndReturnLatticeRowified(Function):
         print("COARSEN AND RETURN LATTICE ROWIFIED, lattice fine values has val full dim of shape ", lattice_fine_values.shape[1]) 
 
 
-        val_full_dim=lattice_fine_values.shape[1]
+        val_dim=lattice_fine_values.shape[1]
         filter_extent=coarsened_lattice_py.lattice.get_filter_extent(1)
         nr_vertices=coarsened_lattice_py.nr_lattice_vertices()
         coarse_lattice_rowified=coarsened_lattice_py.im2row(filter_extent=filter_extent, lattice_neighbours=lattice_fine_structure,  dilation=1, use_center_vertex_from_lattice_neighbours=True, flip_neighbours=False)
@@ -607,7 +585,7 @@ class CoarsenAndReturnLatticeRowified(Function):
         ctx.coarsened_lattice_py=coarsened_lattice_py
         ctx.lattice_fine_structure=lattice_fine_structure
         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
-        ctx.val_full_dim= lattice_fine_structure.lattice.val_full_dim()
+        ctx.val_dim= lattice_fine_structure.lattice.val_dim()
         ctx.filter_extent=filter_extent
         ctx.with_debug_output=with_debug_output
         ctx.with_error_checking=with_error_checking
@@ -628,7 +606,7 @@ class CoarsenAndReturnLatticeRowified(Function):
         coarsened_lattice_py=ctx.coarsened_lattice_py
         lattice_fine_structure=ctx.lattice_fine_structure
         use_center_vertex_from_lattice_neighbours=ctx.use_center_vertex_from_lattice_neighbours
-        val_full_dim=ctx.val_full_dim
+        val_dim=ctx.val_dim
         filter_extent=ctx.filter_extent
   
 
@@ -636,15 +614,15 @@ class CoarsenAndReturnLatticeRowified(Function):
 
 
         values=lattice_fine_structure.values()
-        if (values.shape[1] is not val_full_dim):
+        if (values.shape[1] is not val_dim):
             # print("COARSEN AND RETURN LATTICE ROWIFIED BACKWARD, lattice fine values has val full dim of shape ", values.shape[1]) 
             # sys.exit("During row2im we are accumulating the gradient into the values of the current fine lattice. It should have size nr_vertices x val_full_dim, wher val full dim. But apartenyl it's not")
-            values=torch.zeros( (values.shape[0], val_full_dim), device="cuda" )
+            values=torch.zeros( (values.shape[0], val_dim), device="cuda" )
         else:
             values=values.fill_(0)
         lattice_fine_structure.set_values(values)
 
-        grad_lattice=lattice_fine_structure.lattice.row2im(grad_lattice_rowified, 1, filter_extent, val_full_dim, coarsened_lattice_py.lattice, use_center_vertex_from_lattice_neighbours, False)
+        grad_lattice=lattice_fine_structure.lattice.row2im(grad_lattice_rowified, 1, filter_extent, val_dim, coarsened_lattice_py.lattice, use_center_vertex_from_lattice_neighbours, False)
 
  
         #release
@@ -666,14 +644,13 @@ class FinefyLattice(Function):
         if with_debug_output:
             print("finefy forward")
         lattice_coarse_structure.set_values(lattice_coarse_values)
-        lattice_fine_structure.set_val_full_dim(lattice_coarse_structure.val_full_dim())
+        lattice_fine_structure.set_val_dim(lattice_coarse_structure.val_dim())
 
 
         #convolve at this lattice vertices with the neighbours from lattice_fine
         # TIME_START("convolution_itself")
         dilation=1
-        with_homogeneous_coord=False
-        convolved_lattice_py=lattice_fine_structure.convolve_im2row_standalone(filter_bank, dilation, with_homogeneous_coord, lattice_coarse_structure, use_center_vertex_from_lattice_neighbours)
+        convolved_lattice_py=lattice_fine_structure.convolve_im2row_standalone(filter_bank, dilation,lattice_coarse_structure, use_center_vertex_from_lattice_neighbours)
         # TIME_END("convolution_itself")
         # print("coarsening forwards: convolved lattice has values ", convolved_lattice_py.values())
         # nr_zeros=(convolved_lattice_py.values()==0).sum().item()
@@ -703,11 +680,10 @@ class FinefyLattice(Function):
         ctx.lattice_fine_structure=lattice_fine_structure
         ctx.lattice_coarse_structure=lattice_coarse_structure
         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
-        ctx.with_homogeneous_coord=with_homogeneous_coord
         ctx.filter_extent=int(filter_bank.shape[0]/lattice_coarse_values.shape[1])
         ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
-        ctx.val_full_dim= lattice_coarse_structure.lattice.val_full_dim()
+        ctx.val_dim= lattice_coarse_structure.lattice.val_dim()
         ctx.with_debug_output=with_debug_output
         ctx.with_error_checking=with_error_checking
 
@@ -729,15 +705,14 @@ class FinefyLattice(Function):
         lattice_fine_structure=ctx.lattice_fine_structure
         lattice_coarse_structure=ctx.lattice_coarse_structure
         use_center_vertex_from_lattice_neighbours=ctx.use_center_vertex_from_lattice_neighbours
-        with_homogeneous_coord=ctx.with_homogeneous_coord
         filter_extent=ctx.filter_extent
         nr_filters=ctx.nr_filters
         dilation=ctx.dilation
-        val_full_dim=ctx.val_full_dim
+        val_dim=ctx.val_dim
         with_debug_output=ctx.with_debug_output
         with_error_checking=ctx.with_error_checking
         filter_bank, lattice_coarse_values =ctx.saved_tensors
-        filter_extent=int(filter_bank.shape[0]/val_full_dim)
+        filter_extent=int(filter_bank.shape[0]/val_dim)
 
         #reconstruct lattice_rowified 
         lattice_coarse_structure.set_values(lattice_coarse_values)
@@ -751,18 +726,18 @@ class FinefyLattice(Function):
         grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
 
         filter_bank_backwards=filter_bank.transpose(0,1) # creates a nr_filters x filter_extent * val_fim  
-        filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_full_dim) # nr_filters x filter_extent x val_fim  
+        filter_bank_backwards=filter_bank_backwards.view(nr_filters,filter_extent,val_dim) # nr_filters x filter_extent x val_fim  
         filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
-        filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_full_dim)
+        filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_dim)
         # print("finefy backwards: saved for backwards a coarsened lattice py with nr of keys", coarsened_lattice_py.nr_lattice_vertices())
         lattice_fine_structure.set_values(grad_lattice_values)
         if with_debug_output:
-            print("before setting the val_full_dim, fine structure has val_full_dim set to ", lattice_fine_structure.val_full_dim())
-        lattice_coarse_structure.set_val_full_dim(lattice_fine_structure.val_full_dim()) #setting val full dim to nr of filters because we will convolve the values of grad_lattice values and those have a row of size nr_filters
+            print("before setting the val_dim, fine structure has val_dim set to ", lattice_fine_structure.val_dim())
+        lattice_coarse_structure.set_val_dim(lattice_fine_structure.val_dim()) #setting val full dim to nr of filters because we will convolve the values of grad_lattice values and those have a row of size nr_filters
         if with_debug_output:
-            print("after setting the val_full_dim, fine structure has val_full_dim set to ", lattice_fine_structure.val_full_dim())
+            print("after setting the val_dim, fine structure has val_dim set to ", lattice_fine_structure.val_dim())
         #one hast o convolve at the fine positions, having the neighbour as the coarse ones because they are the ones with the errors
-        grad_lattice_py=lattice_coarse_structure.convolve_im2row_standalone(filter_bank_backwards, dilation, with_homogeneous_coord, lattice_fine_structure, use_center_vertex_from_lattice_neighbours, True)
+        grad_lattice_py=lattice_coarse_structure.convolve_im2row_standalone(filter_bank_backwards, dilation,  lattice_fine_structure, use_center_vertex_from_lattice_neighbours, True)
         grad_lattice=grad_lattice_py.values()
 
         # grad_bias = grad_lattice_values.sum(0)
@@ -927,7 +902,7 @@ class FinefyLattice(Function):
 
 class SliceLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_values, lattice_structure, positions, with_homogeneous_coord, with_debug_output, with_error_checking):
+    def forward(ctx, lattice_values, lattice_structure, positions, with_debug_output, with_error_checking):
 
         # sliced_values=lattice_py.slice_standalone_no_precomputation(positions, with_homogeneous_coord)
         # # import ipdb; ipdb.set_trace()
@@ -950,14 +925,12 @@ class SliceLattice(Function):
         lattice_structure.set_values(lattice_values)
         # lattice_structure.set_val_dim(dim_of_sliced_values)
         lattice_structure.set_val_dim(lattice_values.shape[1])
-        lattice_structure.set_val_full_dim(lattice_values.shape[1])
 
-        sliced_values=lattice_structure.slice_standalone_no_precomputation(positions, with_homogeneous_coord)
+        sliced_values=lattice_structure.slice_standalone_no_precomputation(positions )
         # import ipdb; ipdb.set_trace()
 
         ctx.save_for_backward(positions, lattice_structure.sliced_values_hom(), lattice_structure.splatting_indices(), lattice_structure.splatting_weights() )
         ctx.lattice_structure = lattice_structure
-        ctx.with_homogeneous_coord=with_homogeneous_coord
         ctx.with_debug_output=with_debug_output
         ctx.with_error_checking=with_error_checking
 
@@ -1027,24 +1000,20 @@ class SliceLattice(Function):
         # print("grad_sliced_values has shape", grad_sliced_values.shape)
     # torch::Tensor slice_backwards_standalone_with_precomputation(torch::Tensor& positions_raw, const torch::Tensor& values_forward_vertices, const torch::Tensor& grad_sliced_values);
         if with_debug_output:
-            print("slice backwards with_homogeneous coord",ctx.with_homogeneous_coord)
-        if(ctx.with_homogeneous_coord):
-            lattice_py.lattice.slice_backwards_standalone_with_precomputation(positions, sliced_values_hom, grad_sliced_values)
-        else:
-            # print("splatting in the backward step")
-            # print("splatting in the backward step val dim is", lattice_py.val_dim())
-            # print("splatting in the backward step val_full dim is", lattice_py.val_full_dim())
-            # print("lattice_py. has nr vertices", lattice_py.nr_lattice_vertices() )
-            # print("lattice values has shape", lattice_py.values().shape )
-            # lattice_py.lattice.splat_standalone(positions, grad_sliced_values, False)
-            if(lattice_py.val_full_dim() is not grad_sliced_values.shape[1]):
-                sys.exit("for some reason the values stored in the lattice are not the same dimension as the gradient. What?")
-            lattice_py.set_val_dim(grad_sliced_values.shape[1])
-            lattice_py.set_val_full_dim(grad_sliced_values.shape[1])
-            # print("lattice has val dim set to ", lattice_py.val_dim())
-            # print("lattice has val_full dim set to ", lattice_py.val_full_dim())
-            # lattice_py.lattice.splat_standalone(positions, grad_sliced_values, False) 
-            lattice_py.lattice.slice_backwards_standalone_with_precomputation_no_homogeneous(positions, grad_sliced_values) 
+            print("slice backwards with_homogeneous coord")
+        # print("splatting in the backward step")
+        # print("splatting in the backward step val dim is", lattice_py.val_dim())
+        # print("splatting in the backward step val_full dim is", lattice_py.val_full_dim())
+        # print("lattice_py. has nr vertices", lattice_py.nr_lattice_vertices() )
+        # print("lattice values has shape", lattice_py.values().shape )
+        # lattice_py.lattice.splat_standalone(positions, grad_sliced_values, False)
+        if(lattice_py.val_dim() is not grad_sliced_values.shape[1]):
+            sys.exit("for some reason the values stored in the lattice are not the same dimension as the gradient. What?")
+        lattice_py.set_val_dim(grad_sliced_values.shape[1])
+        # print("lattice has val dim set to ", lattice_py.val_dim())
+        # print("lattice has val_full dim set to ", lattice_py.val_full_dim())
+        # lattice_py.lattice.splat_standalone(positions, grad_sliced_values, False) 
+        lattice_py.lattice.slice_backwards_standalone_with_precomputation_no_homogeneous(positions, grad_sliced_values) 
         # lattice_values=lattice_py.values().clone() #we get a pointer to the values so they don't dissapear when we realease the lettice
         lattice_values=lattice_py.values() #we get a pointer to the values so they don't dissapear when we realease the lettice
         # lattice_values=lattice_py.latt #we get a pointer to the values so they don't dissapear when we realease the lettice
@@ -1108,7 +1077,6 @@ class SliceClassifyLattice(Function):
         #attempt 2
         lattice_structure.set_values(lattice_values)
         lattice_structure.set_val_dim(lattice_values.shape[1])
-        lattice_structure.set_val_full_dim(lattice_values.shape[1])
 
         initial_values=lattice_values #needed fo the backwards pass TODO maybe the clone is not needed?
 
@@ -1124,7 +1092,7 @@ class SliceClassifyLattice(Function):
         ctx.lattice_structure = lattice_structure
         ctx.with_debug_output=with_debug_output
         ctx.with_error_checking=with_error_checking
-        ctx.val_full_dim=lattice_values.shape[1]
+        ctx.val_dim=lattice_values.shape[1]
         ctx.nr_classes=nr_classes
 
 
@@ -1161,12 +1129,12 @@ class SliceClassifyLattice(Function):
         # positions, initial_values, splatting_indices, splatting_weights, delta_weights, linear_clasify_weight, linear_clasify_bias =ctx.saved_tensors
         positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias =ctx.saved_tensors
         lattice_py = ctx.lattice_structure
-        val_full_dim=ctx.val_full_dim
+        val_dim=ctx.val_dim
         nr_classes=ctx.nr_classes
 
         # lattice_py.set_splatting_indices(splatting_indices)
         # lattice_py.set_splatting_weights(splatting_weights)
-        lattice_py.set_val_full_dim(val_full_dim)
+        lattice_py.set_val_dim(val_dim)
 
 
         # if with_debug_output:
@@ -1225,7 +1193,6 @@ class GatherLattice(Function):
         #attempt 2
         lattice_structure.set_values(lattice_values)
         lattice_structure.set_val_dim(lattice_values.shape[1])
-        lattice_structure.set_val_full_dim(lattice_values.shape[1])
 
 
         # gathered_values=lattice_structure.gather_standalone_no_precomputation(positions)
@@ -1244,7 +1211,7 @@ class GatherLattice(Function):
         ctx.save_for_backward(positions)
         # ctx.save_for_backward(positions, lattice_structure.splatting_indices().clone(), lattice_structure.splatting_weights().clone() )
         ctx.lattice_structure = lattice_structure
-        ctx.val_full_dim=lattice_values.shape[1]
+        ctx.val_dim=lattice_values.shape[1]
         ctx.with_debug_output=with_debug_output
         ctx.with_error_checking=with_error_checking
 
@@ -1281,7 +1248,7 @@ class GatherLattice(Function):
         # positions,splatting_indices, splatting_weights =ctx.saved_tensors
         positions, =ctx.saved_tensors
         lattice_py = ctx.lattice_structure
-        val_full_dim=ctx.val_full_dim
+        val_dim=ctx.val_dim
 
 
         # lattice_py.set_splatting_indices(splatting_indices)
@@ -1292,7 +1259,7 @@ class GatherLattice(Function):
 
         # lattice_py.begin_splat_modify_only_values()
         # help(lattice_py.lattice)
-        lattice_py.set_val_full_dim(val_full_dim)
+        lattice_py.set_val_dim(val_dim)
         lattice_py.lattice.gather_backwards_standalone_with_precomputation(positions, grad_sliced_values) 
         lattice_values=lattice_py.values() #we get a pointer to the values so they don't dissapear when we realease the lettice
       

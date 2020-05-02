@@ -108,7 +108,7 @@ public:
 
 
         // void splat_standalone(const float* positions, const float* values, const int nr_positions, const int pos_dim, const int val_dim, const float* splatting_indices_and_weights, const HashTableGPU& hash_table_gpu){
-        void splat_standalone(const float* positions, const float* values, const int nr_positions, const int pos_dim, const int val_dim, const int val_full_dim,  const int* splatting_indices, const float* splatting_weights, const bool with_homogeneous_coord, const HashTableGPU& hash_table_gpu){
+        void splat_standalone(const float* positions, const float* values, const int nr_positions, const int pos_dim, const int val_dim, const int* splatting_indices, const float* splatting_weights, const HashTableGPU& hash_table_gpu){
    
             // do it with jitify
 
@@ -154,10 +154,10 @@ public:
             blocks=dim3((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             blockSize=dim3(BLOCK_SIZE, 1, 1);
             CUresult res_2= m_lattice_program.kernel("splatCacheNaive")
-                        .instantiate(pos_dim, val_dim, val_full_dim)
+                        .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         // .launch( nr_positions, values, splatting_indices_and_weights, hash_table_gpu );
-                        .launch( nr_positions, values, splatting_indices, splatting_weights, with_homogeneous_coord, hash_table_gpu );
+                        .launch( nr_positions, values, splatting_indices, splatting_weights, hash_table_gpu );
             TIME_END("splatCacheNaive");
             CUDA_CHECK_CURESULT(res_2);
             CUDA_CHECK_ERROR()
@@ -168,7 +168,7 @@ public:
         }
 
 
-        void just_create_verts(const float* positions, const int nr_positions, const int pos_dim, const int val_dim, const int val_full_dim,  const int* splatting_indices, const float* splatting_weights, const bool with_homogeneous_coord, const HashTableGPU& hash_table_gpu){
+        void just_create_verts(const float* positions, const int nr_positions, const int pos_dim, const int val_dim,  const int* splatting_indices, const float* splatting_weights, const HashTableGPU& hash_table_gpu){
    
             // do it with jitify
 
@@ -276,7 +276,7 @@ public:
 
 
         //creates a lattice rowified by grabbing the values of the neighbours from the hash_table_neighbours. The neigbhours are the neighbours of the keys in hash_table_query. Useful for lattices which are at different coarsenes levels
-        void im2row(const int nr_vertices, const int pos_dim, const int val_full_dim, const int dilation, float* im2row_out, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neighbours, const bool flip_neighbours, const bool debug_kernel){
+        void im2row(const int nr_vertices, const int pos_dim, const int val_dim, const int dilation, float* im2row_out, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neighbours, const bool flip_neighbours, const bool debug_kernel){
 
             int nr_blocks=nr_vertices/BLOCK_SIZE;
             // check for partial block at the end
@@ -287,7 +287,7 @@ public:
             //43ms
 
             CUresult res= m_lattice_program.kernel("im2row")
-                    .instantiate(pos_dim, val_full_dim)
+                    .instantiate(pos_dim, val_dim)
                     .configure(nr_blocks, BLOCK_SIZE)
                     .launch( nr_vertices, im2row_out, filter_extent, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, use_center_vertex_from_lattice_neighbours, flip_neighbours, debug_kernel);
             CUDA_CHECK_CURESULT(res);
@@ -332,7 +332,7 @@ public:
             CUDA_CHECK_ERROR();
         }
 
-        void slice_standalone_no_precomputation(const float* positions, float* sliced_values, const int pos_dim, const int val_full_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
+        void slice_standalone_no_precomputation(const float* positions, float* sliced_values, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
             // do it with jitify
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
@@ -342,7 +342,7 @@ public:
 
             blockSize.y = 1;
             CUresult res= m_lattice_program.kernel("slice_no_precomputation")
-                        .instantiate(pos_dim, val_full_dim)
+                        .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         .launch( positions, sliced_values, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
             CUDA_CHECK_CURESULT(res);
@@ -350,14 +350,14 @@ public:
 
         }
 
-        void gather_standalone_no_precomputation(const float* positions, float* gathered_values, const int pos_dim, const int val_full_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
+        void gather_standalone_no_precomputation(const float* positions, float* gathered_values, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
             // do it with jitify
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
             CUresult res= m_lattice_program.kernel("gather_no_precomputation")
-                        .instantiate(pos_dim, val_full_dim)
+                        .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         .launch( positions, gathered_values, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
             CUDA_CHECK_CURESULT(res);
@@ -365,14 +365,14 @@ public:
 
         }
 
-        void gather_standalone_with_precomputation(const float* positions, float* gathered_values, const int pos_dim, const int val_full_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
+        void gather_standalone_with_precomputation(const float* positions, float* gathered_values, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
             // do it with jitify
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
             CUresult res= m_lattice_program.kernel("gather_with_precomputation")
-                        .instantiate(pos_dim, val_full_dim)
+                        .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         .launch( positions, gathered_values, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
             CUDA_CHECK_CURESULT(res);
@@ -414,7 +414,7 @@ public:
 
         }
 
-        void slice_classify_no_precomputation(const float* positions, float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int pos_dim, const int val_full_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
+        void slice_classify_no_precomputation(const float* positions, float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
 
             // do it with jitify
@@ -423,7 +423,7 @@ public:
 
 
             CUresult res= m_lattice_program.kernel("slice_classify_no_precomputation")
-                        .instantiate(pos_dim, val_full_dim)
+                        .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
                         .launch( positions, class_logits, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
             CUDA_CHECK_CURESULT(res);
@@ -431,7 +431,7 @@ public:
         }
 
 
-        void slice_classify_with_precomputation(const float* positions, float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int pos_dim, const int val_full_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
+        void slice_classify_with_precomputation(const float* positions, float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
 
             // do it with jitify
@@ -440,7 +440,7 @@ public:
 
 
             CUresult res= m_lattice_program.kernel("slice_classify_with_precomputation")
-                        .instantiate(pos_dim, val_full_dim, nr_classes)
+                        .instantiate(pos_dim, val_dim, nr_classes)
                         .configure(blocks, blockSize)
                         // .smem(nr_classes*val_full_dim*4) //shared memory in bytes
                         .launch( positions, class_logits, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
@@ -478,14 +478,14 @@ public:
         }
 
  
-        void slice_classify_backwards_with_precomputation(float* grad_class_logits, float* initial_values, int* splatting_indices, float* splatting_weights,  const int pos_dim, const int val_full_dim, const int nr_positions, 
+        void slice_classify_backwards_with_precomputation(float* grad_class_logits, float* initial_values, int* splatting_indices, float* splatting_weights,  const int pos_dim, const int val_dim, const int nr_positions, 
         float* delta_weights, float* linear_clasify_weight, float* linear_clasify_bias, const int nr_classes, float* grad_lattice_values, float* grad_delta_weights, float* grad_linear_clasify_weight, float* grad_linear_clasify_bias,
          const HashTableGPU& hash_table_gpu){
 
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
             CUresult res= m_lattice_program.kernel("slice_classify_backwards_with_precomputation")
-                        .instantiate(pos_dim, val_full_dim, nr_classes)
+                        .instantiate(pos_dim, val_dim, nr_classes)
                         .configure(blocks, blockSize)
                         .launch( nr_positions, grad_class_logits, initial_values, splatting_indices, splatting_weights, delta_weights, linear_clasify_weight, linear_clasify_bias, grad_lattice_values, grad_delta_weights,
                          grad_linear_clasify_weight, grad_linear_clasify_bias, hash_table_gpu );
@@ -1224,11 +1224,11 @@ splatCache(const int n, const float *values, float* splatting_indices_and_weight
     }
 }
 
-template<int pos_dim, int val_dim, int val_full_dim>
+template<int pos_dim, int val_dim>
 // __global__ void splatCache(const int n, const float *values, int* splatting_indices, float* splatting_weights, HashTableGPU hash_table) {
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
-splatCacheNaive(const int nr_positions, float *values, int* splatting_indices, float* splatting_weights, const bool with_homogeneous_coord,  HashTableGPU hash_table) {
+splatCacheNaive(const int nr_positions, float *values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x; // each thread will deal with one position
     if(idx >= nr_positions){
@@ -1249,7 +1249,7 @@ splatCacheNaive(const int nr_positions, float *values, int* splatting_indices, f
 
             // float weight = splatting_indices_and_weights[ idx * (pos_dim + 1)*2 + color*2 + 1];
             float weight = splatting_weights[ idx * (pos_dim + 1) + color];
-            float *valOut = hash_table.m_values + splatting_idx * val_full_dim;
+            float *valOut = hash_table.m_values + splatting_idx * val_dim;
 
             // printf("idx is %d, color is %d my_value is %f and weight is %f \n", idx, color, *my_value, weight );
 
@@ -1482,7 +1482,7 @@ convolve(int n, float *newValues, const float* filter_bank, const int nr_filters
 
 }
 
-template<int pos_dim, int val_full_dim>
+template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neigbhours, bool flip_neighbours, bool debug_kernel) {
@@ -1492,7 +1492,7 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
     if (idx >= *hash_table_query.m_nr_filled) return;
     
 
-    int row_size=filter_extent*val_full_dim; // each row contains a patch around the current lattice vertex that contains the values of all the neighbours in the filter extent (and the center vertex)
+    int row_size=filter_extent*val_dim; // each row contains a patch around the current lattice vertex that contains the values of all the neighbours in the filter extent (and the center vertex)
     float *row_out = im2row_out + row_size * idx;
 
 
@@ -1562,7 +1562,7 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
 
     
     //store the values of this current lattice vertex (the one at the center of the kernel)
-    float zeros[val_full_dim]{0};
+    float zeros[val_dim]{0};
     float* valMe = zeros;
     bool center_vertex_has_valid_value=false; //valid value means a non zero one. It will save us from writing a value of zero which is redundant
     int key_query_int[pos_dim + 1];
@@ -1574,11 +1574,11 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
     if(use_center_vertex_from_lattice_neigbhours && has_all_coords_integer){
         int query_offset = hash_table_neighbours.retrieve(key_query_int); 
         if(query_offset>=0){
-            valMe = hash_table_neighbours.m_values + val_full_dim * query_offset;
+            valMe = hash_table_neighbours.m_values + val_dim * query_offset;
             center_vertex_has_valid_value=true;
         }
     }else if (!use_center_vertex_from_lattice_neigbhours){
-        valMe= hash_table_query.m_values + val_full_dim * idx;
+        valMe= hash_table_query.m_values + val_dim * idx;
         center_vertex_has_valid_value=true;
     }
 
@@ -1682,16 +1682,16 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
             //each neigbhour gets multiplied with the weight in the filter bank sequencially from 0 to filter_extent-1 (the last weight is for the center lattice vertex)
             if(offNp >= 0 && np_coords_integer){
                 nr_neighbours_found++;
-                valNp = hash_table_neighbours.m_values + val_full_dim * offNp;
+                valNp = hash_table_neighbours.m_values + val_dim * offNp;
 
                 int neighbour_idx=0;
                 if(flip_neighbours){ //for the backwards pass we flip the neighbours so that when multiplying with the kernel they get the weights as if the kernel was centered around the neighbour
                     neighbour_idx=1;
                 }
-                int idx_within_row= val_full_dim*axis*2 + neighbour_idx*val_full_dim;  //there are 2 neigbours per axis and each has val_ful_dim values
+                int idx_within_row= val_dim*axis*2 + neighbour_idx*val_dim;  //there are 2 neigbours per axis and each has val_ful_dim values
                 //store the values of neighbour 1
                 #pragma unroll
-                for (int i = 0; i < val_full_dim; i++){
+                for (int i = 0; i < val_dim; i++){
                     int row_idx=idx_within_row +i; //we store each neigbhour values one after another. so if we have neighbour with 3 values each they will be in a row stored as n1v1, n1v2, n1v3, n2v1, n2v2 etc
                     row_out[row_idx] = valNp[i];
                 }
@@ -1705,16 +1705,16 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
 
             if(offNm >= 0 && nm_coords_integer){
                 nr_neighbours_found++;
-                valNm = hash_table_neighbours.m_values + val_full_dim * offNm;
+                valNm = hash_table_neighbours.m_values + val_dim * offNm;
 
                 int neighbour_idx=1;
                 if(flip_neighbours){ //for the backwards pass we flip the neighbours so that when multiplying with the kernel they get the weights as if the kernel was centered around the neighbour
                     neighbour_idx=0;
                 }
-                int idx_within_row= val_full_dim*axis*2 + neighbour_idx*val_full_dim;  //there are 2 neigbours per axis and each has val_ful_dim values
+                int idx_within_row= val_dim*axis*2 + neighbour_idx*val_dim;  //there are 2 neigbours per axis and each has val_ful_dim values
                 //store the values of neighbour 2
                 #pragma unroll
-                for (int i = 0; i < val_full_dim; i++){
+                for (int i = 0; i < val_dim; i++){
                     int row_idx=idx_within_row +i; //we store each neigbhour values one after another. so if we have neighbour with 3 values each they will be in a row stored as n1v1, n1v2, n1v3, n2v1, n2v2 etc
                     row_out[row_idx] = valNm[i];
                 }
@@ -1738,11 +1738,11 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
         // printf("didn't find any neigbhours for key at idx %d, dilation %d with key %f  %f  %f %f  \n",idx, dilation, key_query[0],key_query[1],key_query[2], key_query[3]);
     }
 
-    int idx_within_row= val_full_dim*nr_immediate_neigbhours; //we skip the values of all the neighbours that we stored in the row and now we are pointing to the position in the row where we can write 
+    int idx_within_row= val_dim*nr_immediate_neigbhours; //we skip the values of all the neighbours that we stored in the row and now we are pointing to the position in the row where we can write 
     //store the values of the center vertex
     if(center_vertex_has_valid_value){
         #pragma unroll
-        for (int i = 0; i < val_full_dim; i++){
+        for (int i = 0; i < val_dim; i++){
             int row_idx=idx_within_row +i; //we store each neigbhour values one after another. so if we have neighbour with 3 values each they will be in a row stored as n1v1, n1v2, n1v3, n2v1, n2v2 etc
             row_out[row_idx] = valMe[i];
         }
@@ -1898,7 +1898,7 @@ test_row2im(int capacity, float* im2row_in, int filter_extent, int dilation, Has
 
 
 
-template<int pos_dim, int val_full_dim>
+template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neigbhours, const bool do_test) {
@@ -2009,7 +2009,7 @@ row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTabl
 
     
     //store the values of this current lattice vertex (the one at the center of the kernel)
-    float *val_me_out = hash_table_query.m_values + val_full_dim * idx;
+    float *val_me_out = hash_table_query.m_values + val_dim * idx;
 
     // int nr_immediate_neigbhours=2*(pos_dim+1);
     int nr_axes=pos_dim+1;
@@ -2048,10 +2048,10 @@ row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTabl
                 //Since the neigbhour is my positive one (np) then for the neighbour I am the negative one Nm
                 //Therefore the start position within the row where I will start to find my values will be at 
                 float *row = im2row_in + row_size * offNp; //this is the row where we will find our value
-                int idx_within_row= val_full_dim*axis*2 + 1*val_full_dim;  //we have 2 neighbour per row and each have val_full_dim, and we should skip axis_idx nr of them. The +1*Val_full_dum is because we skip one more value chunk because this vertex will be seen as Nm for the neigbhour
+                int idx_within_row= val_dim*axis*2 + 1*val_dim;  //we have 2 neighbour per row and each have val_full_dim, and we should skip axis_idx nr of them. The +1*Val_full_dum is because we skip one more value chunk because this vertex will be seen as Nm for the neigbhour
 
                 float* start_of_my_values=row + idx_within_row;
-                for (int i = 0; i < val_full_dim; i++){
+                for (int i = 0; i < val_dim; i++){
                     if(!do_test){
                         val_me_out[i]+=start_of_my_values[i];
                     }
@@ -2071,10 +2071,10 @@ row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTabl
             if(offNm >= 0){
 
                 float *row = im2row_in + row_size * offNm; //this is the row where we will find our value
-                int idx_within_row= val_full_dim*axis*2 + 0*val_full_dim;  //we have 2 neighbour per row and each have val_full_dim, and we should skip axis_idx nr of them. The +1*Val_full_dum is because we skip one more value chunk because this vertex will be seen as Nm for the neigbhour
+                int idx_within_row= val_dim*axis*2 + 0*val_dim;  //we have 2 neighbour per row and each have val_full_dim, and we should skip axis_idx nr of them. The +1*Val_full_dum is because we skip one more value chunk because this vertex will be seen as Nm for the neigbhour
 
                 float* start_of_my_values=row + idx_within_row;
-                for (int i = 0; i < val_full_dim; i++){
+                for (int i = 0; i < val_dim; i++){
 
                     if(!do_test){
                         val_me_out[i]+=start_of_my_values[i];
@@ -2101,9 +2101,9 @@ row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTabl
         int query_offset = hash_table_neighbours.retrieve(key_query_int); 
         if(query_offset>=0){
             float *row = im2row_in + row_size * query_offset; //this is the row where we will find our value
-            int idx_within_row= row_size - val_full_dim; 
+            int idx_within_row= row_size - val_dim; 
             float* start_of_my_values=row + idx_within_row;
-            for (int i = 0; i < val_full_dim; i++){
+            for (int i = 0; i < val_dim; i++){
                 if(!do_test){
                     val_me_out[i]+=start_of_my_values[i];
                 }
@@ -2116,9 +2116,9 @@ row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTabl
         }
     }else if (!use_center_vertex_from_lattice_neigbhours){
         float *row = im2row_in + row_size * idx; //this is the row where we will find our value
-        int idx_within_row= row_size - val_full_dim; 
+        int idx_within_row= row_size - val_dim; 
         float* start_of_my_values=row + idx_within_row;
-        for (int i = 0; i < val_full_dim; i++){
+        for (int i = 0; i < val_dim; i++){
             // val_me_out[i]+=start_of_my_values[i];
             if(!do_test){
                 val_me_out[i]+=start_of_my_values[i];
@@ -2380,7 +2380,7 @@ slice(const int n, float *values, int* splatting_indices, float* splatting_weigh
 }
 
 
-template<int pos_dim, int val_full_dim>
+template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 slice_no_precomputation(const float* positions,  float* values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
@@ -2477,7 +2477,7 @@ slice_no_precomputation(const float* positions,  float* values, const int nr_pos
 
 
     //here we accumulate the values and the homogeneous term
-    float val_hom[val_full_dim]{0};
+    float val_hom[val_dim]{0};
 
     int key[pos_dim];
     for (int remainder = 0; remainder <= pos_dim; remainder++) {
@@ -2491,7 +2491,7 @@ slice_no_precomputation(const float* positions,  float* values, const int nr_pos
 
         // Retrieve pointer to the value at this vertex.
         int idx_val=hash_table.retrieve(key);
-        float *val = const_cast<float *>(hash_table.m_values + idx_val * val_full_dim );
+        float *val = const_cast<float *>(hash_table.m_values + idx_val * val_dim );
         // printf("idx_val  %d \n", idx_val );
 
         //store also the splatting indices and weight so that they can be used for the backwards pass
@@ -2504,7 +2504,7 @@ slice_no_precomputation(const float* positions,  float* values, const int nr_pos
 
         //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
         if(idx_val!=-1){
-            for (int i = 0; i < val_full_dim ; i++){
+            for (int i = 0; i < val_dim ; i++){
                 val_hom[i]+= val[i]* barycentric[remainder];
                 // printf("val[i]  %f \n", val[i] );
                 // printf("barycentric  %f \n", barycentric[remainder] );
@@ -2526,7 +2526,7 @@ slice_no_precomputation(const float* positions,  float* values, const int nr_pos
 
 
     //do not divicde by the homogeneous coordinate, rather just store the value as it is because we will afterwards need the homogeneous coordinate for the backwards passs
-    for (int i = 0; i < val_full_dim; i++){
+    for (int i = 0; i < val_dim; i++){
             values[idx*val_full_dim + i]= val_hom[i] ;
     }
 
@@ -2535,7 +2535,7 @@ slice_no_precomputation(const float* positions,  float* values, const int nr_pos
 }
 
 
-template<int pos_dim, int val_full_dim>
+template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 gather_no_precomputation(const float* positions,  float* gathered_values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
@@ -2618,7 +2618,7 @@ gather_no_precomputation(const float* positions,  float* gathered_values, const 
 
     //here we accumulate the values and the homogeneous term
     // float ga[val_full_dim]{0};
-    int row_size_gathered=(pos_dim+1)*(val_full_dim+1);
+    int row_size_gathered=(pos_dim+1)*(val_dim+1);
     float* gathered_row = gathered_values + idx * row_size_gathered;
 
     int key[pos_dim];
@@ -2633,7 +2633,7 @@ gather_no_precomputation(const float* positions,  float* gathered_values, const 
 
         // Retrieve pointer to the value at this vertex.
         int idx_val=hash_table.retrieve(key);
-        float *val = const_cast<float *>(hash_table.m_values + idx_val * val_full_dim );
+        float *val = const_cast<float *>(hash_table.m_values + idx_val * val_dim );
         // printf("idx_val  %d \n", idx_val );
 
         //store also the splatting indices and weight so that they can be used for the backwards pass
@@ -2646,8 +2646,8 @@ gather_no_precomputation(const float* positions,  float* gathered_values, const 
 
         //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
         if(idx_val!=-1 && barycentric[remainder]>0.00001){
-            int idx_in_row=remainder*( val_full_dim + 1 );
-            for (int i = 0; i < val_full_dim ; i++){
+            int idx_in_row=remainder*( val_dim + 1 );
+            for (int i = 0; i < val_dim ; i++){
                 if(debug){
                     // printf("copying val %d into gathered row at positions %d \n", i, idx_in_row +i);
                 }
@@ -2668,7 +2668,7 @@ gather_no_precomputation(const float* positions,  float* gathered_values, const 
 
 
 
-template<int pos_dim, int val_full_dim>
+template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 gather_with_precomputation(const float* positions,  float* gathered_values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
@@ -2683,7 +2683,7 @@ gather_with_precomputation(const float* positions,  float* gathered_values, cons
 
     //here we accumulate the values and the homogeneous term
     // float ga[val_full_dim]{0};
-    int row_size_gathered=(pos_dim+1)*(val_full_dim+1);
+    int row_size_gathered=(pos_dim+1)*(val_dim+1);
     float* gathered_row = gathered_values + idx * row_size_gathered;
 
     int key[pos_dim];
@@ -2691,14 +2691,14 @@ gather_with_precomputation(const float* positions,  float* gathered_values, cons
         int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + remainder];
         if(splatting_idx>=0){
             float weight = splatting_weights[ idx * (pos_dim + 1) + remainder];
-            float *val = const_cast<float *>(hash_table.m_values + splatting_idx * val_full_dim );
+            float *val = const_cast<float *>(hash_table.m_values + splatting_idx * val_dim );
 
             //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
-            int idx_in_row=remainder*( val_full_dim + 1 );
-            for (int i = 0; i < val_full_dim ; i++){
+            int idx_in_row=remainder*( val_dim + 1 );
+            for (int i = 0; i < val_dim ; i++){
                 gathered_row[idx_in_row + i] = val[i]*weight;
             }
-            gathered_row[idx_in_row+val_full_dim]=weight;
+            gathered_row[idx_in_row+val_dim]=weight;
 
         }
 
@@ -3008,7 +3008,7 @@ slice_elevated_verts(float* values, int* splatting_indices, float* splatting_wei
 }
 
 
-template<int pos_dim, int val_full_dim>
+template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 slice_classify_no_precomputation(const float* positions,  float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
@@ -3084,7 +3084,7 @@ slice_classify_no_precomputation(const float* positions,  float* class_logits, c
 
 
     //here we accumulate the values and the homogeneous term
-    float val_hom[val_full_dim]{0};
+    float val_hom[val_dim]{0};
 
     const float* delta_weights_row=delta_weights+idx*(pos_dim+1); //delta_weights has shape nr_positions x (pos_dim+1)
 
@@ -3100,7 +3100,7 @@ slice_classify_no_precomputation(const float* positions,  float* class_logits, c
 
         // Retrieve pointer to the value at this vertex.
         int idx_val=hash_table.retrieve(key);
-        float *val = const_cast<float *>(hash_table.m_values + idx_val * val_full_dim );
+        float *val = const_cast<float *>(hash_table.m_values + idx_val * val_dim );
         // printf("idx_val  %d \n", idx_val );
 
         //store also the splatting indices and weight so that they can be used for the backwards pass
@@ -3113,7 +3113,7 @@ slice_classify_no_precomputation(const float* positions,  float* class_logits, c
 
         //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
         if(idx_val!=-1){
-            for (int i = 0; i < val_full_dim ; i++){
+            for (int i = 0; i < val_dim ; i++){
                 val_hom[i]+= val[i]* (barycentric[remainder]+delta_weights_row[remainder]);
                 // val_hom[i]+= val[i]* (delta_weights_row[remainder]);
                 // printf("val[i]  %f \n", val[i] );
@@ -3129,8 +3129,8 @@ slice_classify_no_precomputation(const float* positions,  float* class_logits, c
     float* logits_out_for_cur_position=class_logits+idx*nr_classes;//class_logits has shape nr_positions x nr_classes
 
     for (int c = 0; c < nr_classes; c++) {
-        const float* weight_for_class= linear_clasify_weight+ c*val_full_dim;
-        for (int val_idx = 0; val_idx < val_full_dim; val_idx++) {
+        const float* weight_for_class= linear_clasify_weight+ c*val_dim;
+        for (int val_idx = 0; val_idx < val_dim; val_idx++) {
             //WARNING linear clasify weight has shape nr_classes x val_Full_dim. So in the tranposed way that we would expect if it was just a mtrix multiply
             // if (c==0 && val_idx==0){
                 // printf("logits_out_for_cur_position  %f \n", logits_out_for_cur_position[0] );
@@ -3147,7 +3147,7 @@ slice_classify_no_precomputation(const float* positions,  float* class_logits, c
 
 
 
-template<int pos_dim, int val_full_dim, int nr_classes>
+template<int pos_dim, int val_dim, int nr_classes>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 slice_classify_with_precomputation(const float* positions,  float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
@@ -3165,7 +3165,7 @@ slice_classify_with_precomputation(const float* positions,  float* class_logits,
 
 
     //here we accumulate the values and the homogeneous term
-    float val_hom[val_full_dim]{0};
+    float val_hom[val_dim]{0};
 
     const float* delta_weights_row=delta_weights+idx*(pos_dim+1); //delta_weights has shape nr_positions x (pos_dim+1)
 
@@ -3173,10 +3173,10 @@ slice_classify_with_precomputation(const float* positions,  float* class_logits,
         int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + remainder];
         if(splatting_idx>=0){
             float weight = splatting_weights[ idx * (pos_dim + 1) + remainder];
-            float *val = const_cast<float *>(hash_table.m_values + splatting_idx * val_full_dim );
+            float *val = const_cast<float *>(hash_table.m_values + splatting_idx * val_dim );
 
             //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
-            for (int i = 0; i < val_full_dim ; i++){
+            for (int i = 0; i < val_dim ; i++){
                 val_hom[i]+= val[i]* (weight+delta_weights_row[remainder]);
             }
 
@@ -3193,9 +3193,9 @@ slice_classify_with_precomputation(const float* positions,  float* class_logits,
 
 
     //load the weights of the linear layers into shared mem 
-    __shared__ float linear_weights_shared[nr_classes*val_full_dim];
+    __shared__ float linear_weights_shared[nr_classes*val_dim];
     if (threadIdx.x == 0 ){
-        for (int i = 0; i < nr_classes*val_full_dim; i++) {
+        for (int i = 0; i < nr_classes*val_dim; i++) {
             linear_weights_shared[i]=linear_clasify_weight[i];
         }
     }
@@ -3204,8 +3204,8 @@ slice_classify_with_precomputation(const float* positions,  float* class_logits,
 
     for (int c = 0; c < nr_classes; c++) {
         // const float* weight_for_class= linear_clasify_weight+ c*val_full_dim;
-        const float* weight_for_class= linear_weights_shared+ c*val_full_dim;
-        for (int val_idx = 0; val_idx < val_full_dim; val_idx++) {
+        const float* weight_for_class= linear_weights_shared+ c*val_dim;
+        for (int val_idx = 0; val_idx < val_dim; val_idx++) {
             //WARNING linear clasify weight has shape nr_classes x val_Full_dim. So in the tranposed way that we would expect if it was just a mtrix multiply
             // if (c==0 && val_idx==0){
                 // printf("logits_out_for_cur_position  %f \n", logits_out_for_cur_position[0] );
@@ -3353,7 +3353,7 @@ slice_backwards_with_precomputation_no_homogeneous(const int nr_positions, float
 
 
 
-template<int pos_dim, int val_full_dim, int nr_classes>
+template<int pos_dim, int val_dim, int nr_classes>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 slice_classify_backwards_with_precomputation(const int nr_positions, float* grad_class_logits, float* initial_values, int* splatting_indices, float* splatting_weights, float* delta_weights, float* linear_clasify_weight, float* linear_clasify_bias, float* grad_lattice_values, float* grad_delta_weights, float* grad_linear_clasify_weight, float* grad_linear_clasify_bias,  HashTableGPU hash_table) {
@@ -3373,9 +3373,9 @@ slice_classify_backwards_with_precomputation(const int nr_positions, float* grad
 
     //load the weights of the linear layers into shared mem 
     // printf("trying to allocate shared memory of size %d \n", nr_classes*val_full_dim);
-    __shared__ float linear_weights_shared[nr_classes*val_full_dim];
+    __shared__ float linear_weights_shared[nr_classes*val_dim];
     if (threadIdx.x == 0 ){
-        for (int i = 0; i < nr_classes*val_full_dim; i++) {
+        for (int i = 0; i < nr_classes*val_dim; i++) {
             linear_weights_shared[i]=linear_clasify_weight[i];
         }
     }
@@ -3393,17 +3393,17 @@ slice_classify_backwards_with_precomputation(const int nr_positions, float* grad
 
             float splat_weight = splatting_weights[ idx * (pos_dim + 1) + color];
             float splat_delta_weight=delta_weights[ idx * (pos_dim + 1) + color];
-            float *grad_lattice_vertex_out = grad_lattice_values + splatting_idx * val_full_dim;
+            float *grad_lattice_vertex_out = grad_lattice_values + splatting_idx * val_dim;
 
 
-            for (int v = 0; v < val_full_dim; v++) {
+            for (int v = 0; v < val_dim; v++) {
                 float grad=0.0;
                 for (int c = 0; c < nr_classes; c++) {
                     // //debug
                     // if( linear_clasify_weight[v+c*val_full_dim]!=linear_weights_shared[v+c*val_full_dim] ){
                     //     printf("The global value is not the same as the shared one, global is %f and shared is %f \n",linear_clasify_weight[v+c*val_full_dim],linear_weights_shared[v+c*val_full_dim]  );
                     // }
-                    grad+=grad_class_logits_cur_position[c]*linear_weights_shared[v+c*val_full_dim]*(splat_weight+splat_delta_weight);
+                    grad+=grad_class_logits_cur_position[c]*linear_weights_shared[v+c*val_dim]*(splat_weight+splat_delta_weight);
                 }
                 atomicAdd(grad_lattice_vertex_out+v, grad);
             }
@@ -3415,16 +3415,16 @@ slice_classify_backwards_with_precomputation(const int nr_positions, float* grad
 
     //GRAD LINEAR CLASIFY WEIGHT (need to do some attomic add over all the clasify weights which are shape nr_classes x val_full_dim )
     //we need the sliced value ( sliced using as weight both the splatting weight and the delta weight)
-    float sliced_value[val_full_dim]{0};
+    float sliced_value[val_dim]{0};
     for(int color=0; color<pos_dim+1; color++){
         int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + color];
         if(splatting_idx>=0){
 
             float splat_weight = splatting_weights[ idx * (pos_dim + 1) + color];
             float splat_delta_weight=delta_weights[ idx * (pos_dim + 1) + color];
-            float* vertex_value=initial_values+splatting_idx*val_full_dim;
+            float* vertex_value=initial_values+splatting_idx*val_dim;
 
-            for (int v = 0; v < val_full_dim; v++) {
+            for (int v = 0; v < val_dim; v++) {
                 sliced_value[v]+=vertex_value[v]*(splat_weight + splat_delta_weight);
                 // sliced_value[v]+=vertex_value[v]*(splat_delta_weight);
             }
@@ -3433,8 +3433,8 @@ slice_classify_backwards_with_precomputation(const int nr_positions, float* grad
     }
     //Now we accumulate the gradient into the LINEAR CLASIFY WEIGHT 
     for (int c = 0; c < nr_classes; c++) {
-        for (int v = 0; v < val_full_dim; v++) {
-            atomicAdd(grad_linear_clasify_weight+v +c*val_full_dim, sliced_value[v]*grad_class_logits_cur_position[c]);
+        for (int v = 0; v < val_dim; v++) {
+            atomicAdd(grad_linear_clasify_weight+v +c*val_dim, sliced_value[v]*grad_class_logits_cur_position[c]);
         }
     }
 
@@ -3451,16 +3451,16 @@ slice_classify_backwards_with_precomputation(const int nr_positions, float* grad
         float grad=0.0;
         int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + color];
         if(splatting_idx>=0){
-            float* vertex_value=initial_values+splatting_idx*val_full_dim;
+            float* vertex_value=initial_values+splatting_idx*val_dim;
             for (int c = 0; c < nr_classes; c++) {
                 float grad_output_wrt_dw=0.0;
                 //need to calculate the gradient of the output o1 with respect to the delta weight
-                for (int v = 0; v < val_full_dim; v++) {
+                for (int v = 0; v < val_dim; v++) {
                     // //debug
                     // if( linear_clasify_weight[v+c*val_full_dim]!=linear_weights_shared[v+c*val_full_dim] ){
                     //     printf("The global value is not the same as the shared one, global is %f and shared is %f ",linear_clasify_weight[v+c*val_full_dim],linear_weights_shared[v+c*val_full_dim]  );
                     // }
-                    grad_output_wrt_dw+=vertex_value[v]*linear_weights_shared[v +c*val_full_dim];
+                    grad_output_wrt_dw+=vertex_value[v]*linear_weights_shared[v +c*val_dim];
                 }
                 grad+=grad_output_wrt_dw*grad_class_logits_cur_position[c];
             }

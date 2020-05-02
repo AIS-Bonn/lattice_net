@@ -21,7 +21,7 @@ class DropoutLattice(torch.nn.Module):
     def forward(self, lv):
 
         if(len(lv.shape)) is not 2:
-            sys.exit("the lattice values must be two dimensional, nr_lattice vertices x val_full_dim.However it is",len(lv.shape) ) 
+            sys.exit("the lattice values must be two dimensional, nr_lattice vertices x val_dim.However it is",len(lv.shape) ) 
 
         #droput expect input of shape N,C,H,W and drops a full channel
         lv_drop=lv.transpose(0,1) #val_full_dim x nr_lattice_vertices
@@ -46,11 +46,10 @@ class CreateVertsModule(torch.nn.Module):
 
 
 class SplatLatticeModule(torch.nn.Module):
-    def __init__(self, with_homogeneous_coord=True):
+    def __init__(self):
         super(SplatLatticeModule, self).__init__()
-        self.with_homogeneous_coord=with_homogeneous_coord
     def forward(self, lattice_py, positions, values):
-        return SplatLattice.apply(lattice_py, positions, values, self.with_homogeneous_coord)
+        return SplatLattice.apply(lattice_py, positions, values )
 
 class DistributeLatticeModule(torch.nn.Module):
     def __init__(self, experiment, with_debug_output, with_error_checking):
@@ -122,7 +121,7 @@ class DistributeCapLatticeModule(torch.nn.Module):
 
 
 class ConvLatticeModule(torch.nn.Module):
-    def __init__(self, nr_filters, neighbourhood_size, dilation=1, bias=True, with_homogeneous_coord=True, with_debug_output=True, with_error_checking=True):
+    def __init__(self, nr_filters, neighbourhood_size, dilation=1, bias=True, with_debug_output=True, with_error_checking=True):
     # def __init__(self, nr_filters, neighbourhood_size, dilation=1):
         super(ConvLatticeModule, self).__init__()
         self.first_time=True
@@ -132,7 +131,6 @@ class ConvLatticeModule(torch.nn.Module):
         self.nr_filters=nr_filters
         self.dilation=dilation
         self.use_bias=bias
-        self.with_homogeneous_coord=with_homogeneous_coord
         self.use_center_vertex_from_lattice_neigbhours=False
         self.with_debug_output=with_debug_output
         self.with_error_checking=with_error_checking
@@ -161,8 +159,8 @@ class ConvLatticeModule(torch.nn.Module):
         if(self.first_time):
             self.first_time=False
             filter_extent=lattice_structure.lattice.get_filter_extent(self.neighbourhood_size)
-            val_full_dim=lattice_structure.lattice.val_full_dim()
-            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_full_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
+            val_dim=lattice_structure.lattice.val_dim()
+            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
             if self.use_bias:
                 self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
             # if(self.with_homogeneous_coord):
@@ -172,7 +170,7 @@ class ConvLatticeModule(torch.nn.Module):
             with torch.no_grad():
                 self.reset_parameters(filter_extent)
 
-        lv, ls=ConvIm2RowLattice.apply(lattice_values, lattice_structure, self.weight, self.dilation, self.with_homogeneous_coord, lattice_neighbours_values, lattice_neighbours_structure, self.use_center_vertex_from_lattice_neigbhours, self.with_debug_output, self.with_error_checking)
+        lv, ls=ConvIm2RowLattice.apply(lattice_values, lattice_structure, self.weight, self.dilation, lattice_neighbours_values, lattice_neighbours_structure, self.use_center_vertex_from_lattice_neigbhours, self.with_debug_output, self.with_error_checking)
         if self.use_bias:
             lv+=self.bias
         ls.set_values(lv)
@@ -211,8 +209,8 @@ class CoarsenLatticeModule(torch.nn.Module):
         if(self.first_time):
             self.first_time=False
             filter_extent=lattice_fine_structure.lattice.get_filter_extent(self.neighbourhood_size) 
-            val_full_dim=lattice_fine_structure.lattice.val_full_dim()
-            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_full_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
+            val_dim=lattice_fine_structure.lattice.val_dim()
+            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
             # self.bias = torch.nn.Parameter(torch.empty( self.nr_filters).to("cuda") )
             with torch.no_grad():
                 self.reset_parameters(filter_extent)
@@ -252,13 +250,13 @@ class FinefyLatticeModule(torch.nn.Module):
 
     def forward(self, lattice_coarse_values, lattice_coarse_structure, lattice_fine_structure):
         lattice_coarse_structure.set_values(lattice_coarse_values)
-        lattice_fine_structure.set_val_full_dim(lattice_coarse_structure.val_full_dim())
+        lattice_fine_structure.set_val_dim(lattice_coarse_structure.val_dim())
 
         if(self.first_time):
             self.first_time=False
             filter_extent=lattice_fine_structure.lattice.get_filter_extent(self.neighbourhood_size) 
-            val_full_dim=lattice_coarse_structure.lattice.val_full_dim()
-            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_full_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
+            val_dim=lattice_coarse_structure.lattice.val_dim()
+            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
             # self.bias = torch.nn.Parameter(torch.empty( self.nr_filters).to("cuda") )
             with torch.no_grad():
                 self.reset_parameters(filter_extent)
@@ -309,11 +307,11 @@ class CoarsenMaxLatticeModule(torch.nn.Module):
         #create a coarse lattice and return the lattice rowified of it
         lattice_rowified, coarse_structure= CoarsenAndReturnLatticeRowified.apply(lattice_values, lattice_structure, self.use_center_vertex_from_lattice_neigbhours,  self.with_debug_output, self.with_error_checking) 
 
-        val_full_dim=lattice_values.shape[1]
+        val_dim=lattice_values.shape[1]
         filter_extent=coarse_structure.lattice.get_filter_extent(1)
         nr_vertices=coarse_structure.nr_lattice_vertices()
 
-        lattice_rowified=lattice_rowified.view(nr_vertices, filter_extent, val_full_dim)
+        lattice_rowified=lattice_rowified.view(nr_vertices, filter_extent, val_dim)
 
         #during argmax, we try to ignore the values that have zero (the lattice vertices that are not allocated. the easiest way it to just set them to a negative number to ensure they are never selected by the max operation)
         lattice_rowified[lattice_rowified==0.0]=-9999999
@@ -360,11 +358,11 @@ class CoarsenAvgLatticeModule(torch.nn.Module):
         #create a coarse lattice and return the lattice rowified of it
         lattice_rowified, coarse_structure= CoarsenAndReturnLatticeRowified.apply(lattice_values, lattice_structure, self.use_center_vertex_from_lattice_neigbhours,  self.with_debug_output, self.with_error_checking) 
 
-        val_full_dim=lattice_values.shape[1]
+        val_dim=lattice_values.shape[1]
         filter_extent=coarse_structure.lattice.get_filter_extent(1)
         nr_vertices=coarse_structure.nr_lattice_vertices()
 
-        lattice_rowified=lattice_rowified.view(nr_vertices, filter_extent, val_full_dim)
+        lattice_rowified=lattice_rowified.view(nr_vertices, filter_extent, val_dim)
 
 
         #averagin of only the non zero values around each vertex neighboruhood can be done as  sum and afterwards a division by how many non zero elements have
@@ -405,11 +403,11 @@ class CoarsenBlurLatticeModule(torch.nn.Module):
         #create a coarse lattice and return the lattice rowified of it
         lattice_rowified, coarse_structure= CoarsenAndReturnLatticeRowified.apply(lattice_values, lattice_structure, self.use_center_vertex_from_lattice_neigbhours,  self.with_debug_output, self.with_error_checking) 
 
-        val_full_dim=lattice_values.shape[1]
+        val_dim=lattice_values.shape[1]
         filter_extent=coarse_structure.lattice.get_filter_extent(1)
         nr_vertices=coarse_structure.nr_lattice_vertices()
 
-        lattice_rowified=lattice_rowified.view(nr_vertices, filter_extent, val_full_dim)
+        lattice_rowified=lattice_rowified.view(nr_vertices, filter_extent, val_dim)
 
         if self.blur_filter is None:
             self.blur_filter = torch.tensor([1.0, 1.0,  1.0, 1.0,  1.0, 1.0, 1.0, 1.0, 8.0 ])/9.0
@@ -444,15 +442,14 @@ class CoarsenBlurLatticeModule(torch.nn.Module):
     
 
 class SliceLatticeModule(torch.nn.Module):
-    def __init__(self, with_homogeneous_coord=False, with_debug_output=True, with_error_checking=True):
+    def __init__(self, with_debug_output=True, with_error_checking=True):
         super(SliceLatticeModule, self).__init__()
-        self.with_homogeneous_coord=with_homogeneous_coord
         self.with_debug_output=with_debug_output
         self.with_error_checking=with_error_checking
     def forward(self, lattice_values, lattice_structure, positions):
 
         lattice_structure.set_values(lattice_values)
-        return SliceLattice.apply(lattice_values, lattice_structure, positions, self.with_homogeneous_coord, self.with_debug_output, self.with_error_checking)
+        return SliceLattice.apply(lattice_values, lattice_structure, positions, self.with_debug_output, self.with_error_checking)
 
 class GatherLatticeModule(torch.nn.Module):
     def __init__(self, with_debug_output=True, with_error_checking=True):
@@ -499,7 +496,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
 
         nr_positions=positions.shape[0]
         pos_dim=positions.shape[1]
-        val_full_dim=lv.shape[1]
+        val_dim=lv.shape[1]
         # print("SliceFast with nr_positions ", nr_positions, " pos_dim ", pos_dim, "val_full_dim ", val_full_dim)
 
         # #we want to regress first some weights deltas. For this we bottleneck first the values of the lattice so that the gather operation will be fast
@@ -510,7 +507,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
         #slowly reduce the features 
         if len(self.stepdown) is 0:
             for i in range(2):
-                nr_channels_out= int( val_full_dim/np.power(2,i) ) 
+                nr_channels_out= int( val_dim/np.power(2,i) ) 
                 if nr_channels_out  < self.bottleneck_size:
                     sys.exit("We used to many linear layers an now the values are lower than the bottlenck size. Which means that the bottleneck would actually do an expansion...")
                 print("adding stepdown with output of ", nr_channels_out)
@@ -753,7 +750,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
 
         #we slice with the delta weights and we clasify at the same time
         if self.linear_clasify is None: #create the linear clasify but we use the tensors directly inside our cuda kernel
-            self.linear_clasify=torch.nn.Linear(val_full_dim, self.nr_classes, bias=True).to("cuda") 
+            self.linear_clasify=torch.nn.Linear(val_dim, self.nr_classes, bias=True).to("cuda") 
 
         # print("linear clasigfy weight has shpae", self.linear_clasify.weight.shape)
         # print("linear clasigfy bias has shpae", self.linear_clasify.bias.shape)
@@ -843,7 +840,7 @@ class GroupNormLatticeModule(torch.nn.Module):
             sys.exit("This batchnor is thught to work for when using the values which has size exactly in the number of vertices")
 
         if(lattice_values.dim() is not 2):
-            sys.exit("lattice should be 2 dimensional, nr_vertices x val_full_dim")
+            sys.exit("lattice should be 2 dimensional, nr_vertices x val_dim")
 
         #group norm wants the tensor to be N, C, L  (nr_batches, channels, nr_samples)
         lattice_values=lattice_values.unsqueeze(0)
@@ -884,7 +881,7 @@ class LayerNormLatticeModule(torch.nn.Module):
             sys.exit("This batchnor is thught to work for when using the values which has size exactly in the number of vertices")
 
         if(lattice_values.dim() is not 2):
-            sys.exit("lattice should be 2 dimensional, nr_vertices x val_full_dim")
+            sys.exit("lattice should be 2 dimensional, nr_vertices x val_dim")
         
         # lattice_values=lattice_values.unsqueeze(0)
         lattice_values=self.bn(lattice_values)
@@ -950,7 +947,7 @@ class PointNetModule(torch.nn.Module):
                     self.att_scores=GnRelu1x1(nr_input_channels, True, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking)
 
 
-                self.last_conv=ConvLatticeModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=False, with_homogeneous_coord=False, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking) #disable the bias becuse it is followed by a gn
+                self.last_conv=ConvLatticeModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=False, with_debug_output=self.with_debug_output, with_error_checking=self.with_error_checking) #disable the bias becuse it is followed by a gn
 
         # print("pointnet distributed at the beggining is ", distributed.shape)
 
@@ -1083,7 +1080,6 @@ class PointNetModule(torch.nn.Module):
 
         lattice_py.set_values(distributed_reduced)
         lattice_py.set_val_dim(distributed_reduced.shape[1])
-        lattice_py.set_val_full_dim(distributed_reduced.shape[1])
 
        # #bn-relu-conv
         # if distributed_reduced.shape[1] is not self.nr_outputs_last_layer:
@@ -1110,7 +1106,6 @@ class PointNetModule(torch.nn.Module):
         # print("distributed_reduced has shape ", distributed_reduced.shape)
         lattice_py.set_values(distributed_reduced)
         lattice_py.set_val_dim(distributed_reduced.shape[1])
-        lattice_py.set_val_full_dim(distributed_reduced.shape[1])
 
         # return lattice_reduced
         return distributed_reduced, lattice_py
@@ -1239,7 +1234,6 @@ class PointNetDenseModule(torch.nn.Module):
         # print("distributed_reduced has shape ", distributed_reduced.shape)
         lattice_py.set_values(distributed_reduced)
         lattice_py.set_val_dim(distributed_reduced.shape[1])
-        lattice_py.set_val_full_dim(distributed_reduced.shape[1])
 
         # return lattice_reduced
         return distributed_reduced, lattice_py
@@ -1461,7 +1455,7 @@ class GnReluConv(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_dropout, with_debug_output, with_error_checking):
         super(GnReluConv, self).__init__()
         self.nr_filters=nr_filters
-        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         self.norm= None
         self.relu = torch.nn.ReLU(inplace=True)
         self.with_dropout=with_dropout
@@ -1492,7 +1486,7 @@ class GnGeluConv(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_dropout, with_debug_output, with_error_checking):
         super(GnGeluConv, self).__init__()
         self.nr_filters=nr_filters
-        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         self.norm= None
         self.with_dropout=with_dropout
         if with_dropout:
@@ -1520,7 +1514,7 @@ class GnConvGelu(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_dropout, with_debug_output, with_error_checking):
         super(GnConvGelu, self).__init__()
         self.nr_filters=nr_filters
-        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias,  with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         self.norm= None
         self.with_dropout=with_dropout
         if with_dropout:
@@ -1554,7 +1548,7 @@ class GnConv(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_dropout, with_debug_output, with_error_checking):
         super(GnConv, self).__init__()
         self.nr_filters=nr_filters
-        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         self.norm= None
         self.with_dropout=with_dropout
         if with_dropout:
@@ -1576,7 +1570,7 @@ class BnReluConv(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_debug_output, with_error_checking):
         super(BnReluConv, self).__init__()
         self.nr_filters=nr_filters
-        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         self.bn= None
         self.relu = torch.nn.ReLU(inplace=True)
         # self.relu = torch.nn.ReLU()
@@ -1599,7 +1593,7 @@ class BnConvRelu(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_debug_output, with_error_checking):
         super(BnConvRelu, self).__init__()
         self.nr_filters=nr_filters
-        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         self.bn= None
         # self.relu = torch.nn.ReLU(inplace=True)
         self.relu = torch.nn.ReLU()
@@ -1624,7 +1618,7 @@ class ConvReluBn(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_debug_output, with_error_checking):
         super(ConvReluBn, self).__init__()
         self.nr_filters=nr_filters
-        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_homogeneous_coord=False, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
+        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias, with_debug_output=with_debug_output, with_error_checking=with_error_checking)
         self.bn= BatchNormLatticeModule(nr_filters)
         self.relu = torch.nn.ReLU()
         self.leaky= torch.nn.LeakyReLU(negative_slope=0.2)

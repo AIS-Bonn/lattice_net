@@ -46,13 +46,13 @@ public:
 
     void begin_splat(); //clears the hashtable and new_values matris so we can use them as fresh
     // void begin_splat_modify_only_values(); //clears the hashtable and new_values matris so we can use them as fresh
-    void splat_standalone(torch::Tensor& positions_raw, torch::Tensor& values, const bool with_homogeneous_coord); 
-    void just_create_verts(torch::Tensor& positions_raw, const bool with_homogeneous_coord); 
+    void splat_standalone(torch::Tensor& positions_raw, torch::Tensor& values); 
+    void just_create_verts(torch::Tensor& positions_raw ); 
     void distribute(torch::Tensor& positions_raw, torch::Tensor& values); 
     torch::Tensor create_splatting_mask(const torch::Tensor& nr_points_per_simplex, const int nr_positions, const int max_nr_points);
     // void blur_standalone(torch::Tensor& positions_raw, torch::Tensor& values); 
     std::shared_ptr<Lattice> blur_standalone(); 
-    torch::Tensor slice_standalone_no_precomputation(torch::Tensor& positions_raw, const bool with_homogeneous_coord); //slice at the position and don't use the m_matrix, but rather query the simplex and get the barycentric coordinates and all that. This is useful for when we slice at a different position than the one used for splatting
+    torch::Tensor slice_standalone_no_precomputation(torch::Tensor& positions_raw); //slice at the position and don't use the m_matrix, but rather query the simplex and get the barycentric coordinates and all that. This is useful for when we slice at a different position than the one used for splatting
     std::shared_ptr<Lattice> slice_elevated_verts(const std::shared_ptr<Lattice> lattice_to_slice_from);
     torch::Tensor gather_standalone_no_precomputation(torch::Tensor& positions_raw); //gathers the features of the neighbouring vertices and concats them all together, together with the barycentric weights. The output tensor will be size 1 x nr_positions x ( (m_pos_dim+1) x (val_full_dim +1) ). On each row we store sequencially the values of each vertex and then at the end we add the last m_pos_dim+1 barycentric weights
     torch::Tensor gather_standalone_with_precomputation(torch::Tensor& positions_raw);
@@ -61,7 +61,7 @@ public:
     torch::Tensor slice_classify_with_precomputation(torch::Tensor& positions_raw, torch::Tensor& delta_weights, torch::Tensor& linear_clasify_weight, torch::Tensor& linear_clasify_bias, const int nr_classes);
     
     std::shared_ptr<Lattice> convolve_standalone(torch::Tensor& filter_bank); // convolves the lattice with a filter bank, creating a new values matrix. kernel_bank is a of size nr_filters x filter_extent x in_val_dim
-    std::shared_ptr<Lattice> convolve_im2row_standalone(torch::Tensor& filter_bank, const int dilation, const bool with_homogeneous_coord, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex, const bool flip_neighbours);
+    std::shared_ptr<Lattice> convolve_im2row_standalone(torch::Tensor& filter_bank, const int dilation, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex, const bool flip_neighbours);
     torch::Tensor im2row(std::shared_ptr<Lattice> lattice_neighbours, const int filter_extent, const int dilation, const bool use_center_vertex_from_lattice_neigbhours, const bool flip_neighbours);
 
     std::shared_ptr<Lattice> create_coarse_verts();  //creates another lattice which would be the result of splatting the positions/2. The values of the new coarse lattice are set to 0
@@ -102,7 +102,7 @@ public:
 
     //setters
     void set_val_dim(const int);
-    void set_val_full_dim(const int);
+    // void set_val_full_dim(const int);
     void set_sigma(const float);
     void set_nr_lattice_vertices(const int nr_verts);
 
@@ -147,7 +147,7 @@ private:
     int m_hash_table_capacity;
     int m_pos_dim;
     int m_val_dim;
-    int m_val_full_dim;
+    // int m_val_full_dim;
     // int m_val_full_dim;
     std::vector<float> m_sigmas;
     torch::Tensor m_sigmas_tensor;
