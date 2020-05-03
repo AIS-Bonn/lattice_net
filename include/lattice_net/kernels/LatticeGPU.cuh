@@ -49,7 +49,7 @@ public:
             // m_test_jitify_program = m_kernel_cache.program( std::string(CMAKE_SOURCE_DIR)+"/include/surfel_renderer/lattice/kernels/hello_kernel.cuh", 0, options);
             // m_lattice_program = m_kernel_cache.program( std::string(CMAKE_SOURCE_DIR)+"/include/surfel_renderer/lattice/kernels/LatticeGPU.cuh", 0, options );
 
-            m_test_jitify_program=create_jitify_program( std::string(CMAKE_SOURCE_DIR)+"/include/lattice_net/kernels/hello_kernel.cuh" );
+            // m_test_jitify_program=create_jitify_program( std::string(CMAKE_SOURCE_DIR)+"/include/lattice_net/kernels/hello_kernel.cuh" );
             m_lattice_program=create_jitify_program( std::string(CMAKE_SOURCE_DIR)+"/include/lattice_net/kernels/LatticeGPU.cuh" );
         }
         // #endif
