@@ -14,6 +14,7 @@ public:
     }
 
     bool with_viewer();
+    bool with_visdom();
     bool with_debug_output();
     bool with_error_checking();
     std::string dataset_name();
@@ -31,6 +32,7 @@ private:
 
     std::string m_dataset_name;
     bool m_with_viewer; //wether the training script will show in a viewer the gt_cloud and prediciton cloud
+    bool m_with_visdom;
     bool m_with_debug_output; //weather the training script should output a bunch of debug stuff
     bool m_with_error_checking; //weather the training script should check for erronoues things like how many positions we sliced correctly
     int m_batch_size;

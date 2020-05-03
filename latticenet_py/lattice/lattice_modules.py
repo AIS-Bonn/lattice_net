@@ -745,13 +745,13 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
 
         #ERROR FOR THE DELTAWEIGHTS
         #the delta of the barycentric coordinates should sum to zero so that the sum of the normal barycentric coordinates should still sum to 1.0
-        # sum_bar=delta_weights.sum(2)
-        # # print("sum_bar is ", sum_bar)
-        # diff=sum_bar-0.0 #deviation from the expected value
-        # diff2=diff.mul(diff)
-        # # diff2=diff.abs()
-        # delta_weight_error_sum=diff2.mean()
-        delta_weight_error_sum=0.0
+        sum_bar=delta_weights.sum(1)
+        # print("sum_bar is ", sum_bar)
+        diff=sum_bar-0.0 #deviation from the expected value
+        diff2=diff.mul(diff)
+        # diff2=diff.abs()
+        delta_weight_error_sum=diff2.mean()
+        # delta_weight_error_sum=0.0
 
         #attempt 2 by just doing a dot product of every barycentric offset
         # dot_per_point=(delta_weights.mul(delta_weights)).sum(2)

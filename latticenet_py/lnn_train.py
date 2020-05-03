@@ -21,10 +21,6 @@ from latticenet_py.callbacks.visdom_callback import *
 from latticenet_py.callbacks.state_callback import *
 from latticenet_py.callbacks.phase import *
 
-# from optimizers.over9000.radam import *
-# from optimizers.pytorch_optimizer.torch_optimizer.adabound import *
-# from optimizers.pytorch_optimizer.torch_optimizer.adamod import *
-
 
 config_file="lnn_train_shapenet.cfg"
 #config_file="lnn_train_semantic_kitti.cfg"
@@ -63,17 +59,12 @@ def run():
     lattice=LatticePy()
     lattice.create(config_path, "splated_lattice")
 
-    # cb = CallbacksGroup([
-        # LatticeSigmaCallback() #TODO
-        # ViewerCallback(),
-        # VisdomCallback(),
-        # StateCallback() #changes the iter nr epoch nr,
-    # ])
     cb_list = []
-    # cb_list.append(VisdomCallback())
-    cb_list.append(StateCallback())
+    if(train_params.with_visdom()):
+        cb_list.append(VisdomCallback())
     if(train_params.with_viewer()):
         cb_list.append(ViewerCallback())
+    cb_list.append(StateCallback())
     cb = CallbacksGroup(cb_list)
 
 
@@ -123,18 +114,11 @@ def run():
                         positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
 
                         TIME_START("forward")
-                        pred_logsoftmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+                        pred_logsoftmax, pred_raw =model(lattice, positions, values)
                         TIME_END("forward")
-                        # loss_dice = 0.3*loss_fn(pred_logsoftmax, target) #seems to work quite good with 0.3 of dice and 0.7 of CE. Trying now to lovasz
-                        # loss_dice = 0.5*loss_fn(pred_logsoftmax, target)
-                        loss_dice = 0.8*loss_fn(pred_logsoftmax, target)
-                        # loss_dice = 0.0
-                        #print("pred_softmax has shape ", pred_softmax.shape, "target is ", target.shape)
-                        loss_ce = 0.2*secondary_fn(pred_logsoftmax, target)
-                        # loss_ce = 0.0
+                        loss_dice = 0.5*loss_fn(pred_logsoftmax, target)
+                        loss_ce = 0.5*secondary_fn(pred_logsoftmax, target)
                         loss = loss_dice+loss_ce
-                        # loss += 0.1*delta_weight_error_sum #TODO is not clear how much it improves iou if at all
-                        # loss /=train_params.batch_size() #TODO we only support batchsize of 1 at the moment
 
                         #model.summary()
 
@@ -142,12 +126,7 @@ def run():
                         if first_time:
                             first_time=False
                             optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
-                            # optimizer=RAdam(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay())
-                            #optimizer=torch.optim.SGD(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay(), momentum=0.9, nesterov=True)
-                            # optimizer=AdaBound(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay()) #starts as adam, becomes sgd epoch 175, reduced lr twice, got train iou of 82.5 and test iou of 74.5
-                            # optimizer=AdaMod(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay()) #does warmup like radam but all along the training after  epoch 70, reaches train iou of 83.3 and test iou of 74.8 and converges a lot faster than the adabound
                             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
-                            #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=3)
 
                         cb.after_forward_pass(pred_softmax=pred_logsoftmax, target=target, cloud=cloud, loss=loss.item(), loss_dice=loss_dice.item(), phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
                         pbar.update(1)
@@ -164,7 +143,6 @@ def run():
 
                     # Profiler.print_all_stats()
 
-
                 if phase.loader.is_finished():
                     pbar.close()
                     if not is_training: #we reduce the learning rate when the test iou plateus
@@ -172,7 +150,6 @@ def run():
                             scheduler.step(phase.loss_acum_per_epoch) #for ReduceLROnPlateau
                     cb.epoch_ended(phase=phase, model=model, save_checkpoint=train_params.save_checkpoint(), checkpoint_path=train_params.checkpoint_path() ) 
                     cb.phase_ended(phase=phase) 
-                    # if not phase.grad:
 
 
                 if train_params.with_viewer():

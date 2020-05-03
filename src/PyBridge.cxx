@@ -125,6 +125,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def_static("create", &TrainParams::create<const std::string> ) //for templated methods like this one we need to explicitly instantiate one of the arguments
     .def("dataset_name",  &TrainParams::dataset_name )
     .def("with_viewer",  &TrainParams::with_viewer )
+    .def("with_visdom",  &TrainParams::with_visdom )
     .def("with_debug_output",  &TrainParams::with_debug_output )
     .def("with_error_checking",  &TrainParams::with_error_checking )
     .def("batch_size",  &TrainParams::batch_size )
