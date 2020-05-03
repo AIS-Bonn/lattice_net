@@ -1562,8 +1562,8 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
 
     
     //store the values of this current lattice vertex (the one at the center of the kernel)
-    float zeros[val_dim]{0};
-    float* valMe = zeros;
+    // float zeros[val_dim]{0};
+    float* valMe ;
     bool center_vertex_has_valid_value=false; //valid value means a non zero one. It will save us from writing a value of zero which is redundant
     int key_query_int[pos_dim + 1];
     for (int i = 0; i < pos_dim+1; i++) {
@@ -1599,7 +1599,7 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
 
 
     int nr_immediate_neigbhours=2*(pos_dim+1);
-    int nr_axes=pos_dim+1;
+    const int nr_axes=pos_dim+1;
     // int idx_neigbhour=0; //if there are 6 neighbours in total (in the case of pos_dim being 2), this will be in range [0,5]
     // printf("nr_axes is %d!\n",nr_axes);
     int nr_neighbours_found=0;
@@ -1677,8 +1677,8 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
             }
 
             //in case neighbours don't exist (lattice edges) offNp and offNm are -1
-            float *valNp = zeros; //or valMe? for edges?
-            float *valNm = zeros;
+            float *valNp; //or valMe? for edges?
+            float *valNm;
             //each neigbhour gets multiplied with the weight in the filter bank sequencially from 0 to filter_extent-1 (the last weight is for the center lattice vertex)
             if(offNp >= 0 && np_coords_integer){
                 nr_neighbours_found++;
