@@ -192,7 +192,7 @@ class LNN(torch.nn.Module):
 
 
 
-        sv, delta_weight_error_sum=self.slice_fast_cuda(lv, ls, positions)
+        sv =self.slice_fast_cuda(lv, ls, positions)
 
 
         logsoftmax=self.logsoftmax(sv)
