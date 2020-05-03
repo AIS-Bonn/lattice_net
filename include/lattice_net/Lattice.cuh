@@ -79,8 +79,6 @@ public:
     void gather_backwards_elevated_standalone_with_precomputation(const std::shared_ptr<Lattice> lattice_gathered_from, const torch::Tensor& grad_sliced_values);
 
 
-    std::vector<torch::Tensor> to_tensors(); //maked the lattice unfold into its corresponding tensors. This needs to happen because pytorch only works with tensors and not with arbitrary objects
-    void from_tensors(const std::vector<torch::Tensor>& tensors);
     std::shared_ptr<Lattice> clone_lattice();
     Eigen::MatrixXd keys_to_verts();
     Eigen::MatrixXd elevate(torch::Tensor& positions_raw);
@@ -153,7 +151,7 @@ private:
     std::vector<float> m_sigmas;
     torch::Tensor m_sigmas_tensor;
     // float* m_new_values;
-    torch::Tensor m_tmp_blurred_values_tensor; //intermediate tensor use to store the values after bluring in each axis. It swaps repedetly with hash_table.m_values
+    // torch::Tensor m_tmp_blurred_values_tensor; //intermediate tensor use to store the values after bluring in each axis. It swaps repedetly with hash_table.m_values
     //TODO it would be a lot faster to have both the indices and the weights adjacent in memory by maybe conserding he index as a float too and rounding it to the nearest integer in the kernel
     // curandState* m_devStates; //states for random nr generation
     // int m_nr_states; //nr of states we have in m_devStates
