@@ -4,27 +4,14 @@
 #include <stdarg.h>
 
 #include <cuda.h>
-// #include <cuda_runtime.h>
-// #include <cuda_runtime_api.h>
-// #include "device_launch_parameters.h" //needed for threadIdx and blockDim 
-// #include <device_functions.h> //for __syncthreads
-// #include <curand_kernel.h> //for curand_uniform https://gist.github.com/NicholasShatokhin/3769635
 
 
 #include "torch/torch.h"
 
 #include "lattice_net/jitify_helper/jitify_options.hpp" //Needs to be added BEFORE jitify because this defined the include paths so that the kernels cna find each other
 #include "jitify/jitify.hpp"
-//my stuff
-// #include "surfel_renderer/lattice/kernels/HashTableGPU.cuh"
 #include <Eigen/Dense>
 
-// #define BLOCK_SIZE 64 //TODO no actually need for it. It can be a parameter. And the one kernel that needs to read this inside it's code can just use BLOCKdim.x
-
-// struct MatrixEntry {
-//     int index;
-//     float weight;
-// };
 
 class LatticeGPU;
 class HashTable;
@@ -146,23 +133,9 @@ private:
     int m_hash_table_capacity;
     int m_pos_dim;
     int m_val_dim;
-    // int m_val_full_dim;
-    // int m_val_full_dim;
     std::vector<float> m_sigmas;
     torch::Tensor m_sigmas_tensor;
-    // float* m_new_values;
-    // torch::Tensor m_tmp_blurred_values_tensor; //intermediate tensor use to store the values after bluring in each axis. It swaps repedetly with hash_table.m_values
-    //TODO it would be a lot faster to have both the indices and the weights adjacent in memory by maybe conserding he index as a float too and rounding it to the nearest integer in the kernel
-    // curandState* m_devStates; //states for random nr generation
-    // int m_nr_states; //nr of states we have in m_devStates
-
-    // //cuda things 
-    // jitify::JitCache m_kernel_cache;
-    // //kernels 
-    // jitify::Program m_test_jitify_program;
-    // jitify::Program m_lattice_program;
-
-    // torch::Tensor m_embedding_matrix; // matrix that first divides the positions by the sigmas, then scales by the total variance of splatting and slicing, then embeds the positions in the (m_pos_dim+1) space
+  
 };
 
 

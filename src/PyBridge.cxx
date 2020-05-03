@@ -26,24 +26,6 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(latticenet, m) {
 
- 
-    // //DataLoader ShapeNetPartSeg
-    // py::class_<DataLoaderShapeNetPartSeg> (m, "DataLoaderShapeNetPartSeg")
-    // .def(py::init<const std::string>())
-    // .def("start", &DataLoaderShapeNetPartSeg::start )
-    // .def("get_cloud", &DataLoaderShapeNetPartSeg::get_cloud )
-    // .def("has_data", &DataLoaderShapeNetPartSeg::has_data ) 
-    // .def("is_finished", &DataLoaderShapeNetPartSeg::is_finished ) 
-    // .def("is_finished_reading", &DataLoaderShapeNetPartSeg::is_finished_reading ) 
-    // .def("reset", &DataLoaderShapeNetPartSeg::reset ) 
-    // .def("nr_samples", &DataLoaderShapeNetPartSeg::nr_samples ) 
-    // .def("set_mode_train", &DataLoaderShapeNetPartSeg::set_mode_train ) 
-    // .def("set_mode_test", &DataLoaderShapeNetPartSeg::set_mode_test ) 
-    // .def("set_mode_validation", &DataLoaderShapeNetPartSeg::set_mode_validation ) 
-    // .def("get_object_name", &DataLoaderShapeNetPartSeg::get_object_name ) 
-    // .def("set_object_name", &DataLoaderShapeNetPartSeg::set_object_name ) 
-    // ;
-
 
     //Lattice
     // py::module::import("torch");
