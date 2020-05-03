@@ -55,6 +55,24 @@ class LatticePy(torch.Tensor):
 
     #     return convolved_lattice_py
 
+    def depthwise_convolve(self, filter_bank, dilation, lattice_neighbours=None, use_center_vertex_from_lattice_neighbours=True, flip_neighbours=False):
+        # print("running convolve")
+        # if lattice_neighbours is not None:
+            # print("lattice py doing convolve with lattic eneighbours")
+        # else:
+            # print("lattice_py, doing convolve with lattice neighbous being none ")
+
+        if lattice_neighbours is None:
+            convolved_lattice=self.lattice.depthwise_convolve(filter_bank, dilation, self.lattice, use_center_vertex_from_lattice_neighbours, flip_neighbours)
+        else:
+            convolved_lattice=self.lattice.depthwise_convolve(filter_bank, dilation, lattice_neighbours.lattice, use_center_vertex_from_lattice_neighbours, flip_neighbours)
+        # print("finished convolve")
+        convolved_lattice_py=LatticePy()
+        convolved_lattice_py.lattice=convolved_lattice
+
+        return convolved_lattice_py
+        # return LatticePy(blurred_lattice)
+
     def convolve_im2row_standalone(self, filter_bank, dilation, lattice_neighbours=None, use_center_vertex_from_lattice_neighbours=True, flip_neighbours=False):
         # print("running convolve")
         # if lattice_neighbours is not None:

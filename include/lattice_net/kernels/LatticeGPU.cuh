@@ -274,6 +274,23 @@ public:
         //             .launch( hash_table_capacity, im2row_out, filter_extent, dilation, hash_table_query_and_neighbours, hash_table_query_and_neighbours,  );
         // }
 
+        void depthwise_convolve(const int nr_vertices, const int pos_dim, const int val_dim, float*filter_bank, const int dilation, float* values_out, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neighbours, const bool flip_neighbours, const bool debug_kernel){
+
+            int nr_blocks=nr_vertices/BLOCK_SIZE;
+            // check for partial block at the end
+            if(nr_vertices % BLOCK_SIZE) ++nr_blocks; 
+
+            // std::cout <<"launching a im2row with block size " << block_size << " and nr blocks " << nr_blocks << std::endl;
+            //46ms
+            //43ms
+
+            CUresult res= m_lattice_program.kernel("depthwise_convolve")
+                    .instantiate(pos_dim, val_dim, filter_extent)
+                    .configure(nr_blocks, BLOCK_SIZE)
+                    .launch( nr_vertices, values_out, filter_bank, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, use_center_vertex_from_lattice_neighbours, flip_neighbours, debug_kernel);
+            CUDA_CHECK_CURESULT(res);
+            CUDA_CHECK_ERROR();
+        }
 
         //creates a lattice rowified by grabbing the values of the neighbours from the hash_table_neighbours. The neigbhours are the neighbours of the keys in hash_table_query. Useful for lattices which are at different coarsenes levels
         void im2row(const int nr_vertices, const int pos_dim, const int val_dim, const int dilation, float* im2row_out, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neighbours, const bool flip_neighbours, const bool debug_kernel){
@@ -1479,6 +1496,297 @@ convolve(int n, float *newValues, const float* filter_bank, const int nr_filters
     //     valOut[i] = 0.25 * valNp[i] + 0.5 * valMe[i] + 0.25 * valNm[i];
     
     // }
+
+}
+
+
+template<int pos_dim, int val_dim, int filter_extent>
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+depthwise_convolve(int nr_vertices, float* values_out, float* filter_bank, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neigbhours, bool flip_neighbours, bool debug_kernel) {
+
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a lattice vertex
+    if (idx >= nr_vertices) return;
+    if (idx >= *hash_table_query.m_nr_filled) return;
+
+    //filter bank is a matrix of size filter_extent x val_dim. We proload it into shared mem
+    __shared__ float filter_shared[filter_extent*val_dim];
+    if (threadIdx.x == 0 ){
+        for (int i = 0; i < filter_extent*val_dim; i++) {
+            filter_shared[i]=filter_bank[i];
+        }
+    }
+    __syncthreads();
+
+    float val_out_local[val_dim]{0}; //we store the convolved vertex output here first because this will get stored as a register and then we finally copy it to global memory in the val_out_cur_vertex
+
+    
+
+    // int row_size=filter_extent*val_dim; // each row contains a patch around the current lattice vertex that contains the values of all the neighbours in the filter extent (and the center vertex)
+    float *val_out_cur_vertex = values_out + val_dim * idx;
+
+
+    // find my key (from the hash_table_query) and the keys of my neighbors (from the hash_table_neighbours). The hash tables can actually be the same
+    float key_query_float[pos_dim + 1];
+    float key_sum=0;
+    for (int i = 0; i < pos_dim; i++) {
+        key_query_float[i] = hash_table_query.m_keys[idx * pos_dim + i];
+        key_sum+=key_query_float[i];
+    }
+    key_query_float[pos_dim]= -key_sum;
+
+
+    int lvl_diff=query_lvl-neighbours_lvl; 
+    float scale=pow(2.0f, (float)lvl_diff); 
+    // printf("scale is %f \n", scale);
+    for (int i = 0; i < pos_dim+1; i++) {
+        key_query_float[i] = key_query_float[i]*scale; 
+    }
+    // printf("scaled key at idx %d is %f  %f  %f %f  \n",idx, key_query[0],key_query[1],key_query[2], key_query[3]);
+
+    // if (scale < 1.0){
+    //     printf("scaled key at idx %d is %f  %f  %f %f  \n",idx, key_query_float[0],key_query_float[1],key_query_float[2], key_query_float[3]);
+    // }
+
+
+    //if the scale is smaller than 1.0 it means we are in a fine scale which we are trying to embedd in a coarser one. Therefore we are multiplying the keys by 0.5 and then moving in each axis by 0.5. However this division by 2 may still create integer key so when moving by 0.5 in a direction we will end up with fractional key. These keys that are stil integers correspond with vertices from the fine that lie directly on top of the coarse vertex when dividing then by 2. But when we convolve over the coarse vertices these are not taken into account which may be a mistake. Either way for the moment we shall ignore them 
+    bool has_all_coords_integer=true;
+    if(scale<1.0){
+       has_all_coords_integer=are_all_coords_integer(key_query_float, pos_dim+1);
+    }
+
+
+    // bool has_one_coord_integer=is_only_one_coord_integer(key_query_float, pos_dim+1);
+    // if (has_one_coord_integer){
+    //     printf("scaled key at idx %d is %f  %f  %f %f  \n",idx, key_query_float[0],key_query_float[1],key_query_float[2], key_query_float[3]);
+    // }
+    // int nr_coords_integer_val=nr_coords_integer(key_query_float, pos_dim+1);
+    // //The nr_coords integer is either pos_dim+1 or 0
+    // if (scale <1.0 && ( nr_coords_integer_val!=pos_dim+1 && nr_coords_integer_val!=0 ) ){
+    //     printf("nr_coords_integer_val is %d \n", nr_coords_integer_val);
+    //     printf("scaled key at idx %d is %f  %f  %f %f  \n",idx, key_query_float[0],key_query_float[1],key_query_float[2], key_query_float[3]);
+    // }
+    
+
+
+
+
+    
+
+
+    int np[pos_dim + 1];
+    int nm[pos_dim + 1];
+
+
+    if(debug_kernel){
+        // printf("val_full_dim is %d\n", val_full_dim);
+        // printf("query lvl is %d\n", query_lvl);
+        // printf("neighbours lvl is %d\n", neighbours_lvl);
+        // printf("dilation is %d\n", dilation);
+        // printf("pos_dim is %d\n", pos_dim);
+        // printf("scale is %f \n", scale);
+    }
+
+    // printf("val_full_dim is %d\n", val_full_dim);
+
+
+    
+    //store the values of this current lattice vertex (the one at the center of the kernel)
+    // float zeros[val_dim]{0};
+    float* valMe ;
+    bool center_vertex_has_valid_value=false; //valid value means a non zero one. It will save us from writing a value of zero which is redundant
+    int key_query_int[pos_dim + 1];
+    for (int i = 0; i < pos_dim+1; i++) {
+        key_query_int[i] = round(key_query_float[i]);
+    }
+    
+    //if we have fractional coords it means we are in a fine lattice which is embeddeed in a coarser one. So the keys were multiplied by 0.5 or something like that. That means that we will not find any center vertex
+    if(use_center_vertex_from_lattice_neigbhours && has_all_coords_integer){
+        int query_offset = hash_table_neighbours.retrieve(key_query_int); 
+        if(query_offset>=0){
+            valMe = hash_table_neighbours.m_values + val_dim * query_offset;
+            center_vertex_has_valid_value=true;
+        }
+    }else if (!use_center_vertex_from_lattice_neigbhours){
+        valMe= hash_table_query.m_values + val_dim * idx;
+        center_vertex_has_valid_value=true;
+    }
+
+
+    bool should_check_neighbours=true;
+    if(scale>=1.0){ //we are convolving a lattice of the same scale ,or we are querying from a coarser to a finer one. so we definitelly check the neighbours
+        should_check_neighbours=true;
+    }else if(scale<1.0 && has_all_coords_integer){ //we are in a fine lattice that has the query as all integer, means that whne we move by 0.5 in every axis we won't have an integer neighbour anymore. therefore a coarser vertex will not be there
+        should_check_neighbours=false;
+    }else if(scale<1.0 && !has_all_coords_integer){
+        should_check_neighbours=true; //We have a fractional key, but when checking the neigbhours we will move by 0.5 and therefore end up with an integer key
+    }
+
+    // if(scale<1.0){
+    //     printf("should_check_neighbours is %d \n", should_check_neighbours);
+    // }
+
+
+
+    int nr_immediate_neigbhours=2*(pos_dim+1);
+    const int nr_axes=pos_dim+1;
+    // int idx_neigbhour=0; //if there are 6 neighbours in total (in the case of pos_dim being 2), this will be in range [0,5]
+    // printf("nr_axes is %d!\n",nr_axes);
+    int nr_neighbours_found=0;
+    float movement_multiplier=1.0;
+    if(scale<1.0){ //if the scale is fractional than the movement also has to be fractional in order to ensure we end up with a integer key
+        movement_multiplier=scale;
+    }
+    float np_float[pos_dim + 1];
+    float nm_float[pos_dim + 1];
+    if( should_check_neighbours ){
+        for(int axis=0; axis<nr_axes; axis++){
+            //for each axis we have 2 neighbours
+
+            // //chekc first if the neigbhours have integer coords 
+            // for (int i = 0; i < pos_dim+1; i++) {
+            //     np_float[i] = key_query_float[i] + movement_multiplier*dilation;
+            //     nm_float[i] = key_query_float[i] - movement_multiplier*dilation;
+            // }
+            // np_float[axis] = key_query_float[axis] - movement_multiplier*dilation*pos_dim;
+            // nm_float[axis] = key_query_float[axis] + movement_multiplier*dilation*pos_dim;
+            // bool np_coords_integer=are_all_coords_integer(np_float, pos_dim+1);
+            // bool nm_coords_integer=are_all_coords_integer(nm_float, pos_dim+1);
+            // if(!np_coords_integer){
+            //     printf("np has no integer coords\n");
+            // }
+
+            // //get the integer coords
+            // for (int i = 0; i < pos_dim+1; i++) {
+            //     np[i] = round(np_float[i]);
+            //     nm[i] = round(nm_float[i]);
+            // }
+
+
+            bool np_coords_integer=true;
+            bool nm_coords_integer=true;
+            //if the pos_dim+1 is even, eg 4, then pos dim is 3 which kinda the usual case we work with. In this case we just get the keys for the neighbours
+            if( (pos_dim+1)%2==0 ){
+                for (int i = 0; i < pos_dim+1; i++) {
+                    np[i] = round(key_query_float[i] + movement_multiplier*dilation);
+                    nm[i] = round(key_query_float[i] - movement_multiplier*dilation);
+                }
+                np[axis] = round(key_query_float[axis] - movement_multiplier*dilation*pos_dim);
+                nm[axis] = round(key_query_float[axis] + movement_multiplier*dilation*pos_dim);
+            }else{
+                //the pos dim+1 is odd which means that the key_query_float after scaling can be something like 0.5, 0.5, 1.0. Now if we move with a movement_multiplied of 0.5 we end up with non integer key. We should double check for that. This doesnt happen in the case when pos_dim+1 is even because then we can always get a coordinate vector that sums to zero without having fractional coordinates.
+                //chekc first if the neigbhours have integer coords 
+                for (int i = 0; i < pos_dim+1; i++) {
+                    np_float[i] = key_query_float[i] + movement_multiplier*dilation;
+                    nm_float[i] = key_query_float[i] - movement_multiplier*dilation;
+                }
+                np_float[axis] = key_query_float[axis] - movement_multiplier*dilation*pos_dim;
+                nm_float[axis] = key_query_float[axis] + movement_multiplier*dilation*pos_dim;
+                np_coords_integer=are_all_coords_integer(np_float, pos_dim+1);
+                nm_coords_integer=are_all_coords_integer(nm_float, pos_dim+1);
+                // if(!np_coords_integer){
+                //     printf("np has no integer coords\n");
+                // }
+
+                //get the integer coords
+                for (int i = 0; i < pos_dim+1; i++) {
+                    np[i] = round(np_float[i]);
+                    nm[i] = round(nm_float[i]);
+                }
+            }
+            
+
+            int offNp =-1;
+            int offNm =-1;
+
+            if (np_coords_integer){
+                offNp = hash_table_neighbours.retrieve(np);
+            }
+            if (nm_coords_integer){
+                offNm = hash_table_neighbours.retrieve(nm);
+            }
+
+            //in case neighbours don't exist (lattice edges) offNp and offNm are -1
+            float *valNp; //or valMe? for edges?
+            float *valNm;
+            //each neigbhour gets multiplied with the weight in the filter bank sequencially from 0 to filter_extent-1 (the last weight is for the center lattice vertex)
+            if(offNp >= 0 && np_coords_integer){
+                nr_neighbours_found++;
+                valNp = hash_table_neighbours.m_values + val_dim * offNp;
+
+                int neighbour_idx=0;
+                if(flip_neighbours){ //for the backwards pass we flip the neighbours so that when multiplying with the kernel they get the weights as if the kernel was centered around the neighbour
+                    neighbour_idx=1;
+                }
+                int idx_within_row= val_dim*axis*2 + neighbour_idx*val_dim;  //there are 2 neigbours per axis and each has val_ful_dim values
+                //store the values of neighbour 1
+                #pragma unroll
+                for (int i = 0; i < val_dim; i++){
+                    // int row_idx=idx_within_row +i; //we store each neigbhour values one after another. so if we have neighbour with 3 values each they will be in a row stored as n1v1, n1v2, n1v3, n2v1, n2v2 etc
+                    // row_out[row_idx] = valNp[i];
+                    val_out_local[i] += valNp[i]* filter_shared[idx_within_row + i];
+                }
+            }else{
+                // if(debug_kernel){
+                //     printf("not found neighbour np\n");
+                // }
+            }
+
+            // idx_neigbhour++;
+
+            if(offNm >= 0 && nm_coords_integer){
+                nr_neighbours_found++;
+                valNm = hash_table_neighbours.m_values + val_dim * offNm;
+
+                int neighbour_idx=1;
+                if(flip_neighbours){ //for the backwards pass we flip the neighbours so that when multiplying with the kernel they get the weights as if the kernel was centered around the neighbour
+                    neighbour_idx=0;
+                }
+                int idx_within_row= val_dim*axis*2 + neighbour_idx*val_dim;  //there are 2 neigbours per axis and each has val_ful_dim values
+                //store the values of neighbour 2
+                #pragma unroll
+                for (int i = 0; i < val_dim; i++){
+                    // int row_idx=idx_within_row +i; //we store each neigbhour values one after another. so if we have neighbour with 3 values each they will be in a row stored as n1v1, n1v2, n1v3, n2v1, n2v2 etc
+                    // row_out[row_idx] = valNm[i];
+                    val_out_local[i] += valNm[i]* filter_shared[idx_within_row + i];
+                }
+            }else{
+                // if(debug_kernel){
+                //     printf("not found neighbour nm\n");
+                // }
+            }
+
+
+
+        }
+    }
+
+
+    if(debug_kernel){
+        // printf("for idx %d of the query keys we have found %d neigbhours in the neighbours keys\n", idx, nr_neighbours_found);
+    }
+
+    if(nr_neighbours_found==0){
+        // printf("didn't find any neigbhours for key at idx %d, dilation %d with key %f  %f  %f %f  \n",idx, dilation, key_query[0],key_query[1],key_query[2], key_query[3]);
+    }
+
+    int idx_within_row= val_dim*nr_immediate_neigbhours; //we skip the values of all the neighbours that we stored in the row and now we are pointing to the position in the row where we can write 
+    //store the values of the center vertex
+    if(center_vertex_has_valid_value){
+        #pragma unroll
+        for (int i = 0; i < val_dim; i++){
+            // int row_idx=idx_within_row +i; //we store each neigbhour values one after another. so if we have neighbour with 3 values each they will be in a row stored as n1v1, n1v2, n1v3, n2v1, n2v2 etc
+            // row_out[row_idx] = valMe[i];
+            val_out_local[i] += valMe[i]* filter_shared[idx_within_row + i];
+        }
+    }
+
+    //copy the val_out_local to the output values of that vertex
+    for (int i = 0; i < val_dim; i++){
+        val_out_cur_vertex[i]=val_out_local[i];
+    }
+
+
 
 }
 

@@ -70,6 +70,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def("create_splatting_mask",  &Lattice::create_splatting_mask )
     // .def("blur_standalone",  &Lattice::blur_standalone )
     // .def("convolve_standalone",  &Lattice::convolve_standalone )
+    .def("depthwise_convolve",  &Lattice::depthwise_convolve )
     .def("convolve_im2row_standalone",  &Lattice::convolve_im2row_standalone )
     .def("im2row",  &Lattice::im2row )
     .def("row2im",  &Lattice::row2im )

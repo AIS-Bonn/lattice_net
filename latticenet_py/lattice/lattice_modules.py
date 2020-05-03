@@ -113,6 +113,60 @@ class DistributeCapLatticeModule(torch.nn.Module):
 
 
 
+class DepthwiseConvLatticeModule(torch.nn.Module):
+    def __init__(self, nr_filters, neighbourhood_size, dilation=1, bias=True ):
+    # def __init__(self, nr_filters, neighbourhood_size, dilation=1):
+        super(DepthwiseConvLatticeModule, self).__init__()
+        self.first_time=True
+        self.weight=None
+        self.bias=None
+        self.neighbourhood_size=neighbourhood_size
+        self.nr_filters=nr_filters
+        self.dilation=dilation
+        self.use_bias=bias
+        self.use_center_vertex_from_lattice_neigbhours=False
+
+    #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
+    def reset_parameters(self, filter_extent):
+        torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu') #pytorch uses default leaky relu but we use relu as here https://github.com/szagoruyko/binary-wide-resnet/blob/master/wrn_mcdonnell.py and as in here https://github.com/pytorch/vision/blob/19315e313511fead3597e23075552255d07fcb2a/torchvision/models/resnet.py#L156
+        if self.bias is not None:
+            fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in)
+            torch.nn.init.uniform_(self.bias, -bound, bound)
+
+        #use the same weight init as here  https://github.com/kevinzakka/densenet/blob/master/model.py and like the one from the original paper https://github.com/liuzhuang13/DenseNet/blob/master/models/densenet.lua#L138-L156
+        # n = filter_extent*self.nr_filters
+        # self.weight.data.normal_(0, np.sqrt(2. / n))
+        # if self.bias is not None:
+            # torch.nn.init.zeros_(self.bias)
+
+    def forward(self, lattice_values, lattice_structure, lattice_neighbours_values=None, lattice_neighbours_structure=None):
+
+        lattice_structure.set_values(lattice_values) #you have to set the values here and not in the conv func because if it's the first time we run this we need to have a valued val_full_dim
+        if( lattice_neighbours_structure is not None):
+            lattice_neighbours_structure.set_values(lattice_neighbours_values)
+
+
+        if(self.first_time):
+            self.first_time=False
+            filter_extent=lattice_structure.lattice.get_filter_extent(self.neighbourhood_size)
+            val_dim=lattice_structure.lattice.val_dim()
+            self.weight = torch.nn.Parameter( torch.empty( filter_extent,  val_dim  ).to("cuda") ) #works for ConvIm2RowLattice
+            if self.use_bias:
+                self.bias = torch.nn.Parameter( torch.empty( val_dim ).to("cuda") )
+            # if(self.with_homogeneous_coord):
+            #     self.bias = torch.nn.Parameter(torch.empty( self.nr_filters+1).to("cuda") )
+            # else:
+            #     self.bias = torch.nn.Parameter(torch.empty( self.nr_filters).to("cuda") )
+            with torch.no_grad():
+                self.reset_parameters(filter_extent)
+
+        lv, ls=DepthwiseConv.apply(lattice_values, lattice_structure, self.weight, self.dilation, lattice_neighbours_values, lattice_neighbours_structure, self.use_center_vertex_from_lattice_neigbhours )
+        if self.use_bias:
+            lv+=self.bias
+        ls.set_values(lv)
+        
+        return lv, ls
 
 class ConvLatticeModule(torch.nn.Module):
     def __init__(self, nr_filters, neighbourhood_size, dilation=1, bias=True ):
@@ -1411,6 +1465,38 @@ class Conv1x1(torch.nn.Module):
         return lv, ls
 
 
+class GnReluDepthwiseConv(torch.nn.Module):
+    def __init__(self, nr_filters, dilation, bias, with_dropout):
+        super(GnReluDepthwiseConv, self).__init__()
+        self.nr_filters=nr_filters
+        self.conv=DepthwiseConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias)
+        self.norm= None
+        self.relu = torch.nn.ReLU(inplace=True)
+        self.with_dropout=with_dropout
+        if with_dropout:
+            self.drop=DropoutLattice(0.2)
+        # self.relu = torch.nn.ReLU()
+    def forward(self, lv, ls, skip_connection=None):
+
+        #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
+        if self.norm is None:
+            self.norm = GroupNormLatticeModule(lv.shape[1])
+        lv, ls=self.norm(lv,ls)
+        lv=self.relu(lv)
+        # lv=gelu(lv)
+        if self.with_dropout:
+            lv = self.drop(lv)
+        ls.set_values(lv)
+        # print("print before conv lv is", lv.shape)
+        lv_1, ls_1 = self.conv(lv, ls)
+        # print("print after conv lv is", lv_1.shape)
+        if skip_connection is not None:
+            lv_1+=skip_connection
+        ls_1.set_values(lv_1)
+
+        return lv_1, ls_1
+
+
 class GnReluConv(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_dropout):
         super(GnReluConv, self).__init__()
@@ -2025,6 +2111,10 @@ class ResnetBlock(torch.nn.Module):
         #again with bn-relu-conv
         self.conv1=GnReluConv(nr_filters, dilations[0], biases[0], with_dropout=False)
         self.conv2=GnReluConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout)
+
+        # self.conv1=GnReluDepthwiseConv(nr_filters, dilations[0], biases[0], with_dropout=False)
+        # self.conv2=GnReluDepthwiseConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout)
+
         # self.gate  = torch.nn.Parameter( torch.ones( 1, nr_filters ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1,1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 

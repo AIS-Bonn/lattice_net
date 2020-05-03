@@ -184,6 +184,132 @@ class BlurLattice(Function):
         pass
 
 
+
+class DepthwiseConv(Function):
+    @staticmethod
+    def forward(ctx, lattice_values, lattice_py, filter_bank, dilation, lattice_neighbours_values=None, lattice_neighbours_structure=None, use_center_vertex_from_lattice_neighbours=False):
+        #in the case we have lattice_neighbours, this one will be the coarse one and the lattice neighbours will be the finer one
+
+        # print("lattice values is ", lattice_values)
+        # print("lattice neighbour values required grad is ", lattice_neighbours_values.requires_grad)
+        # print("lattice values required grad is ", lattice_values.requires_grad)
+
+        lattice_py.set_values(lattice_values)
+        if(lattice_neighbours_structure is not None):
+            lattice_neighbours_structure.set_values(lattice_neighbours_values)
+
+
+        # print("calling depthwise convolve with a filter bank of shape ", filter_bank.shape)
+
+        # print("inside ConvIm2RowLattice input lattice values is ", lattice_values.shape)
+        # TIME_START("convolution_itself")
+        convolved_lattice_py=lattice_py.depthwise_convolve(filter_bank, dilation, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours)
+        # TIME_END("convolution_itself")
+        # print("conv forwards: convolved lattice has values ", convolved_lattice_py.values())
+        # if with_error_checking:
+        #     nr_zeros=(convolved_lattice_py.values()==0).sum().item()
+        #     print("conv forwards: convolved lattice has nr of values which are zero  ", nr_zeros  )
+        #     if(nr_zeros>10):
+        #         sys.exit("something went wrong. We have way to many zeros after doing the convolution")
+        #     nr_zero_rows_rowified= ( lattice_py.lattice_rowified().sum(1)==0 ).sum().item()
+        #     print("conv forwards: lattice rowified has nr of rows which are zero  ", nr_zero_rows_rowified  )
+        #     if(nr_zero_rows_rowified>0):
+        #         sys.exit("Why are they vertices that have no neigbhours")
+
+        values=convolved_lattice_py.values()
+        # print("inside ConvIm2RowLattice output lattice values is ", values.shape)
+        # values+=bias
+        convolved_lattice_py.set_values(values)
+
+
+
+        # #debug why there are so many vertices that do not have any neighours
+        # rowified=lattice_py.lattice_rowified().clone()
+        # sum_rowified=rowified.sum(1)
+        # print("sum_rowified is ", sum_rowified)
+        # print("sum_rowified ha shape ", sum_rowified.shape)
+
+
+        # if(lattice_neighbours_structure is not None):
+            # print("lattice rowified for the coarse and fine graph is ", lattice_py.lattice_rowified() )
+        #save stuff
+        # ctx.save_for_backward(filter_bank, bias, lattice_py.lattice_rowified() ) 
+        # print("saving for backwards convolved lattice which has nr filled", convolved_lattice_py.lattice.m_hash_table.m_nr_filled_tensor)
+        # print("saving for backwards, filter_bank of shape", filter_bank.shape, "lattice rowified ", lattice_py.lattice_rowified().shape , "lattice_neighbours_values" )
+        # ctx.save_for_backward(filter_bank, lattice_py.lattice_rowified(), lattice_neighbours_values ) 
+        ctx.save_for_backward(filter_bank, lattice_values, lattice_neighbours_values ) 
+        ctx.lattice_py=lattice_py
+        # ctx.convolved_lattice_py=convolved_lattice_py #seems like its a bad idea to store an output because in the backwards pass this object might not be in the same state as we expected it to
+        ctx.lattice_neighbours_structure=lattice_neighbours_structure
+        ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
+        ctx.filter_extent=int(filter_bank.shape[0])
+        ctx.dilation=dilation
+        ctx.val_dim= lattice_py.lattice.val_dim()
+        # print("save for backwards the val full dim of ", ctx.val_full_dim)
+
+        return values, convolved_lattice_py
+
+    @staticmethod
+    def backward(ctx, grad_lattice_values, grad_lattice_structure):
+        
+        #the forward pass was done with lattice_in_rows*filter_bank, afterwards the homogeneous coordinate was just copied so the gradient for that will be 0
+        #out=lattice_in_rows*filter_bank
+        # this is WRONG https://math.stackexchange.com/questions/1866757/not-understanding-derivative-of-a-matrix-matrix-product
+        # this is good http://cs231n.stanford.edu/vecDerivs.pdf
+        #dout_d_lattice_in_rows=filter_bank.tranposed()
+        #dout_dfilterbank = dlatticerows.tranpose()
+
+        #atemp2 derived by me
+        #out=lattice_in_rows*filter_bank
+        #dout_d_filter=lattice_in_rows
+
+        # lattice_py=ctx.lattice.py 
+        #grad_convolved_lattice has size hash_table_capacity x nr_filers+1
+        #lattice_rowified has size  m_hash_table_capacity x filter_extent*(m_val_dim+1)
+        #grad_filter_bank should have size filter_extent * (val_dim+1) x self.nr_filters 
+        # so on possibility is to do im2row.tranpose.mm(grad_convolved_lattice.slice(1, 0, nr_filters) this will give me a matrix that would fit the filter bank
+        # grad_filter_bank=grad_convolved_lattice.mm(im2col)
+
+
+        lattice_py=ctx.lattice_py 
+        # convolved_lattice_py=ctx.convolved_lattice_py 
+        # print("got from backwards convolved lattice which has nr filled", convolved_lattice_py.lattice.m_hash_table.m_nr_filled_tensor)
+        lattice_neighbours_structure=ctx.lattice_neighbours_structure
+        use_center_vertex_from_lattice_neighbours=ctx.use_center_vertex_from_lattice_neighbours
+        filter_extent=ctx.filter_extent
+        dilation=ctx.dilation
+        val_dim=ctx.val_dim
+        # print("got from the saved ctx a val full dim of ", val_full_dim)
+        # print("got from the saved ctx a nr filters of ", nr_filters)
+        # lattice_py.set_val_full_dim(val_full_dim)
+
+        # lattice_rowified=lattice_py.lattice_rowified()   
+        filter_bank, lattice_values, lattice_neighbours_values =ctx.saved_tensors
+        filter_extent=int(filter_bank.shape[0]/val_dim)
+        # print("got from the saved ctx values of shaoe ", lattice_values.shape)
+
+        
+
+
+
+        ctx.lattice_py=0 #release this object so it doesnt leak
+        ctx.lattice_neighbours_structure=0
+        # print("WE ARE NOT RELEASING THE LATTICE BECAUSE WE ARE RUNNING GRAD_CHECK")
+
+        # return None, grad_filter
+        # if(lattice_neighbours_values is None):
+        #     return grad_lattice, None, grad_filter,  None, None, None, None, None, None, None
+        # else:
+        #     return grad_lattice, None, grad_filter,  None, None, None, None, None, None, None
+
+
+        return lattice_py.values(), None, filter_bank,  None, None, None, None, None, None, None
+        
+
+        # dummy = torch.zeros(4000,64)
+        # dummy=dummy.to("cuda")
+        # return grad_lattice, None, grad_filter, grad_bias, None, None, dummy, None
+
 class ConvIm2RowLattice(Function):
     @staticmethod
     def forward(ctx, lattice_values, lattice_py, filter_bank, dilation, lattice_neighbours_values=None, lattice_neighbours_structure=None, use_center_vertex_from_lattice_neighbours=False):

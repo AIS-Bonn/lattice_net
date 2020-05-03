@@ -529,7 +529,9 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
     // VLOG(1) << "calling im2row with lattice neighbours which have vlaues of norm " << lattice_neighbours->m_hash_table->m_values_tensor.norm();
     // VLOG(4) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
+    // TIME_START("im2row_of_convolve")
     m_impl->im2row(nr_vertices, m_pos_dim, m_val_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
+    // TIME_END("im2row_of_convolve")
 
     // m_impl->test_row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex);
     // TIME_END("im2row");
@@ -550,6 +552,108 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     // VLOG(1) << "convolved has shape" << convolved.sizes();
 
     convolved_lattice->m_hash_table->m_values_tensor=convolved;
+    convolved_lattice->m_hash_table->update_impl(); //very important
+
+    // TIME_END("convolve_im2row");
+
+    VLOG(4) << "convolved lattice has nr filled " << convolved_lattice->nr_lattice_vertices();
+    CHECK(convolved_lattice->nr_lattice_vertices()!=0) << "Why does this convolved lattice has zero nr_filled?";
+
+    // VLOG(1) << "this lattice has lattice rowified of norm " <<m_lattice_rowified.norm();
+
+    //FOR DEBUG assign the lattice rowified also the the convolve lattice so that we can query it afterwards and debug why there are vertices that don't have any neighbours
+    // convolved_lattice->m_lattice_rowified=m_lattice_rowified.clone(); //IMPORTANT at the moment. Do not comment out
+    convolved_lattice->m_lattice_rowified=m_lattice_rowified;
+
+    return convolved_lattice;
+
+}
+
+std::shared_ptr<Lattice> Lattice::depthwise_convolve(torch::Tensor& filter_bank, const int dilation, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex_from_lattice_neigbhours, const bool flip_neighbours){
+
+
+    CHECK(filter_bank.defined()) << "Filter bank is undefined";
+    CHECK(filter_bank.dim()==2) << "Filter bank should have dimension 2, corresponding with filter_extent x val_dim.  However it has dimension: " << filter_bank.dim();
+    // CHECK(filter_bank.size(0)== 2*(m_pos_dim+1)+1 ) <<"Filter extent should cover nr of vertices corresponding to a 1 hop neighborhood. Bigger neighbourhoods are not yet implemented. That means it should be 2*(m_pos_dim+1)+1 which would be" << 2*(m_pos_dim+1)+1 << "however the filter_bank.size(1) is " << filter_bank.size(1);
+    // CHECK(filter_bank.size(2) == m_val_dim+1) << "Filters should convolve over all the values of this lattice so the m_val_dim+1 which is " << m_val_dim+1 << "which is " << "should be equal to filter_bank.size(2) which is " << filter_bank.size(2);
+
+    int filter_extent=filter_bank.size(0);
+    // VLOG(1) << "filter_bank sizes is" << filter_bank.sizes();
+    // VLOG(1) << "val full dim is " << m_val_full_dim;
+    CHECK(filter_extent == get_filter_extent(1) ) << "Filters should convolve over all the neighbours in the 1 hop plus the center vertex lattice. So the filter extent should be " << get_filter_extent(1) << ". However it is" << filter_extent;
+
+    //this lattice should be coarser (so a higher lvl) or at least at the same lvl as the lattice neigbhours (which is a finer lvl therefore the lattice_neigbhours.m_lvl is lower)
+    CHECK(m_lvl-lattice_neighbours->m_lvl<=1) << "the difference in levels between query and neigbhours lattice should be only 1 or zero, so the query should be corser by 1 level with respect to the neighbours. Or if they are at the same level then nothing needs to be done. However the current lattice lvl is " << m_lvl << " and the neighbours lvl is " << lattice_neighbours->m_lvl;
+    
+    VLOG(4) <<"starting convolved im2row_standlaone. The current lattice has nr_vertices_lattices" << nr_lattice_vertices();
+    CHECK(nr_lattice_vertices()!=0) << "Why does this current lattice have zero nr_filled?";
+    int nr_vertices=nr_lattice_vertices();
+    // VLOG(1)
+
+    std::shared_ptr<Lattice> convolved_lattice=create(this); //create a lattice with no config but takes the config from this one
+    convolved_lattice->m_name="convolved_lattice";
+    int cur_hash_table_size=m_hash_table->m_values_tensor.size(0);
+    // VLOG(1) << "cloning values tensor which has size" << cur_hash_table_size;
+    // VLOG(1) << "cloning values tensor which has size" << cur_hash_table_size;
+    // if(with_homogeneous_coord){
+        // convolved_lattice->m_hash_table->m_values_tensor=torch::zeros({m_hash_table_capacity, nr_filters+1}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) ) ; // +1 because of homogeneous coordinates
+    // }else{
+        //no need to allocate because it will be directly set to be the whatever comes from the matrix mutliplicaiton between lattice_rowified and filter bank
+    // }
+    // convolved_lattice->m_hash_table->m_values_tensor=convolved_lattice->m_hash_table->m_values_tensor.to("cuda");
+    convolved_lattice->m_hash_table->m_values_tensor=torch::zeros({nr_vertices, m_val_dim}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) ) ;
+
+    //m_val_dim and m_val_full_dim are equal now
+    convolved_lattice->m_val_dim=m_val_dim;
+    convolved_lattice->m_hash_table->update_impl(); //updating the hash table pointer to point to the newly clones values tensor
+
+    //kernel bank is of size nr_filers x filter_extent x in_val_dim
+    filter_bank=filter_bank.to("cuda");
+
+    //fill im2row TODO precompute it in the lattice
+
+    // TIME_START("create_lattice_rowified");
+    // VLOG(1) << "checking if lattice rowified has size: nr_vertices" << nr_vertices << " filter_extent " << filter_extent << " m_val_full_dim " << m_val_full_dim;
+    // if( !m_lattice_rowified.defined() || m_lattice_rowified.size(0)!=nr_vertices || m_lattice_rowified.size(1)!=filter_extent*m_val_dim  ){
+    //     // VLOG(1) << "Creating a lattice rowified with size: nr_vertices" << nr_vertices << " filter_extent " << filter_extent << " m_val_full_dim " << m_val_full_dim;
+    //     m_lattice_rowified=torch::zeros({nr_vertices, filter_extent*m_val_dim }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+    // }else{
+    //     m_lattice_rowified.fill_(0);
+    // }
+    // TIME_END("create_lattice_rowified");
+
+    // TIME_START("convolve_im2row");
+    // TIME_START("im2row");
+    bool debug_kernel=false;
+    // if(m_lvl==2){
+    //     // debug_kernel=true;
+    // }
+
+    // VLOG(1) << "calling im2row with lattice neighbours which have vlaues of norm " << lattice_neighbours->m_hash_table->m_values_tensor.norm();
+    // VLOG(4) <<"calling im2row with m_val_full_dim of " << m_val_full_dim;
+    // TIME_START("depthwise_convolve")
+    m_impl->depthwise_convolve(nr_vertices, m_pos_dim, m_val_dim, filter_bank.data_ptr<float>(), dilation, convolved_lattice->m_hash_table->m_values_tensor.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, debug_kernel);
+    // TIME_END("depthwise_convolve")
+
+    // m_impl->test_row2im(m_hash_table_capacity, m_pos_dim, m_val_full_dim, dilation, m_lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex);
+    // TIME_END("im2row");
+
+    // VLOG(1) <<"lattice rowified is \n" << m_lattice_rowified;
+    // Tensor lattice_rowified_unsqueezed=m_lattice_rowified.unsqueeze(0);
+    // EigenMatrixXfRowMajor lattice_rowified_eigen=tensor2eigen(lattice_rowified_unsqueezed);
+    // VLOG(1) <<"lattice rowified is \n" << lattice_rowified_eigen;
+
+    // VLOG(1) << "im2row should have at least some non zero value pero row. The rowsise sum of lattice_rowified is " << m_lattice_rowified.sum(1);
+
+
+    //multiply each patch with the filter bank
+    // Tensor convolved= m_lattice_rowified.mm(filter_bank);
+    // VLOG(1) << "finished multiplication";
+    // VLOG(1) << "current values has shape" << m_hash_table->m_values_tensor.sizes();
+    // VLOG(1) << "convolved_hash_table.values has shape" << convolved_lattice->m_hash_table->m_values_tensor.sizes();
+    // VLOG(1) << "convolved has shape" << convolved.sizes();
+
+    // convolved_lattice->m_hash_table->m_values_tensor=convolved;
     convolved_lattice->m_hash_table->update_impl(); //very important
 
     // TIME_END("convolve_im2row");

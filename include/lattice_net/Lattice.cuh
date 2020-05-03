@@ -62,6 +62,7 @@ public:
     
     std::shared_ptr<Lattice> convolve_standalone(torch::Tensor& filter_bank); // convolves the lattice with a filter bank, creating a new values matrix. kernel_bank is a of size nr_filters x filter_extent x in_val_dim
     std::shared_ptr<Lattice> convolve_im2row_standalone(torch::Tensor& filter_bank, const int dilation, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex, const bool flip_neighbours);
+    std::shared_ptr<Lattice> depthwise_convolve(torch::Tensor& filter_bank, const int dilation, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex, const bool flip_neighbours);
     torch::Tensor im2row(std::shared_ptr<Lattice> lattice_neighbours, const int filter_extent, const int dilation, const bool use_center_vertex_from_lattice_neigbhours, const bool flip_neighbours);
 
     std::shared_ptr<Lattice> create_coarse_verts();  //creates another lattice which would be the result of splatting the positions/2. The values of the new coarse lattice are set to 0
