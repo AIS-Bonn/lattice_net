@@ -3,7 +3,7 @@
 //c++
 #include <string>
 
-#include "EasyPytorch/UtilsPytorch.h" //contains torch so it has to be added BEFORE any other include because the other ones might include loguru which gets screwed up if torch was included before it
+#include "UtilsPytorch.h" //contains torch so it has to be added BEFORE any other include because the other ones might include loguru which gets screwed up if torch was included before it
 #include "EasyCuda/UtilsCuda.h"
 #include "string_utils.h"
 
