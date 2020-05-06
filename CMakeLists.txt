@@ -17,11 +17,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 
 
-add_subdirectory( ${CMAKE_SOURCE_DIR}/deps/pybind11)
 
 #pybind attempt 3
 # pybind11_add_module(DataLoaderTest ${CMAKE_SOURCE_DIR}/src/pycom/PyCom.cxx )
-pybind11_add_module(latticenet ${PROJECT_SOURCE_DIR}/src/PyBridge.cxx )
 
 
 ####   GLOBAL OPTIONS   ###https://stackoverflow.com/questions/15201064/cmake-conditional-preprocessor-define-on-code
@@ -35,6 +33,7 @@ find_package(EasyPBR REQUIRED)
 find_package(DataLoaders REQUIRED)
 find_package(Torch REQUIRED)
 find_package(CUDA REQUIRED)
+add_subdirectory(${EASYPBR_SRC_PATH}/deps/pybind11  [EXCLUDE_FROM_ALL])
 # add_subdirectory(${PROJECT_SOURCE_DIR}/deps/pybind11)
 # find_package(catkin REQUIRED COMPONENTS roscpp std_msgs cv_bridge pcl_ros image_transport )
 
@@ -75,6 +74,8 @@ set(DEPS_SRC
 
 ###   SET ALL THE GLOBAL OPTIONS #########################################
 
+#pybind
+pybind11_add_module(latticenet ${PROJECT_SOURCE_DIR}/src/PyBridge.cxx )
 
 #lib 
 # add_library( latticenet_cpp SHARED ${MY_SRC}  ${DEPS_SRC}  )

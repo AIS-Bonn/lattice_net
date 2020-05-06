@@ -4,3 +4,6 @@
 [submodule "deps/jitify"]
 	path = deps/jitify
 	url = https://github.com/RaduAlexandru/jitify
+[submodule "deps/EasyPytorch"]
+	path = deps/EasyPytorch
+	url = https://github.com/RaduAlexandru/EasyPytorch.git
