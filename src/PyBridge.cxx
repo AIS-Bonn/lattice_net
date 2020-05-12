@@ -108,12 +108,8 @@ PYBIND11_MODULE(latticenet, m) {
     .def("dataset_name",  &TrainParams::dataset_name )
     .def("with_viewer",  &TrainParams::with_viewer )
     .def("with_visdom",  &TrainParams::with_visdom )
-    .def("with_debug_output",  &TrainParams::with_debug_output )
-    .def("with_error_checking",  &TrainParams::with_error_checking )
-    .def("batch_size",  &TrainParams::batch_size )
     .def("lr",  &TrainParams::lr )
     .def("weight_decay",  &TrainParams::weight_decay )
-    .def("max_training_epochs",  &TrainParams::max_training_epochs )
     .def("save_checkpoint",  &TrainParams::save_checkpoint )
     .def("checkpoint_path",  &TrainParams::checkpoint_path )
     ;

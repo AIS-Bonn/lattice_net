@@ -28,12 +28,8 @@ void TrainParams::init_params(const std::string config_file){
     m_dataset_name=(std::string)train_config["dataset_name"];
     m_with_viewer = train_config["with_viewer"];
     m_with_visdom = train_config["with_visdom"];
-    m_with_debug_output = train_config["with_debug_output"];
-    m_with_error_checking = train_config["with_error_checking"];
-    m_batch_size = train_config["batch_size"];
     m_lr = train_config["lr"];
     m_weight_decay = train_config["weight_decay"];
-    m_max_training_epochs = train_config["max_training_epochs"];
     m_save_checkpoint=train_config["save_checkpoint"];
     m_checkpoint_path=(std::string)train_config["checkpoint_path"];
 
@@ -52,23 +48,11 @@ bool TrainParams::with_viewer(){
 bool TrainParams::with_visdom(){
     return m_with_visdom;
 }
-bool TrainParams::with_debug_output(){
-    return m_with_debug_output;
-}
-bool TrainParams::with_error_checking(){
-    return m_with_error_checking;
-}
-int TrainParams::batch_size(){
-    return m_batch_size;
-}
 float TrainParams::lr(){
     return m_lr;
 }
 float TrainParams::weight_decay(){
     return m_weight_decay;
-}
-int TrainParams::max_training_epochs(){
-    return m_max_training_epochs;
 }
 bool TrainParams::save_checkpoint(){
     return m_save_checkpoint;
