@@ -35,6 +35,6 @@ public:
     void clear();
     bool is_initialized();
     void update_impl();
-    void set_values(torch::Tensor new_values); //use this to set new values because it will also call update_impl to set the float pointers to the correct place in the implementation
+    void set_values(const torch::Tensor& new_values); //use this to set new values because it will also call update_impl to set the float pointers to the correct place in the implementation
    
 };

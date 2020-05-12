@@ -39,9 +39,7 @@ void HashTable::init(int capacity, int pos_dim, int val_dim){
 }
 
 void HashTable::clear(){
-    LOG(WARNING) << "trying to clear hash table";
     if(is_initialized()){
-        LOG(WARNING) << "clearing hash table";
         m_values_tensor.fill_(0);
         m_keys_tensor.fill_(0);
         m_entries_tensor.fill_(-1);
@@ -59,11 +57,6 @@ bool HashTable::is_initialized(){
 }
 
 void HashTable::update_impl(){
-    // CHECK(m_keys_tensor.defined()) << "m_keys_tensor is not defined";
-    // CHECK(m_values_tensor.defined()) << "m_values_tensor is not defined";
-    // CHECK(m_entries_tensor.defined()) << "m_entries_tensor is not defined";
-    // CHECK(m_nr_filled_tensor.defined()) << "m_nr_filled_tensor is not defined";
-
     m_impl->m_capacity = m_capacity;
     if(m_keys_tensor.defined()){
         m_impl->m_keys = m_keys_tensor.data_ptr<int>();
@@ -82,8 +75,8 @@ void HashTable::update_impl(){
 
  }
 
-void HashTable::set_values(torch::Tensor new_values){
-    m_values_tensor=new_values;
+void HashTable::set_values(const torch::Tensor& new_values){
+    m_values_tensor=new_values.contiguous();
     update_impl();
 }
  

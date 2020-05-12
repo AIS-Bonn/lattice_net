@@ -206,9 +206,9 @@ class LatticePy(torch.Tensor):
         # self.lattice.set_val_full_dim(val_dim)
     def set_values(self, new_values):
         # self.lattice.m_hash_table.set_values(new_values)
-        if not new_values.is_contiguous():
-            new_values=new_values.contiguous()
-        self.lattice.m_hash_table.m_values_tensor=new_values
+        # if not new_values.is_contiguous():
+            # new_values=new_values.contiguous()
+        self.lattice.m_hash_table.set_values(new_values)
         self.set_val_dim(new_values.shape[1])
         self.lattice.m_hash_table.update_impl()
         #this tensor needs to have a shape so that the sizes of the forwards and backard pass match

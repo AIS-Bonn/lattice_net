@@ -31,9 +31,9 @@ PYBIND11_MODULE(latticenet, m) {
     // py::module::import("torch");
     // py::object variable = (py::object) py::module::import("torch").attr("autograd").attr("Variable"); //from here but it segment faults https://pybind11.readthedocs.io/en/stable/advanced/misc.html
     py::class_<HashTable, std::shared_ptr<HashTable>   > (m, "HashTable")
-    .def_readwrite("m_values_tensor", &HashTable::m_values_tensor) //careful when using this because setting it and not using update_impl is a big bug
-    .def_readwrite("m_keys_tensor", &HashTable::m_keys_tensor) //careful when using this because setting it and not using update_impl is a big bug
-    .def_readwrite("m_nr_filled_tensor", &HashTable::m_nr_filled_tensor) ////careful when using this because setting it and not using update_impl is a big bug
+    .def_readonly("m_values_tensor", &HashTable::m_values_tensor) //careful when using this because setting it and not using update_impl is a big bug
+    .def_readonly("m_keys_tensor", &HashTable::m_keys_tensor) //careful when using this because setting it and not using update_impl is a big bug
+    .def_readonly("m_nr_filled_tensor", &HashTable::m_nr_filled_tensor) ////careful when using this because setting it and not using update_impl is a big bug
     .def("update_impl", &HashTable::update_impl)
     .def("set_values", &HashTable::set_values)
     ;
