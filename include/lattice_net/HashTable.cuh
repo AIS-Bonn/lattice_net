@@ -5,13 +5,6 @@
 
 #include "torch/torch.h"
 
-// #include "kernels/hello_kernel.cuh"
-// #include <cuda.h>
-
-// struct MatrixEntry {
-//     int index;
-//     float weight;
-// };
 
 class HashTableGPU;
 
@@ -22,8 +15,8 @@ public:
     void init(int capacity, int pos_dim, int val_dim);
 
     int m_capacity;
-    torch::Tensor m_keys_tensor; // size m_capacity x m_pos_dim  of int (or should it be short as in the original implementation)
-    torch::Tensor m_values_tensor; // Size m_capacity x m_val_full_dim  of float  Stores homgeneous values, hence the m_val_full_dim
+    torch::Tensor m_keys_tensor; // size m_capacity x m_pos_dim  of int 
+    torch::Tensor m_values_tensor; // Size m_capacity x m_val_dim  of float 
     torch::Tensor m_entries_tensor; // size m_capacity x 1 of int  entries of the matrix for recording where the splatting happened for each point. The hash value h of the key is used to index into this tensor. the result is an index that points into the rows of the values and keys tensor where the corresponding key is stored
     torch::Tensor m_nr_filled_tensor; // 1x1 tensor of int storing the nr of filled cells of the keys and values tensor
     int m_pos_dim;
