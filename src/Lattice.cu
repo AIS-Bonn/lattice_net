@@ -9,7 +9,6 @@
 
 //my stuff
 #include "lattice_net/HashTable.cuh"
-// #include "surfel_renderer/lattice/kernels/HashTableGPU.cuh"
 #include "lattice_net/kernels/LatticeGPU.cuh"
 
 //jitify
@@ -35,9 +34,6 @@ using namespace configuru;
 //boost
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
-
-//jitify
-using jitify::reflection::type_of;
 
 
 
@@ -81,7 +77,6 @@ Lattice::Lattice(Lattice* other):
     m_hash_table( new HashTable() ),
     m_pos_dim(-1),
     m_val_dim(-1),
-    // m_val_full_dim(-1),
     m_lvl(1)
     {
         m_lvl=other->m_lvl;
@@ -89,20 +84,19 @@ Lattice::Lattice(Lattice* other):
         m_val_dim=other->m_val_dim;
         m_hash_table_capacity=other->m_hash_table_capacity;
         m_sigmas=other->m_sigmas;
-        m_sigmas_tensor=other->m_sigmas_tensor.clone();
-        m_splatting_indices_tensor=other->m_splatting_indices_tensor;
-        m_splatting_weights_tensor=other->m_splatting_weights_tensor;
-        m_lattice_rowified=other->m_lattice_rowified;
-        m_positions=other->m_positions;
+        m_sigmas_tensor=other->m_sigmas_tensor.clone(); //deep copy
+        m_splatting_indices_tensor=other->m_splatting_indices_tensor; //shallow copy
+        m_splatting_weights_tensor=other->m_splatting_weights_tensor; //shallow copy
+        m_lattice_rowified=other->m_lattice_rowified; //shallow copy
+        m_positions=other->m_positions; //shallow copy
         //hashtable
-        m_hash_table->m_capacity=other->m_hash_table_capacity;
+        m_hash_table->m_capacity=other->m_hash_table_capacity; 
         m_hash_table->m_pos_dim=other->m_pos_dim;
-        // m_hash_table->m_val_dim=other->m_val_dim;
         //hashtable tensors shallow copy (just a pointer assignemtn so they use the same data in memory)
         m_hash_table->m_keys_tensor=other->m_hash_table->m_keys_tensor;
         m_hash_table->m_values_tensor=other->m_hash_table->m_values_tensor;
         m_hash_table->m_entries_tensor=other->m_hash_table->m_entries_tensor;
-        m_hash_table->m_nr_filled_tensor=other->m_hash_table->m_nr_filled_tensor.clone();
+        m_hash_table->m_nr_filled_tensor=other->m_hash_table->m_nr_filled_tensor.clone(); //deep copy for this one as the new lattice may have different number of vertices
         m_hash_table->update_impl();
 
 }
@@ -180,10 +174,6 @@ void Lattice::set_and_check_input(torch::Tensor& positions_raw, torch::Tensor& v
 
 void Lattice::begin_splat(){
     m_hash_table->clear(); 
-
-    m_impl->begin_splat(); //can be commented out ,it just calls a kernel function for debugging
-
-  
 }
 
 
@@ -261,7 +251,7 @@ void Lattice::just_create_verts(torch::Tensor& positions_raw ){
 
 
 
-    VLOG(3) << "after just_create_verts nr_verts is " << nr_lattice_vertices();
+    // VLOG(3) << "after just_create_verts nr_verts is " << nr_lattice_vertices();
   
 }
 
@@ -307,7 +297,7 @@ void Lattice::distribute(torch::Tensor& positions_raw, torch::Tensor& values){
                             m_splatting_indices_tensor.data_ptr<int>(), m_splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
 
 
-    VLOG(3) << "after distributing nr_verts is " << nr_lattice_vertices();
+    // VLOG(3) << "after distributing nr_verts is " << nr_lattice_vertices();
   
 }
 
@@ -327,16 +317,16 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
 
     CHECK(filter_bank.defined()) << "Filter bank is undefined";
-    CHECK(filter_bank.dim()==2) << "Filter bank should have dimension 2, corresponding with (filter_extent * val_dim+1) x nr_filters.  However it has dimension: " << filter_bank.dim();
+    CHECK(filter_bank.dim()==2) << "Filter bank should have dimension 2, corresponding with (filter_extent * val_dim) x nr_filters.  However it has dimension: " << filter_bank.dim();
 
     int nr_filters=filter_bank.size(1) ;
     int filter_extent=filter_bank.size(0) / m_val_dim;
     CHECK(filter_extent == get_filter_extent(1) ) << "Filters should convolve over all the neighbours in the 1 hop plus the center vertex lattice. So the filter extent should be " << get_filter_extent(1) << ". However it is" << filter_extent;
 
-    //this lattice should be coarser (so a higher lvl) or at least at the same lvl as the lattice neigbhours (which is a finer lvl therefore the lattice_neigbhours.m_lvl is lower)
-    CHECK(m_lvl-lattice_neighbours->m_lvl<=1) << "the difference in levels between query and neigbhours lattice should be only 1 or zero, so the query should be corser by 1 level with respect to the neighbours. Or if they are at the same level then nothing needs to be done. However the current lattice lvl is " << m_lvl << " and the neighbours lvl is " << lattice_neighbours->m_lvl;
+    //this lattice should be coarser (so a higher lvl) or finer(lower lvl) or at least at the same lvl as the lattice neigbhours. But the differnce should be at most 1 level
+    CHECK(std::abs(m_lvl-lattice_neighbours->m_lvl)<=1) << "the difference in levels between query and neigbhours lattice should be only 1 or zero, so the query should be corser by 1 level or finer by 1 lvl with respect to the neighbours. Or if they are at the same level then nothing needs to be done. However the current lattice lvl is " << m_lvl << " and the neighbours lvl is " << lattice_neighbours->m_lvl;
     
-    VLOG(4) <<"starting convolved im2row_standlaone. The current lattice has nr_vertices_lattices" << nr_lattice_vertices();
+    // VLOG(4) <<"starting convolved im2row_standlaone. The current lattice has nr_vertices_lattices" << nr_lattice_vertices();
     CHECK(nr_lattice_vertices()!=0) << "Why does this current lattice have zero nr_filled?";
     int nr_vertices=nr_lattice_vertices();
 
@@ -344,10 +334,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     convolved_lattice->m_name="convolved_lattice";
     int cur_hash_table_size=m_hash_table->m_values_tensor.size(0);
 
-    convolved_lattice->m_val_dim=nr_filters;
-    convolved_lattice->m_hash_table->update_impl(); //updating the hash table pointer to point to the newly clones values tensor
 
-    //kernel bank is of size nr_filers x filter_extent x in_val_dim
     filter_bank=filter_bank.to("cuda");
 
 
@@ -365,7 +352,8 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     //multiply each patch with the filter bank
     Tensor convolved= m_lattice_rowified.mm(filter_bank);
    
-    convolved_lattice->m_hash_table->m_values_tensor=convolved;
+    convolved_lattice->m_hash_table->set_values(convolved);
+    convolved_lattice->m_val_dim=nr_filters;
     convolved_lattice->m_hash_table->update_impl(); //very important
     convolved_lattice->m_lattice_rowified=m_lattice_rowified;
 
@@ -483,9 +471,12 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
 
     CHECK(filter_extent == get_filter_extent(1) ) << "Filters should convolve over all the neighbours in the 1 hop plus the center vertex lattice. So the filter extent should be " << get_filter_extent(1) << ". However it is" << filter_extent;
 
-    CHECK(m_lvl-lattice_neighbours->m_lvl<=1) << "the difference in levels between query and neigbhours lattice should be only 1 or zero, so the query should be corser by 1 level with respect to the neighbours. Or if they are at the same level then nothing needs to be done";
+
     
-    VLOG(3) <<"starting convolved im2row_standlaone. The current lattice has nr_vertices_lattices" << nr_lattice_vertices();
+    //this lattice should be coarser (so a higher lvl) or finer(lower lvl) or at least at the same lvl as the lattice neigbhours. But the differnce should be at most 1 level
+    CHECK(std::abs(m_lvl-lattice_neighbours->m_lvl)<=1) << "the difference in levels between query and neigbhours lattice should be only 1 or zero, so the query should be corser by 1 level or finer by 1 lvl with respect to the neighbours. Or if they are at the same level then nothing needs to be done. However the current lattice lvl is " << m_lvl << " and the neighbours lvl is " << lattice_neighbours->m_lvl;
+
+    // VLOG(3) <<"starting convolved im2row_standlaone. The current lattice has nr_vertices_lattices" << nr_lattice_vertices();
     CHECK(nr_lattice_vertices()!=0) << "Why does this current lattice have zero nr_filled?";
     int nr_vertices=nr_lattice_vertices();
 
@@ -561,7 +552,6 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts(){
 std::shared_ptr<Lattice> Lattice::create_coarse_verts_naive(torch::Tensor& positions_raw){
 
     std::shared_ptr<Lattice> coarse_lattice=create(this); //create a lattice with no config but takes the config from this one
-    // VLOG(1) << "new coarse lattice has splatting incies" << m_splatting_indices_tensor;
     coarse_lattice->m_name="coarse_lattice";
     coarse_lattice->m_lvl=m_lvl+1;
     coarse_lattice->m_sigmas_tensor=m_sigmas_tensor.clone()*2.0; //the sigma for the coarser one is double. This is done so if we slice at this lattice we scale the positions with the correct sigma
