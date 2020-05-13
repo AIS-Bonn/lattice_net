@@ -14,13 +14,10 @@ from latticenet_py.lattice.lattice_py import LatticePy
 
 #Just to have something close to the macros we have in c++
 def profiler_start(name):
-    # print("profiler start form python ", name, " is profiling gpu is ", Profiler.is_profiling_gpu() )
-    torch.cuda.synchronize()
     if(Profiler.is_profiling_gpu()):
         torch.cuda.synchronize()
     Profiler.start(name)
 def profiler_end(name):
-    torch.cuda.synchronize()
     if(Profiler.is_profiling_gpu()):
         torch.cuda.synchronize()
     Profiler.end(name)
