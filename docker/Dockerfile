@@ -1,6 +1,7 @@
 # FROM ubuntu:bionic
 
-FROM pytorch/pytorch:1.4-cuda10.1-cudnn7-devel
+# FROM pytorch/pytorch:1.4-cuda10.1-cudnn7-devel
+FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV NVIDIA_VISIBLE_DEVICES \
     ${NVIDIA_VISIBLE_DEVICES:-all}
@@ -80,7 +81,20 @@ RUN rm libeigen3-dev_3.3.7-1_all.deb
 WORKDIR /
 # COPY .bashrc ./
 
+
+
+#install conda 
+RUN apt-get -y update && apt-get install -y --no-install-recommends curl && sh "./cleanup.sh"
+RUN wget --quiet https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+    /bin/bash ~/miniconda.sh -b -p /opt/conda && \
+    rm ~/miniconda.sh && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh 
+ENV PATH /opt/conda/bin:$PATH
+WORKDIR /
+
+
 COPY lattice_env.yaml ./
+
 
 # Create conda environment
 RUN conda env create -f lattice_env.yaml
@@ -109,8 +123,8 @@ RUN pip install ipdb numpy jupyter h5py scipy ipython pillow matplotlib opencv-p
 RUN sudo python3 -m pip install --upgrade setuptools setuptools-git  && sh "./cleanup.sh" 
 
 #install libtorch 
-WORKDIR / 
-RUN wget https://download.pytorch.org/libtorch/cu101/libtorch-cxx11-abi-shared-with-deps-1.5.0%2Bcu101.zip
+# WORKDIR / 
+# RUN wget https://download.pytorch.org/libtorch/cu101/libtorch-cxx11-abi-shared-with-deps-1.5.0%2Bcu101.zip
 
 
 #torch scatter in order to have scatter_max which is useful for a pointnet architecture
@@ -148,7 +162,7 @@ WORKDIR ${workspace}
 #Cleanup
 RUN rm -rf /var/lib/apt/lists/*
 RUN apt-get update
-RUN rm cleanup.sh
+# RUN rm cleanup.sh
 
 # Make SSH available
 EXPOSE 22
