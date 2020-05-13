@@ -104,8 +104,24 @@ RUN echo "source activate lattice" >> /.bashrc
 RUN conda config --add channels conda-forge
 ENV PATH /opt/conda/envs/lattice/bin:$PATH
 
+
 COPY cleanup.sh ./
 RUN chmod +x ./cleanup.sh
+
+
+#torch scatter in order to have scatter_max which is useful for a pointnet architecture. It needs the cuda_arch list in order to find nvidia drivers and build the gpu part of the torch-scatter https://github.com/rusty1s/pytorch_scatter/pull/79
+#FORCE_CUDA may be needed for cases like this when the cuda runtime is not exposed during docker build but is actually needed https://github.com/facebookresearch/maskrcnn-benchmark/issues/167
+ARG CUDA_HOME="/usr/local/cuda"
+ARG TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
+ARG TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
+ARG CPATH="/usr/local/cuda/include" 
+RUN git clone --recursive https://github.com/rusty1s/pytorch_scatter /opt/torch_scatter
+WORKDIR /opt/torch_scatter
+RUN git checkout tags/2.0.4
+RUN git submodule sync
+RUN git submodule update --init --recursive
+RUN FORCE_CUDA=1 python3 setup.py install 
+WORKDIR /
 
 #nvvp crashes under the default java11 so we need java8 as explained here https://bugs.launchpad.net/ubuntu/+source/nvidia-cuda-toolkit/+bug/1766948
 # RUN sudo apt-get update && sudo apt-get install  -y --no-install-recommends  openjdk-8-jre && sh "./cleanup.sh"
@@ -171,6 +187,32 @@ EXPOSE 42421
 EXPOSE 6006
 # IPython https://github.com/tensorflow/tensorflow/blob/master/tensorflow/tools/docker/Dockerfile.gpu
 EXPOSE 8888
+
+
+# Clone user into docker image and set up X11 sharing
+RUN \
+  echo "${user}:x:${uid}:${uid}:${user},,,:${home}:${shell}" >> /etc/passwd && \
+  echo "${user}:x:${uid}:" >> /etc/group && \
+  echo "${user} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/${user}" && \
+  chmod 0440 "/etc/sudoers.d/${user}"
+
+
+#Set the user in the approapriate groups
+RUN usermod -a -G dialout ${user}
+RUN usermod -a -G video ${user}
+RUN usermod -a -G audio ${user}
+RUN usermod -a -G plugdev ${user}
+
+#own some stuff because they were created by the root user in the docker container
+# RUN chown -R ${user} /opt
+# USER ${user}
+# USER root
+
+# Switch to user
+RUN chown -R ${user} ${workspace}
+USER "${user}"
+
+
 
 ENV CATKIN_TOPLEVEL_WS="${workspace}/devel"
 # Switch to the workspace

@@ -66,5 +66,6 @@ dependencies:
     - urllib3==1.25.8
     - visdom==0.1.8.9
     - websocket-client==0.57.0
+    # - torch_scatter==2.0.4
 prefix: /opt/conda/envs/lattice
 
