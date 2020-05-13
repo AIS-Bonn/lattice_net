@@ -47,6 +47,33 @@ def create_loader(dataset_name, config_file):
 
     return loader
 
+def sanity_check(lattice):
+    nr_positions=lattice.lattice.m_positions.shape[0]
+
+    print("lattice has nr of vertices", lattice.nr_lattice_vertices())
+    if(lattice.nr_lattice_vertices()<100):
+        print(colored("-------------------------------", 'yellow'))
+        print(colored("The number of lattice vertice is bellow 100. This could be a sign of a bug like too big of a sigma set in the config file. If you believe this is correct, feel free to ignore this.", 'yellow'))
+        print(colored("-------------------------------", 'yellow'))
+
+    if(lattice.nr_lattice_vertices()>nr_positions):
+        print(colored("-------------------------------", 'yellow'))
+        print(colored("The number of lattice vertice is higher than the number of positions. This could be a sign of a bug like too small of a sigma set in the config file. If you believe this is correct, feel free to ignore this.", 'yellow'))
+        print(colored("-------------------------------", 'yellow'))
+
+    #sanity check that we don't have way too many points splatting into the same vertex 
+    mean_points_per_vertex, max_points_per_vertex, *rest = lattice.compute_nr_points_per_lattice_vertex()
+    if(max_points_per_vertex>nr_positions*0.1):
+        print(colored("-------------------------------", 'yellow'))
+        print(colored("More then 10% of the positions in the cloud are splatted onto one single lattice vertex. This could be a sign of a bug like too big of a sigma set in the config file. If you believe this is correct, feel free to ignore this.", 'yellow'))
+        print(colored("-------------------------------", 'yellow'))
+
+    if(lattice.nr_lattice_vertices()>lattice.capacity()*0.3):
+        print(colored("-------------------------------", 'yellow'))
+        print(colored("The number of lattice vertice is close to the maximum capacity of the hashmap. Please increase the capacity of the lattice in the config file.", 'yellow'))
+        print(colored("-------------------------------", 'yellow'))
+
+
 
 def run():
     config_path=os.path.join( os.path.dirname( os.path.realpath(__file__) ) , '../config', config_file)
@@ -127,6 +154,10 @@ def run():
                             first_time=False
                             optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
                             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
+
+                            #sanity check that the lattice has enough vertices
+                            sanity_check(lattice)
+
 
                         cb.after_forward_pass(pred_softmax=pred_logsoftmax, target=target, cloud=cloud, loss=loss.item(), loss_dice=loss_dice.item(), phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 
                         pbar.update(1)

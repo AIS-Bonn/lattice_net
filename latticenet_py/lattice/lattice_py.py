@@ -254,7 +254,7 @@ class LatticePy(torch.Tensor):
         min_points=nr_points_per_simplex.min()
         median_points=nr_points_per_simplex.median()
 
-        print("lattice has mean points per simplex: ", mean_points, " min: ", min_points, " max: ", max_points, "median: ", median_points)
+        print("lattice has mean points per simplex: ", mean_points.item(), " min: ", min_points.item(), " max: ", max_points.item(), "median: ", median_points.item())
 
         return mean_points, max_points, min_points, median_points, nr_points_per_simplex
 
