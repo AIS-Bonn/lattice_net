@@ -129,14 +129,14 @@ WORKDIR /
 # RUN sudo apt-get update && apt-get install -y --no-install-recommends cuda-command-line-tools-$CUDA_PKG_VERSION cuda-visual-tools-$CUDA_PKG_VERSION && sh "./cleanup.sh"
 
 #python3 libs 
-RUN sudo apt-get update
+# RUN sudo apt-get update
 # RUN sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get -y install python3-pip python3-tk python3-pyqt5 python3-crypto python3-gnupg python3-dbg && sh "./cleanup.sh"
-RUN sudo python3 -m pip install --upgrade pip
+# RUN sudo python3 -m pip install --upgrade pip
 # RUN sudo apt-get update
 
 # create conda env and get all needed libraries
-RUN pip install ipdb numpy jupyter h5py scipy ipython pillow matplotlib opencv-python wheel trollius rospkg asyncio netifaces visdom torchnet sympy tqdm dlutils sklearn scikit-image twine natsort termcolor && sh "./cleanup.sh"
-RUN sudo python3 -m pip install --upgrade setuptools setuptools-git  && sh "./cleanup.sh" 
+# RUN pip install ipdb numpy jupyter h5py scipy ipython pillow matplotlib opencv-python wheel trollius rospkg asyncio netifaces visdom torchnet sympy tqdm dlutils sklearn scikit-image twine natsort termcolor && sh "./cleanup.sh"
+# RUN sudo python3 -m pip install --upgrade setuptools setuptools-git  && sh "./cleanup.sh" 
 
 #install libtorch 
 # WORKDIR / 
