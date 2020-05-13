@@ -891,11 +891,8 @@ void Lattice::slice_backwards_standalone_with_precomputation_no_homogeneous(torc
     m_pos_dim=positions_raw.size(1);
     CHECK(grad_sliced_values.dim()==2) <<"grad_sliced_values should be nr_positions x m_val_dim, so it should have 2 dimensions. However it has "<< grad_sliced_values.dim();
 
-
-    //no need to reallocate the values, we just need to check that they have the correct size
-    if(m_hash_table->m_values_tensor.size(0) != nr_lattice_vertices() || m_hash_table->m_values_tensor.size(1)!=grad_sliced_values.size(2) ){
-        // LOG(WARNING) << "Reallocating the values tensor which might be quite slow.";
-        m_hash_table->m_values_tensor=torch::zeros({nr_lattice_vertices(), grad_sliced_values.size(2)},  torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  );
+    if(m_hash_table->m_values_tensor.size(0) != nr_lattice_vertices() || m_hash_table->m_values_tensor.size(1)!=grad_sliced_values.size(1) ){
+        m_hash_table->m_values_tensor=torch::zeros({nr_lattice_vertices(), grad_sliced_values.size(1)},  torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  );
     }else{
         m_hash_table->m_values_tensor.fill_(0);
     }
@@ -947,9 +944,7 @@ void Lattice::gather_backwards_standalone_with_precomputation(const torch::Tenso
     CHECK(grad_sliced_values.dim()==2) <<"grad_sliced_values should be nr_positions x ((m_val_dim+1)*(m_pos_dim+1)), so it should have 2 dimensions. However it has "<< grad_sliced_values.dim();
 
 
-    //no need to reallocate the values, we just need to check that they have the correct size
     if(m_hash_table->m_values_tensor.size(0) != nr_lattice_vertices() || m_hash_table->m_values_tensor.size(1)!=m_val_dim ){
-        // LOG(WARNING) << "Reallocating the values tensor which might be quite slow.";
         m_hash_table->m_values_tensor=torch::zeros({nr_lattice_vertices(), m_val_dim },  torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  );
     }else{
         m_hash_table->m_values_tensor.fill_(0);
