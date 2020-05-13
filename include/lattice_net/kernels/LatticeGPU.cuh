@@ -1,10 +1,7 @@
 #pragma once
 
-// #include "../HashGPU.cuh"
 #include "lattice_net/kernels/HashTableGPU.cuh"
 
-// #include "surfel_renderer/jitify_helper/jitify_options.hpp" //Needs to be added BEFORE jitify because this defined the include paths so that the kernels cna find each other
-// #include "jitify.hpp"
 #ifndef __CUDACC_RTC__ 
     #include "lattice_net/jitify_helper/jitify_helper.cuh"
 #endif
@@ -15,8 +12,6 @@
     #include <cuda_runtime_api.h>
     #include "device_launch_parameters.h" //needed for threadIdx and blockDim 
 #endif
-// #include <device_functions.h> //for __syncthreads
-// #include <curand_kernel.h> //for curand_uniform https://gist.github.com/NicholasShatokhin/3769635
 
 #ifndef __CUDACC_RTC__ 
 //Add this header after we add all cuda stuff because we need the profiler to have cudaDeviceSyncronize defined
@@ -39,79 +34,13 @@ public:
 
         //it uses Jittify to get a handle for the programs. The programs can contain more than one kernel.. It doesnt actually compile them, they will get jit compiled the first time you run them
         void create_program_handles(){
-            // std::vector<std::string> options = {"-std=c++11", "-ftz=true", "-prec-div=false", "-prec-sqrt=false"};
-            //lineinfo is so that we get line where it fails when we run cuda-memcheck ./exec
-            //-G is for debug of device code
-            // std::vector<std::string> options = {"-std=c++11", "--generate-line-info"}; 
-            // std::vector<std::string> options = {"-std=c++11", "---use_fast_math=true"}; 
-            // std::vector<std::string> options = {"-std=c++11", "--generate-line-info", "--device-as-default-execution-space"}; 
-
-            // m_test_jitify_program = m_kernel_cache.program( std::string(CMAKE_SOURCE_DIR)+"/include/surfel_renderer/lattice/kernels/hello_kernel.cuh", 0, options);
-            // m_lattice_program = m_kernel_cache.program( std::string(CMAKE_SOURCE_DIR)+"/include/surfel_renderer/lattice/kernels/LatticeGPU.cuh", 0, options );
-
-            // m_test_jitify_program=create_jitify_program( std::string(CMAKE_SOURCE_DIR)+"/include/lattice_net/kernels/hello_kernel.cuh" );
             m_lattice_program=create_jitify_program( std::string(CMAKE_SOURCE_DIR)+"/include/lattice_net/kernels/LatticeGPU.cuh" );
         }
-        // #endif
-
-
-        //clears the hashtable and new_values matris so we can use them as fresh
-        void begin_splat(){
-            // dim3 grid(1);
-            // dim3 block(1);
-            // m_test_jitify_program.kernel("kernel_hello")
-            //             .instantiate()
-            //             .configure(grid, block)
-            //             .launch();
-
-        }
-        // void splat_standalone(const float* positions, const float* values, const int nr_positions, const int pos_dim, const int val_dim, const int* splatting_indices, const float* splatting_weights, const HashTableGPU& hash_table_gpu){
-   
-        //     // do it with jitify
-        //     dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
-        //     dim3 blockSize(BLOCK_SIZE, 1, 1);
-        //     int cleanBlockSize = 128;
-        //     dim3 cleanBlocks((nr_positions - 1) / cleanBlockSize + 1, 2 * (pos_dim + 1), 1);
-
-        //     TIME_START("kernel_splat");
-        //     m_lattice_program.kernel("kernel_splat")
-        //                 .instantiate(pos_dim, val_dim)
-        //                 .configure(blocks, blockSize)
-        //                 .launch( positions, values, nr_positions, splatting_indices, splatting_weights, hash_table_gpu );
-        //     TIME_END("kernel_splat");
-        //     CUDA_CHECK_ERROR();
-
-        //     //the nr of m_filled can be a lot bigger than the actual nr of lattice vertices because of the fact that the keys in the hashtable can have duplicates. While cleaning the hashtable we retreive all the keys and we check their index in the m_keys. The maximum index will be the new m_filled
-        //     // cudaMemset((void*)m_hash_table.m_filled, 0, sizeof(int)*1);
-
-        //     TIME_START("cleanHashtable");
-        //     m_lattice_program.kernel("cleanHashTable")
-        //                 .instantiate(pos_dim)
-        //                 .configure(cleanBlocks, cleanBlockSize)
-        //                 .launch( hash_table_gpu.m_capacity  , hash_table_gpu );
-        //     TIME_END("cleanHashtable");
-        //     CUDA_CHECK_ERROR();
-
-        //     TIME_START("splatCache");
-        //     blocks.y = pos_dim + 1;
-        //     m_lattice_program.kernel("splatCache")
-        //                 .instantiate(pos_dim, val_dim)
-        //                 .configure(blocks, blockSize)
-        //                 .launch( nr_positions, values, splatting_indices, splatting_weights, hash_table_gpu );
-        //     TIME_END("splatCache");
-        //     CUDA_CHECK_ERROR();
-
-        //     // VLOG(1) << "after splatting nr_verts is " << nr_lattice_vertices();
-        
-
-        // }
 
 
         // void splat_standalone(const float* positions, const float* values, const int nr_positions, const int pos_dim, const int val_dim, const float* splatting_indices_and_weights, const HashTableGPU& hash_table_gpu){
         void splat_standalone(const float* positions, const float* values, const int nr_positions, const int pos_dim, const int val_dim, const int* splatting_indices, const float* splatting_weights, const HashTableGPU& hash_table_gpu){
    
-            // do it with jitify
-
             TIME_START("kernel_splat");
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
@@ -125,29 +54,6 @@ public:
             CUDA_CHECK_CURESULT(res_1);
             CUDA_CHECK_ERROR();
 
-            //the nr of m_filled can be a lot bigger than the actual nr of lattice vertices because of the fact that the keys in the hashtable can have duplicates. While cleaning the hashtable we retreive all the keys and we check their index in the m_keys. The maximum index will be the new m_filled
-            // cudaMemset((void*)m_hash_table.m_filled, 0, sizeof(int)*1);
-
-            // TIME_START("cleanHashtable");
-            // int cleanBlockSize = 128;
-            // dim3 cleanBlocks((nr_positions - 1) / cleanBlockSize + 1, 2 * (pos_dim + 1), 1);
-            // m_lattice_program.kernel("cleanHashTable")
-            //             .instantiate(pos_dim)
-            //             .configure(cleanBlocks, cleanBlockSize)
-            //             .launch( hash_table_gpu.m_capacity  , hash_table_gpu );
-            // TIME_END("cleanHashtable");
-            // CUDA_CHECK_ERROR();
-
-            // TIME_START("splatCache");
-            // blocks=dim3((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
-            // blockSize=dim3(BLOCK_SIZE, 1, 1);
-            // blocks.y = pos_dim + 1;
-            // m_lattice_program.kernel("splatCache")
-            //             .instantiate(pos_dim, val_dim)
-            //             .configure(blocks, blockSize)
-            //             .launch( nr_positions, values, splatting_indices_and_weights, hash_table_gpu );
-            // TIME_END("splatCache");
-            // CUDA_CHECK_ERROR();
 
 
             TIME_START("splatCacheNaive");
@@ -162,25 +68,18 @@ public:
             CUDA_CHECK_CURESULT(res_2);
             CUDA_CHECK_ERROR()
 
-            // VLOG(1) << "after splatting nr_verts is " << nr_lattice_vertices();
-        
 
         }
 
 
         void just_create_verts(const float* positions, const int nr_positions, const int pos_dim, const int val_dim,  const int* splatting_indices, const float* splatting_weights, const HashTableGPU& hash_table_gpu){
    
-            // do it with jitify
-
-            // TIME_START("kernel_splat");
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
             CUresult res= m_lattice_program.kernel("kernel_splat")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
-                        // .launch( positions, values, nr_positions, splatting_indices_and_weights, hash_table_gpu );
                         .launch( positions, nr_positions, splatting_indices, splatting_weights, hash_table_gpu, false );
-            // TIME_END("kernel_splat");
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
             CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
@@ -196,32 +95,13 @@ public:
             CUresult res= m_lattice_program.kernel("distribute")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
-                        // .launch( positions, values, nr_positions, splatting_indices_and_weights, hash_table_gpu );
                         .launch( positions, values, nr_positions, splatting_indices, splatting_weights, distributed, hash_table_gpu );
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
             CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
 
-           
-
-            // VLOG(1) << "after splatting nr_verts is " << nr_lattice_vertices();
-        
-
         }
 
-        // void setup_seeds(curandState* globalState, const int nr_states ){
-  
-        //     dim3 blocks(( nr_states - 1) / 512 + 1, 1, 1);
-        //     dim3 blockSize(512, 1, 1);
-        //     m_lattice_program.kernel("setup_seeds")
-        //                 .instantiate(nr_states)
-        //                 .configure(blocks, blockSize)
-        //                 .launch( globalState);
-        //     CUDA_CHECK_ERROR();
-        // }
-
-        //assumes we have enough stats in curand stat for each nr_position*(m_pos_dim+1)
-        // void create_splatting_mask(bool* mask,  const int* splatting_indices, const int* nr_points_per_simplex, const int max_nr_points, const int nr_positions, const int pos_dim, curandState* globalState ){
         void create_splatting_mask(bool* mask,  const int* splatting_indices, const int* nr_points_per_simplex, const int max_nr_points, const int nr_positions, const int pos_dim){
   
             int size_of_indices_vector=nr_positions*(pos_dim+1);
@@ -249,7 +129,6 @@ public:
 
         }
 
-// int n, float *newValues, const float* filter_bank, const int num_filters, const int filter_extent, HashTableGPU hash_table
         void convolve_standalone(const int hash_table_capacity, const int pos_dim, const int val_dim, float* new_values, const float* filter_bank, const int nr_filters, const int filter_extent, const HashTableGPU& hash_table_gpu){
 
             dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
@@ -262,27 +141,12 @@ public:
             CUDA_CHECK_ERROR();
         }
 
-        //creates a lattice rowified by grabbing the values of the neighbours from the hash_table_query_and_neighbours
-        // void im2row(const int hash_table_capacity, const int pos_dim, const int val_full_dim, const int dilation, float* im2row_out, const int filter_extent, const HashTableGPU& hash_table_query_and_neighbours){
-
-        //     int block_size = 512;
-        //     dim3 blocks((hash_table_capacity - 1) / block_size + 1, 1, 1);
-
-        //     m_lattice_program.kernel("im2row")
-        //             .instantiate(pos_dim, val_full_dim)
-        //             .configure(blocks, block_size)
-        //             .launch( hash_table_capacity, im2row_out, filter_extent, dilation, hash_table_query_and_neighbours, hash_table_query_and_neighbours,  );
-        // }
 
         void depthwise_convolve(const int nr_vertices, const int pos_dim, const int val_dim, float*filter_bank, const int dilation, float* values_out, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neighbours, const bool flip_neighbours, const bool debug_kernel){
 
             int nr_blocks=nr_vertices/BLOCK_SIZE;
             // check for partial block at the end
             if(nr_vertices % BLOCK_SIZE) ++nr_blocks; 
-
-            // std::cout <<"launching a im2row with block size " << block_size << " and nr blocks " << nr_blocks << std::endl;
-            //46ms
-            //43ms
 
             CUresult res= m_lattice_program.kernel("depthwise_convolve")
                     .instantiate(pos_dim, val_dim, filter_extent)
@@ -299,10 +163,6 @@ public:
             // check for partial block at the end
             if(nr_vertices % BLOCK_SIZE) ++nr_blocks; 
 
-            // std::cout <<"launching a im2row with block size " << block_size << " and nr blocks " << nr_blocks << std::endl;
-            //46ms
-            //43ms
-
             CUresult res= m_lattice_program.kernel("im2row")
                     .instantiate(pos_dim, val_dim)
                     .configure(nr_blocks, BLOCK_SIZE)
@@ -311,21 +171,9 @@ public:
             CUDA_CHECK_ERROR();
         }
 
-        // void test_row2im(const int hash_table_capacity, const int pos_dim, const int val_full_dim, const int dilation, float* im2row_in, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex){
-
-        //     int block_size = 512;
-        //     dim3 blocks((hash_table_capacity - 1) / block_size + 1, 1, 1);
-
-        //     m_lattice_program.kernel("test_row2im")
-        //             .instantiate(pos_dim, val_full_dim)
-        //             .configure(blocks, block_size)
-        //             .launch( hash_table_capacity, im2row_in, filter_extent, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, use_center_vertex);
-        // }
-
 
         void row2im(const int hash_table_capacity, const int pos_dim, const int val_full_dim, const int dilation, float* im2row_in, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neighbours, const bool do_test){
 
-            // VLOG(1)<< "in the gpu implementation use_center_vertex is " << use_center_vertex;
 
             dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
 
@@ -351,7 +199,6 @@ public:
 
         void slice_standalone_no_precomputation(const float* positions, float* sliced_values, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
-            // do it with jitify
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
             int cleanBlockSize = 128;
@@ -369,7 +216,6 @@ public:
 
         void gather_standalone_no_precomputation(const float* positions, float* gathered_values, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
-            // do it with jitify
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
@@ -384,7 +230,6 @@ public:
 
         void gather_standalone_with_precomputation(const float* positions, float* gathered_values, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
-            // do it with jitify
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
@@ -400,7 +245,6 @@ public:
 
         void gather_elevated_standalone_no_precomputation(const int* keys, float* gathered_values, const int pos_dim, const int val_full_dim, const int nr_vertices, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu_to_gather_from, const int lattice_to_gather_from_lvl, const int elevated_verts_lvl){
 
-            // do it with jitify
             dim3 blocks((nr_vertices - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
@@ -417,7 +261,6 @@ public:
 
         void slice_elevated_verts(const int hash_table_capacity, float* sliced_values, const int pos_dim, const int val_full_dim, int* splatting_indices, float* splatting_weights, const HashTableGPU& hash_table_to_slice_from, const HashTableGPU& hash_table_elevated_verts, const int lattice_to_slice_from_lvl, const int elevated_vert_lvl){
 
-            // do it with jitify
             dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
@@ -433,8 +276,6 @@ public:
 
         void slice_classify_no_precomputation(const float* positions, float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
-
-            // do it with jitify
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
@@ -450,8 +291,6 @@ public:
 
         void slice_classify_with_precomputation(const float* positions, float* class_logits, const float* delta_weights, const float* linear_clasify_weight, const float* linear_clasify_bias, const int nr_classes, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
-
-            // do it with jitify
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
 
@@ -459,7 +298,6 @@ public:
             CUresult res= m_lattice_program.kernel("slice_classify_with_precomputation")
                         .instantiate(pos_dim, val_dim, nr_classes)
                         .configure(blocks, blockSize)
-                        // .smem(nr_classes*val_full_dim*4) //shared memory in bytes
                         .launch( positions, class_logits, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
             CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
@@ -544,11 +382,6 @@ public:
         }
         
 
-        // #ifdef __CUDACC_RTC_ 
-        //cuda kernels cache for compiling with jitify
-        // jitify::JitCache m_kernel_cache;
-        //kernels 
-        jitify::Program m_test_jitify_program;
         jitify::Program m_lattice_program;
 
         //for syncronization
@@ -664,14 +497,12 @@ elevate_points(const int nr_positions,  const float* positions, float* elevated)
 }
 
 
-//cuda kernels that have __global__ qualifier have to go outside the class 
 template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 distribute(float* positions, float* values, const int nr_positions, int* splatting_indices, float* splatting_weights, float* distributed, HashTableGPU hash_table){
 
-    // determine where in the thread grid we are
-    int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
+    int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new position from the input point cloud
 
     if(idx>=nr_positions){ //don't go out of bounds
         return;
@@ -682,27 +513,6 @@ distribute(float* positions, float* values, const int nr_positions, int* splatti
     elevate<pos_dim>(elevated, position);
     int rem0[pos_dim + 1];
     int rank[pos_dim + 1];
-
-
-    // //TODO the scale factor can be precomputed
-    // float scaleFactor[pos_dim];
-    // float invStdDev = (pos_dim + 1) * sqrt(2.0f / 3);
-    // for (int i = 0; i < pos_dim; i++) {
-    //     scaleFactor[i] = 1.0f / (sqrt((float) (i + 1) * (i + 2))) * invStdDev;
-    // }
-
-    // // embed position vector into the hyperplane
-    // // first rotate position into the (pd+1)-dimensional hyperplane
-    // // sm contains the sum of 1..n of our feature vector
-    // float sm = 0;
-    // for (int i = pos_dim; i > 0; i--) {
-    //     float cf = position[i - 1] * scaleFactor[i - 1];
-    //     // float cf = position[i - 1] ;
-    //     elevated[i] = sm - i * cf;
-    //     sm += cf;
-    // }
-    // elevated[0] = sm;
-
 
     // Find the closest 0-colored simplex through rounding
     // greedily search for the closest zero-colored lattice point
@@ -759,10 +569,10 @@ distribute(float* positions, float* values, const int nr_positions, int* splatti
 
 
     int key[pos_dim+1];
-    float* distributed_out_for_cur_position=distributed + idx*(pos_dim+1)*( pos_dim + val_dim +1 );
+    float* distributed_out_for_cur_position=distributed + idx*(pos_dim+1)*( pos_dim + val_dim +1 ); //each row of the distributed will have  ( pos_dim + val_dim +1 ) elements for each of the (pos_dim+1) vertices of a simplex. therefore the whole row of the distributed matrix is of size (pos_dim+1)*( pos_dim + val_dim +1 )
     float* value_cur_position= values + idx * val_dim;
     for (int remainder = 0; remainder <= pos_dim; remainder++) {
-        // Compute the location of the lattice point explicitly. Including the last coordinate, even though it is redundant, as we know it sums up to 0. We do that so we can substract it from the elevated point
+        // Compute the location of the lattice point explicitly. Including the last coordinate, even though it is redundant, as we know it sums up to 0. 
         for (int i = 0; i < pos_dim+1; i++) {
             key[i] = static_cast<int>(rem0[i] + remainder);
             if (rank[i] > pos_dim - remainder)
@@ -773,20 +583,17 @@ distribute(float* positions, float* values, const int nr_positions, int* splatti
 
         //using two matrices for indices and weights
         int index_in_m_entries=hash_table.insert(key); //the slot in which it will be inserted is linearly increasing with an atomicAdd
-        // splatting_indices[idx * (pos_dim + 1) + remainder]=index_in_m_entries; //for the moment this insex indexes in m_entries but after splat_cache it will index in m_keys
-        // splatting_weights[idx * (pos_dim + 1) + remainder]=barycentric[remainder];
-        if(index_in_m_entries>=0){
+        if(index_in_m_entries>=0){ //if it got inserted correctly in the hashmap
             splatting_indices[idx * (pos_dim + 1) + remainder]=hash_table.m_entries[index_in_m_entries]; //it indexes in m_keys
             splatting_weights[idx * (pos_dim + 1) + remainder]=barycentric[remainder];
         }
 
 
-        //store the distributed values, which for positions will be elevated-key and for values will be value*barycentric_weight. We also store a homogeneous value
-        //distributed is a matrix of size nr_positions x (m_pos_dim+1) x  ( m_pos_dim + m_val_dim )
+        //store the distributed values at this row of the distributed matrix, which for positions will be just the position in xyz and for values will be value. We also store a barycentric weight
         float* distributed_out_lattice_vertex = distributed_out_for_cur_position + remainder*( pos_dim + val_dim+1  );
         // distribute positions
         for(int i=0; i<pos_dim; i++){
-           distributed_out_lattice_vertex[i] = position[i];  // TODO for some reason this elevated-key can go up to 3 in value which is bad for tanh
+           distributed_out_lattice_vertex[i] = position[i];  
         }
         //distribute values
         for(int i=0; i<val_dim; i++){
@@ -809,48 +616,7 @@ distribute(float* positions, float* values, const int nr_positions, int* splatti
 }
 
 
-// int size_of_indices_vector=nr_positions*(pos_dim+1);
-// dim3 blocks(( nr_positions*(pos_dim+1) - 1) / 512 + 1, 1, 1);
-// dim3 blockSize(512, 1, 1);
-// m_lattice_program.kernel("create_splatting_mask")
-//             .instantiate(pos_dim)
-//             .configure(blocks, blockSize)
-//             .launch( mask, nr_points_per_simplex, max_nr_points, size_of_indices_vector  );
-// CUDA_CHECK_ERROR();
-//
-
-// template<int nr_states>
-// __global__ void setup_seeds(curandState* globalState){
-
-//     // determine where in the thread grid we are
-//     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with an edge going form a point towards a lattice vertex
-//     if(idx>=nr_states){ //don't go out of bounds
-//         return;
-//     } 
-
-//     unsigned long seed = 0;
-//     curand_init ( seed, idx, 0, &globalState[idx] );
-
-// }
-
-//https://stackoverflow.com/a/12230158
-// __device__ unsigned int RNG(int thread_idx){   
-//     // unsigned int m_w = 150;
-//     unsigned int m_w = thread_idx;
-//     unsigned int m_z = 40;
-
-//     m_z = 36969 * (m_z & 65535) + (m_z >> 16);
-//     m_w = 18000 * (m_w & 65535) + (m_w >> 16);
-
-//         // cout <<(m_z << 16) + m_w << endl;  /* 32-bit result */
-//     unsigned int res=(m_z << 16) + m_w;
-
-//     return res;
-
-// }
-
 template<int pos_dim>
-// __global__ void create_splatting_mask(bool* mask, const int* splatting_indices,  const int* nr_points_per_simplex, const int max_nr_points, const int size_of_indices_vector, curandState* globalState){
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 create_splatting_mask(bool* mask, const int* splatting_indices,  const int* nr_points_per_simplex, const int max_nr_points, const int size_of_indices_vector){
@@ -860,9 +626,7 @@ create_splatting_mask(bool* mask, const int* splatting_indices,  const int* nr_p
     if(idx>=size_of_indices_vector){ //don't go out of bounds
         return;
     } 
-    // printf("lol\n");
 
-    //
     int lattice_vertex_idx=splatting_indices[idx];
     if(lattice_vertex_idx<0){ //if the point didnt splat, then we have a -1 and we don't care about that
         return;
@@ -910,9 +674,8 @@ template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 kernel_splat(const float* positions, const int nr_positions, int* splatting_indices, float* splatting_weights, HashTableGPU hash_table, bool write_new_indices_and_weights){
-// __global__ void kernel_splat(const float* positions,const float* values, const int nr_positions, float* splatting_indices_and_weights, HashTableGPU hash_table){
-    // determine where in the thread grid we are
-    int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
+
+    int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new position
 
     if(idx>=nr_positions){ //don't go out of bounds
         return;
@@ -1031,7 +794,7 @@ kernel_splat(const float* positions, const int nr_positions, int* splatting_indi
                 splatting_weights[idx * (pos_dim + 1) + remainder]=barycentric[remainder];
             }
         }else{
-            printf("position %d could not be inserted\n", idx);
+            // printf("position %d could not be inserted\n", idx);
         }
 
         // //store things 
@@ -1046,120 +809,8 @@ kernel_splat(const float* positions, const int nr_positions, int* splatting_indi
 
 
 
-// template<int pos_dim>
-// __global__ void cleanHashTable(const int n, HashTableGPU hash_table) {
-
-//     const int idx = (blockIdx.y * gridDim.x + blockIdx.x) * blockDim.x * blockDim.y + threadIdx.x;
-
-//     if (idx >= n)
-//         return;
-
-//     // find my hash table entry
-//     int *e = hash_table.m_entries + idx;
-
-//     // Check if I created my own key in the previous phase
-//     if (*e >= 0) {
-//         // Rehash my key and reset the pointer in order to merge with
-//         // any other pixel that created a different entry under the
-//         // same key. If the computation was serial this would never
-//         // happen, but sometimes race conditions can make the same key
-//         // be inserted twice. hashTableRetrieve always returns the
-//         // earlier, so it's no problem as long as we rehash now.
-//         // printf("retreive idx%d, n is %d\n",idx, n);
-
-//         //*e is an index pointing into m_keys. however there might have been another duplicaye key introduced previously in the m_keys. retrive() will give us the index of the earliest one
-//         int new_index_into_keys_and_vals=hash_table.retrieve(hash_table.m_keys + *e * pos_dim);
-
-//         //if they are not the same it means that there was a duplicate, that means that the m_filled was a bit too high and increased artificually only due to duplcate keys being inserted
-//         if(*e!=new_index_into_keys_and_vals && new_index_into_keys_and_vals!=-1){ //if the *e and new_entry_index are different it means that new_entry_index is lower than *e. Of course only if the retreived actually found the key and returned something that is not -1
-//             // atomicMax(hash_table.m_filled, new_entry_index);
-//             *e=new_index_into_keys_and_vals;
-//         }
-
-
-
-
-//     }
-// }
-
-// template<int pos_dim>
-// __global__ void merge_duplicate_keys(HashTableGPU hash_table) {
-
-//     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new key
-    
-//     if (idx >= hash_table.m_capacity)
-//         return;
-
-//     // find my hash table entry
-//     int *e = hash_table.m_entries + idx;
-
-//     // Check if I created my own key in the previous phase
-//     if (*e >= 0) {
-//         // Rehash my key and reset the pointer in order to merge with
-//         // any other pixel that created a different entry under the
-//         // same key. If the computation was serial this would never
-//         // happen, but sometimes race conditions can make the same key
-//         // be inserted twice. hashTableRetrieve always returns the
-//         // earlier, so it's no problem as long as we rehash now.
-//         // printf("retreive idx%d, n is %d\n",idx, n);
-
-//         //*e is an index pointing into m_keys. however there might have been another duplicaye key introduced previously in the m_keys. retrive() will give us the index of the earliest one
-//         int new_index_into_keys_and_vals=hash_table.retrieve(hash_table.m_keys + *e * pos_dim);
-
-//         //if they are not the same it means that there was a duplicate, that means that the m_filled was a bit too high and increased artificually only due to duplcate keys being inserted
-//         if(new_index_into_keys_and_vals!=-1){ //if the *e and new_entry_index are different it means that new_entry_index is lower than *e. Of course only if the retreived actually found the key and returned something that is not -1
-//             // atomicMax(hash_table.m_filled, new_entry_index);
-//             *e=new_index_into_keys_and_vals;
-//         }
-
-
-//     }
-
-
-// }
-
-
-// template<int pos_dim>
-// __global__ void reindex_splatting_indices(int nr_positions, int* splatting_indices, HashTableGPU hash_table) {
-
-//     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a different position
-    
-//     if (idx >= hash_table.m_capacity)
-//         return;
-
-//     // find my hash table entry
-//     int *e = hash_table.m_entries + idx;
-
-//     // Check if I created my own key in the previous phase
-//     if (*e >= 0) {
-//         // Rehash my key and reset the pointer in order to merge with
-//         // any other pixel that created a different entry under the
-//         // same key. If the computation was serial this would never
-//         // happen, but sometimes race conditions can make the same key
-//         // be inserted twice. hashTableRetrieve always returns the
-//         // earlier, so it's no problem as long as we rehash now.
-//         // printf("retreive idx%d, n is %d\n",idx, n);
-
-//         //*e is an index pointing into m_keys. however there might have been another duplicaye key introduced previously in the m_keys. retrive() will give us the index of the earliest one
-//         int new_index_into_keys_and_vals=hash_table.retrieve(hash_table.m_keys + *e * pos_dim);
-
-//         //if they are not the same it means that there was a duplicate, that means that the m_filled was a bit too high and increased artificually only due to duplcate keys being inserted
-//         if(new_index_into_keys_and_vals!=-1){ //if the *e and new_entry_index are different it means that new_entry_index is lower than *e. Of course only if the retreived actually found the key and returned something that is not -1
-//             // atomicMax(hash_table.m_filled, new_entry_index);
-//             *e=new_index_into_keys_and_vals;
-//         }
-
-
-//     }
-
-
-// }
-
-
-
 
 template<int pos_dim, int val_dim>
-// __global__ void splatCache(const int n, const float *values, int* splatting_indices, float* splatting_weights, HashTableGPU hash_table) {
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
 splatCache(const int n, const float *values, float* splatting_indices_and_weights,  HashTableGPU hash_table) {
@@ -1167,7 +818,6 @@ splatCache(const int n, const float *values, float* splatting_indices_and_weight
     const int idx = threadIdx.x + blockIdx.x * blockDim.x;
     const int threadId = threadIdx.x;
     const int color = blockIdx.y;
-    // const bool outOfBounds = (idx >= n);
     const bool outOfBounds = (idx >= n);
 
     __shared__ int sharedOffsets[BLOCK_SIZE];
@@ -1176,9 +826,7 @@ splatCache(const int n, const float *values, float* splatting_indices_and_weight
     float *myValue = sharedValues + threadId * (val_dim+1);
 
 
-    // int splatting_idx=splatting_indices[ idx * (pos_dim + 1) + color];
     int splatting_idx=round(splatting_indices_and_weights[ idx * (pos_dim + 1)*2 + color*2 + 0]);
-    // printf("r index is %d!\n",r.index);
 
     //check if the pointer into the entries array is valid. it may not be valid for points that have not splatted due to some race condition
     if (!outOfBounds && splatting_idx>=0) {
@@ -1834,23 +1482,6 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
     }
 
 
-    // bool has_one_coord_integer=is_only_one_coord_integer(key_query_float, pos_dim+1);
-    // if (has_one_coord_integer){
-    //     printf("scaled key at idx %d is %f  %f  %f %f  \n",idx, key_query_float[0],key_query_float[1],key_query_float[2], key_query_float[3]);
-    // }
-    // int nr_coords_integer_val=nr_coords_integer(key_query_float, pos_dim+1);
-    // //The nr_coords integer is either pos_dim+1 or 0
-    // if (scale <1.0 && ( nr_coords_integer_val!=pos_dim+1 && nr_coords_integer_val!=0 ) ){
-    //     printf("nr_coords_integer_val is %d \n", nr_coords_integer_val);
-    //     printf("scaled key at idx %d is %f  %f  %f %f  \n",idx, key_query_float[0],key_query_float[1],key_query_float[2], key_query_float[3]);
-    // }
-    
-
-
-
-
-    
-
 
     int np[pos_dim + 1];
     int nm[pos_dim + 1];
@@ -1864,9 +1495,6 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
         // printf("pos_dim is %d\n", pos_dim);
         // printf("scale is %f \n", scale);
     }
-
-    // printf("val_full_dim is %d\n", val_full_dim);
-
 
     
     //store the values of this current lattice vertex (the one at the center of the kernel)
@@ -1900,16 +1528,10 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
         should_check_neighbours=true; //We have a fractional key, but when checking the neigbhours we will move by 0.5 and therefore end up with an integer key
     }
 
-    // if(scale<1.0){
-    //     printf("should_check_neighbours is %d \n", should_check_neighbours);
-    // }
-
 
 
     int nr_immediate_neigbhours=2*(pos_dim+1);
     const int nr_axes=pos_dim+1;
-    // int idx_neigbhour=0; //if there are 6 neighbours in total (in the case of pos_dim being 2), this will be in range [0,5]
-    // printf("nr_axes is %d!\n",nr_axes);
     int nr_neighbours_found=0;
     float movement_multiplier=1.0;
     if(scale<1.0){ //if the scale is fractional than the movement also has to be fractional in order to ensure we end up with a integer key
@@ -1920,26 +1542,6 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
     if( should_check_neighbours ){
         for(int axis=0; axis<nr_axes; axis++){
             //for each axis we have 2 neighbours
-
-            // //chekc first if the neigbhours have integer coords 
-            // for (int i = 0; i < pos_dim+1; i++) {
-            //     np_float[i] = key_query_float[i] + movement_multiplier*dilation;
-            //     nm_float[i] = key_query_float[i] - movement_multiplier*dilation;
-            // }
-            // np_float[axis] = key_query_float[axis] - movement_multiplier*dilation*pos_dim;
-            // nm_float[axis] = key_query_float[axis] + movement_multiplier*dilation*pos_dim;
-            // bool np_coords_integer=are_all_coords_integer(np_float, pos_dim+1);
-            // bool nm_coords_integer=are_all_coords_integer(nm_float, pos_dim+1);
-            // if(!np_coords_integer){
-            //     printf("np has no integer coords\n");
-            // }
-
-            // //get the integer coords
-            // for (int i = 0; i < pos_dim+1; i++) {
-            //     np[i] = round(np_float[i]);
-            //     nm[i] = round(nm_float[i]);
-            // }
-
 
             bool np_coords_integer=true;
             bool nm_coords_integer=true;
