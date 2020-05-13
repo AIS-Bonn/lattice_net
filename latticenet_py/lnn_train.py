@@ -68,7 +68,7 @@ def sanity_check(lattice):
         print(colored("More then 10% of the positions in the cloud are splatted onto one single lattice vertex. This could be a sign of a bug like too big of a sigma set in the config file. If you believe this is correct, feel free to ignore this.", 'yellow'))
         print(colored("-------------------------------", 'yellow'))
 
-    if(lattice.nr_lattice_vertices()>lattice.capacity()*0.3):
+    if(lattice.nr_lattice_vertices()>lattice.capacity()*0.25):
         print(colored("-------------------------------", 'yellow'))
         print(colored("The number of lattice vertice is close to the maximum capacity of the hashmap. Please increase the capacity of the lattice in the config file.", 'yellow'))
         print(colored("-------------------------------", 'yellow'))
