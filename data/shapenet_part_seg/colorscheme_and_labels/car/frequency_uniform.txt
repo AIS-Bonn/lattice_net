@@ -1,0 +1,6 @@
+#frequency as a ratio to the total number of points
+0.0                                                                                                                                     
+1.0
+1.0 
+1.0 
+1.0                                                                                                                      
