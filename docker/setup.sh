@@ -1,6 +1,10 @@
 echo "Performing setup of the system by writing some config files"
 #ros sourcing
-/echo_to_file.sh /.bashrc "source /opt/ros/melodic/setup.bash"
+# /echo_to_file.sh /.bashrc "source /opt/ros/melodic/setup.bash"
+
+source activate lattice
+
+
 
 #activate conda environment which is the same in which we install stuff in the Dockerfile
 # ./echo_to_file.sh ~/.bashrc "source activate pt"

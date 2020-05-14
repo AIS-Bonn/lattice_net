@@ -10,6 +10,7 @@ fi
 pushd `dirname $0` > /dev/null
 dockerPath=`pwd`
 latticenetPath="$(dirname "$dockerPath")"
+latticenetContainingFolder="$(dirname "$latticenetPath")"
 popd > /dev/null
 #--build-arg workspace=$SCRIPTPATH\
 
@@ -20,7 +21,7 @@ docker build\
   --build-arg user=$USER\
   --build-arg uid=$UID\
   --build-arg home="/workspace"\
-  --build-arg workspace=${latticenetPath}\
+  --build-arg workspace=${latticenetContainingFolder}\
   --build-arg shell=$SHELL\
   -t $1 \
   -f Dockerfile .

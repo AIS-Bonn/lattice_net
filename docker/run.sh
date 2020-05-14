@@ -18,6 +18,7 @@ if [ "$#" -ne 1 ]; then
 
 dockerPath=`pwd`
 latticenetPath="$(dirname "$dockerPath")"
+latticenetContainingFolder="$(dirname "$latticenetPath")"
 
 # Run the container with shared X11
 docker run\
@@ -29,5 +30,5 @@ docker run\
 	-e SHELL\
 	-e DISPLAY\
 	-e DOCKER=1\
-	-v "${latticenetPath}:${latticenetPath}:rw"\
+	-v "${latticenetContainingFolder}:${latticenetContainingFolder}:rw"\
 	-it $1

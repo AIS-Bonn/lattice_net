@@ -146,7 +146,7 @@ WORKDIR /
 #torch scatter in order to have scatter_max which is useful for a pointnet architecture
 #RUN pip install  --verbose --no-cache-dir  torch-scatter==1.4.0 
 
-WORKDIR /
+# WORKDIR /
 
 # RUN /bin/bash -c "source ./.bashrc"
 
@@ -211,7 +211,7 @@ RUN usermod -a -G plugdev ${user}
 # Switch to user
 # RUN chown -R ${user} ${workspace}
 # RUN echo ${workspace}
-# USER "${user}"
+USER "${user}"
 
 
 
