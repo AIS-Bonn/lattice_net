@@ -209,8 +209,9 @@ RUN usermod -a -G plugdev ${user}
 # USER root
 
 # Switch to user
-RUN chown -R ${user} ${workspace}
-USER "${user}"
+# RUN chown -R ${user} ${workspace}
+# RUN echo ${workspace}
+# USER "${user}"
 
 
 

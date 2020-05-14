@@ -8,16 +8,19 @@ fi
 
 # Get this script's path
 pushd `dirname $0` > /dev/null
-SCRIPTPATH=`pwd`
+dockerPath=`pwd`
+latticenetPath="$(dirname "$dockerPath")"
 popd > /dev/null
 #--build-arg workspace=$SCRIPTPATH\
+
+# echo ${SCRIPTPATH}
 
 # Build the docker image
 docker build\
   --build-arg user=$USER\
   --build-arg uid=$UID\
   --build-arg home="/workspace"\
-  --build-arg workspace="/workspace"\
+  --build-arg workspace=${latticenetPath}\
   --build-arg shell=$SHELL\
   -t $1 \
   -f Dockerfile .

@@ -2,8 +2,10 @@ name: lattice
 channels:
   - defaults
   - pytorch
+  - conda-forge
 dependencies:
   - python=3.6
+  - pip=20.1
   # - _libgcc_mutex=0.1=main
   # - _pytorch_select=0.2=gpu_0
   # - blas=1.0=mkl
@@ -42,30 +44,31 @@ dependencies:
   # - zlib=1.2.11=h7b6447c_3
   - pip:
     - torch==1.4.0
-    - torchvision==0.5.0
-    - chardet==3.0.4
-    - distro==1.5.0
-    - docutils==0.16
-    - idna==2.9
-    - jsonpatch==1.25
-    - jsonpointer==2.0
     - libtorch==1.2.0.1
+    - torchvision==0.5.0
     - pillow==7.1.1
-    - pyparsing==2.4.7
-    - python-dateutil==2.8.1
-    - pyyaml==5.3.1
-    - pyzmq==19.0.0
-    - requests==2.23.0
-    - rospkg==1.2.4
-    - scipy==1.4.1
-    - termcolor==1.1.0
-    - torchfile==0.1.0
     - torchnet==0.0.4
-    - tornado==6.0.4
+    - termcolor==1.1.0
     - tqdm==4.45.0
-    - urllib3==1.25.8
     - visdom==0.1.8.9
-    - websocket-client==0.57.0
+    - setuptools==46.3.0
+    # - requests==2.23.0
+    # - chardet==3.0.4
+    # - distro==1.5.0
+    # - docutils==0.16
+    # - idna==2.9
+    # - jsonpatch==1.25
+    # - jsonpointer==2.0
+    # - pyparsing==2.4.7
+    # - python-dateutil==2.8.1
+    # - pyyaml==5.3.1
+    # - pyzmq==19.0.0
+    # - rospkg==1.2.4
+    # - scipy==1.4.1
+    # - torchfile==0.1.0
+    # - tornado==6.0.4
+    # - urllib3==1.25.8
+    # - websocket-client==0.57.0
     # - torch_scatter==2.0.4
 prefix: /opt/conda/envs/lattice
 
