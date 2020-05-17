@@ -16,19 +16,15 @@ if [ "$#" -ne 1 ]; then
     #the shm-size had to be increased to avoid bus error(core dumped) when using phoxi controller https://github.com/pytorch/pytorch/issues/2244#issuecomment-318864552
 #-v "$HOME:$HOME:rw"\
 
-dockerPath=`pwd`
-latticenetPath="$(dirname "$dockerPath")"
-latticenetContainingFolder="$(dirname "$latticenetPath")"
-
-# Run the container with shared X11
-docker run\
-	--shm-size 2G\
-	--gpus all\
-	--publish-all=true\
-	--net=host\
-	--privileged\
-	-e SHELL\
-	-e DISPLAY\
-	-e DOCKER=1\
-	-v "${latticenetContainingFolder}:${latticenetContainingFolder}:rw"\
-	-it $1
+    # Run the container with shared X11
+    docker run\
+	      --shm-size 2G\
+	        --gpus all\
+		  --publish-all=true\
+		    --net=host\
+		      --privileged\
+		        -e SHELL\
+			  -e DISPLAY\
+			    -e DOCKER=1\
+			    -e WORKSPACE="/workspace"\
+			      -it $1
