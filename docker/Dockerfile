@@ -213,9 +213,15 @@ WORKDIR /
 #RUN /bin/sh -c "source devel/setup.bash"
 
 # clone the needed repositories into the docker
-# WORKDIR ${workspace}/src
-# RUN git clone --recursive https://github.com/RaduAlexandru/easy_pbr.git
-# RUN git clone --recursive https://github.com/RaduAlexandru/data_loaders
+WORKDIR ${workspace}
+RUN git clone --recursive https://github.com/RaduAlexandru/easy_pbr.git
+WORKDIR easy_pbr
+RUN make
+
+WORKDIR ${workspace}
+RUN git clone --recursive https://github.com/RaduAlexandru/data_loaders
+WORKDIR data_loaders
+RUN make
 # after every data_loaders build the devel/setup.bash of the catkin workspace has to be sourced again
 
 
