@@ -31,7 +31,7 @@ $ cd lattice_net && make && cd ..
 
 ### Data 
 
-LatticeNet requires point clouds for training. The data is loaded with the [DataLoaders] package and interfaced using [EasyPBR]. Here we show how to train on the ShapeNet dataset,
+LatticeNet uses point clouds for training. The data is loaded with the [DataLoaders] package and interfaced using [EasyPBR]. Here we show how to train on the ShapeNet dataset,
 While inside the docker container ( after running ./run.sh lattice_img ), download and unzip the ShapeNet dataset: 
 
 ```sh
