@@ -63,11 +63,11 @@ If training is performed with the viewer enabled, you should see something like 
 <br/>
 <p align="middle">
   <!-- <img src="imgs/anatomy_crop_2.png" width="250" /> -->
-  <img src="imgs/code_1.png" width="700"/>
+  <img src="imgs/viewer_2.png" width="750"/>
   <!-- <figcaption> Your text </figcaption> -->
   <!-- <img src="imgs/buburuza_crop_2.png" width="250" />  -->
   <!-- <img src="imgs/lucy_pc_crop.png" width="210" />  -->
-  <img src="imgs/viewer.png" width="700" /> 
+  <!-- <img src="imgs/viewer.png" width="700" />  -->
   <!-- <figcaption> Your text </figcaption> -->
   <!-- <img src="imgs/house_crop_2.png" width="250" /> -->
   <!-- <img src="imgs/shader_ball_crop.png" width="250" /> -->
