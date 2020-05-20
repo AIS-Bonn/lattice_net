@@ -2596,7 +2596,7 @@ gather_with_precomputation(const float* positions,  float* gathered_values, cons
     int row_size_gathered=(pos_dim+1)*(val_dim+1);
     float* gathered_row = gathered_values + idx * row_size_gathered;
 
-    int key[pos_dim];
+    //int key[pos_dim];
     for (int remainder = 0; remainder <= pos_dim; remainder++) {
         int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + remainder];
         if(splatting_idx>=0){
