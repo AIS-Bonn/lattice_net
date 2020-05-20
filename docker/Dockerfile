@@ -2,7 +2,7 @@
 
 # FROM pytorch/pytorch:1.4-cuda10.1-cudnn7-devel
 
-FROM nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04
+FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04
 
 # ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV NVIDIA_VISIBLE_DEVICES \
@@ -125,7 +125,7 @@ WORKDIR /
 # RUN GIT_TRACE=1 GIT_CURL_VERBOSE=1 git clone --verbose --recursive https://github.com/pytorch/pytorch /opt/pytorch
 # RUN git clone --verbose --recursive git@github.com:pytorch/pytorch.git /opt/pytorch
 #RUN git clone --verbose --recursive https://github.com/pytorch/pytorch  /opt/pytorch
-RUN git clone --verbose https://github.com/pytorch/pytorch  /opt/pytorch
+RUN git clone  https://github.com/pytorch/pytorch  /opt/pytorch
 RUN sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pip python3-setuptools && sh "./cleanup.sh"
 RUN pip3 install numpy pyyaml mkl mkl-include typing 
 WORKDIR /opt/pytorch
@@ -139,7 +139,7 @@ ENV BUILD_TORCH ON
 ENV BUILD_CAFFE2_OPS OFF
 ENV BUILD_CAFFE2_MOBILE OFF
 ENV MAX_JOBS 4
-RUN MAX_JOBS=8 python3 setup.py install 
+RUN MAX_JOBS=8 USE_NINJA=1 BUILD_TEST=0 BUILD_JNI=0  python3 setup.py install 
 WORKDIR /
 # #need to make it own by myself and not by root because otherwise when we run python it will not access it
 WORKDIR /
@@ -147,9 +147,9 @@ RUN git clone --recursive https://github.com/pytorch/vision /opt/vision
 WORKDIR /opt/vision
 RUN git checkout tags/v0.5.0
 RUN git submodule sync
-RUN git submodule update --init --recursive
+RUN git submodule update --init --recursive 
 # ENV CMAKE_PREFIX_PATH /opt/conda/envs/pt
-RUN MAX_JOBS=8 python3 setup.py install
+RUN MAX_JOBS=8 USE_NINJA=1 BUILD_TEST=0 BUILD_JNI=0 python3 setup.py install
 WORKDIR /
 
 #torch scatter in order to have scatter_max which is useful for a pointnet architecture. It needs the cuda_arch list in order to find nvidia drivers and build the gpu part of the torch-scatter https://github.com/rusty1s/pytorch_scatter/pull/79
@@ -213,15 +213,15 @@ WORKDIR /
 #RUN /bin/sh -c "source devel/setup.bash"
 
 # clone the needed repositories into the docker
-WORKDIR ${workspace}
-RUN git clone --recursive https://github.com/RaduAlexandru/easy_pbr.git
-WORKDIR easy_pbr
-RUN make
+# WORKDIR ${workspace}
+# RUN git clone --recursive https://github.com/RaduAlexandru/easy_pbr.git
+# WORKDIR easy_pbr
+# RUN make
 
-WORKDIR ${workspace}
-RUN git clone --recursive https://github.com/RaduAlexandru/data_loaders
-WORKDIR data_loaders
-RUN make
+# WORKDIR ${workspace}
+# RUN git clone --recursive https://github.com/RaduAlexandru/data_loaders
+# WORKDIR data_loaders
+# RUN make
 # after every data_loaders build the devel/setup.bash of the catkin workspace has to be sourced again
 
 
