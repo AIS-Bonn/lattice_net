@@ -174,7 +174,7 @@ RUN sudo python3 -m pip install --upgrade setuptools setuptools-git  && sh "./cl
 
 
 
-
+RUN apt-get -y update && apt-get install -y --no-install-recommends unzip && sh "./cleanup.sh"
 
 
 #nvvp crashes under the default java11 so we need java8 as explained here https://bugs.launchpad.net/ubuntu/+source/nvidia-cuda-toolkit/+bug/1766948

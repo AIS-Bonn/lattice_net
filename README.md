@@ -35,7 +35,7 @@ LatticeNet uses point clouds for training. The data is loaded with the [DataLoad
 While inside the docker container ( after running ./run.sh lattice_img ), download and unzip the ShapeNet dataset: 
 
 ```sh
-$ ./lattice_net/data/shapenet_part_seg/download_shapenet.sh
+$ bash ./lattice_net/data/shapenet_part_seg/download_shapenet.sh
 ```
 
 # Usage
