@@ -1,4 +1,4 @@
-from callbacks.callback import *
+from latticenet_py.callbacks.callback import *
 import os
 import torch
 

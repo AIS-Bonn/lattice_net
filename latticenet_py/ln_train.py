@@ -22,7 +22,8 @@ from latticenet_py.callbacks.state_callback import *
 from latticenet_py.callbacks.phase import *
 
 
-config_file="ln_train_shapenet_example.cfg"
+# config_file="ln_train_shapenet_example.cfg"
+config_file="lnn_train_shapenet.cfg"
 #config_file="lnn_train_semantic_kitti.cfg"
 # config_file="lnn_train_scannet.cfg"
 

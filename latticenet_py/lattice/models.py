@@ -8,9 +8,9 @@ from termcolor import colored
 
 from latticenet  import TrainParams
 from latticenet  import ModelParams
-from lattice.lattice_py import LatticePy
-from lattice.lattice_funcs import *
-from lattice.lattice_modules import *
+from latticenet_py.lattice.lattice_py import LatticePy
+from latticenet_py.lattice.lattice_funcs import *
+from latticenet_py.lattice.lattice_modules import *
 
 from functools import reduce
 from torch.nn.modules.module import _addindent

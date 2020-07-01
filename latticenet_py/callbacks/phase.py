@@ -1,6 +1,6 @@
 #https://github.com/devforfu/pytorch_playground/blob/master/loop.ipynbA
 
-from callbacks.scores import *
+from latticenet_py.callbacks.scores import *
 
 class Phase:
     """

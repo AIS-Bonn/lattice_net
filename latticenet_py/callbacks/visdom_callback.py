@@ -1,5 +1,5 @@
-from callbacks.callback import *
-from callbacks.vis import *
+from latticenet_py.callbacks.callback import *
+from latticenet_py.callbacks.vis import *
 
 class VisdomCallback(Callback):
 
