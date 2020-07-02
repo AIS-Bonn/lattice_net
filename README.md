@@ -17,7 +17,7 @@ You will need to have Docker>=19.03 and nvidia drivers installed. <br/>
 Afterwards, you can build the docker image which contains all the LatticeNet dependencies using: 
 
 ```sh
-$ git clone --recursive https://git.ais.uni-bonn.de/rosu/lattice_net.git 
+$ git clone --recursive https://github.com/RaduAlexandru/lattice_net
 $ cd lattice_net/docker
 $ ./build.sh lattice_img #this will take some time because some packages need to be build from source
 $ ./run.sh lattice_img 
