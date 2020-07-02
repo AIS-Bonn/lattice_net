@@ -23,7 +23,16 @@ TrainParams::TrainParams(const std::string config_file){
 void TrainParams::init_params(const std::string config_file){
 
     //read all the parameters
-    Config cfg = configuru::parse_file(std::string(CMAKE_SOURCE_DIR)+"/config/"+config_file, CFG);
+    // Config cfg = configuru::parse_file(std::string(CMAKE_SOURCE_DIR)+"/config/"+config_file, CFG);
+
+    std::string config_file_abs;
+    if (fs::path(config_file).is_relative()){
+        config_file_abs=(fs::path(PROJECT_SOURCE_DIR) / config_file).string();
+    }else{
+        config_file_abs=config_file;
+    }
+    Config cfg = configuru::parse_file(config_file_abs, CFG);
+
     Config train_config=cfg["train"];
     m_dataset_name=(std::string)train_config["dataset_name"];
     m_with_viewer = train_config["with_viewer"];
