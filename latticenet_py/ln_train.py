@@ -22,17 +22,18 @@ from latticenet_py.callbacks.state_callback import *
 from latticenet_py.callbacks.phase import *
 
 
-# config_file="ln_train_shapenet_example.cfg"
-config_file="lnn_train_shapenet.cfg"
+config_file="ln_train_shapenet_example.cfg"
+# config_file="lnn_train_shapenet.cfg"
 #config_file="lnn_train_semantic_kitti.cfg"
 # config_file="lnn_train_scannet.cfg"
 
 torch.manual_seed(0)
 # torch.autograd.set_detect_anomaly(True)
+config_path=os.path.join( os.path.dirname( os.path.realpath(__file__) ) , '../config', config_file)
 
 # #initialize the parameters used for training
-train_params=TrainParams.create(config_file)    
-model_params=ModelParams.create(config_file)    
+train_params=TrainParams.create(config_path)    
+model_params=ModelParams.create(config_path)    
 
 
 def create_loader(dataset_name, config_file):
@@ -77,7 +78,6 @@ def sanity_check(lattice):
 
 
 def run():
-    config_path=os.path.join( os.path.dirname( os.path.realpath(__file__) ) , '../config', config_file)
     if train_params.with_viewer():
         view=Viewer.create(config_path)
 
