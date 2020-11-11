@@ -108,6 +108,16 @@ cuda_add_library(latticenet_cu  SHARED  ${CMAKE_SOURCE_DIR}/src/Lattice.cu
 
 
 ###   LIBS   ###############################################
+if(${TORCH_FOUND})
+    set(LIBS ${LIBS} ${TORCH_LIBRARIES} )
+    #torch 1.5.0 and above mess with pybind and we therefore need to link against libtorch_python.so also
+    find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib")
+    message(STATUS "TORCH_PYTHON_LIBRARY: ${TORCH_PYTHON_LIBRARY}")
+    if(TORCH_PYTHON_LIBRARY)
+        message(STATUS "Linking to torch_python_library")
+        set(LIBS ${LIBS} ${TORCH_PYTHON_LIBRARY} )
+    endif()
+endif()
 set(LIBS ${LIBS} ${catkin_LIBRARIES} ${EASYPBR_LIBRARY} ${DATALOADERS_LIBRARY} ${CUDA_LIBRARIES} ${TORCH_LIBRARIES} ${OpenCV_LIBS})
 
 
