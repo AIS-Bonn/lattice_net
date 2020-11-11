@@ -207,14 +207,14 @@ class LNN(torch.nn.Module):
         with torch.set_grad_enabled(False):
 
             if self.model_params.positions_mode()=="xyz":
-                positions_tensor=torch.from_numpy(cloud.V).float().to("cuda")
+                positions_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
             elif self.model_params.positions_mode()=="xyz+rgb":
-                xyz_tensor=torch.from_numpy(cloud.V).float().to("cuda")
-                rgb_tensor=torch.from_numpy(cloud.C).float().to("cuda")
+                xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
+                rgb_tensor=torch.from_numpy(cloud.C.copy() ).float().to("cuda")
                 positions_tensor=torch.cat((xyz_tensor,rgb_tensor),1)
             elif self.model_params.positions_mode()=="xyz+intensity":
-                xyz_tensor=torch.from_numpy(cloud.V).float().to("cuda")
-                intensity_tensor=torch.from_numpy(cloud.I).float().to("cuda")
+                xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
+                intensity_tensor=torch.from_numpy(cloud.I.copy() ).float().to("cuda")
                 positions_tensor=torch.cat((xyz_tensor,intensity_tensor),1)
             else:
                 err="positions mode of ", self.model_params.positions_mode() , " not implemented"
@@ -224,22 +224,22 @@ class LNN(torch.nn.Module):
             if self.model_params.values_mode()=="none":
                 values_tensor=torch.zeros(positions_tensor.shape[0], 1) #not really necessary but at the moment I have no way of passing an empty value array
             elif self.model_params.values_mode()=="intensity":
-                values_tensor=torch.from_numpy(cloud.I).float().to("cuda")
+                values_tensor=torch.from_numpy(cloud.I.copy() ).float().to("cuda")
             elif self.model_params.values_mode()=="rgb":
-                values_tensor=torch.from_numpy(cloud.C).float().to("cuda")
+                values_tensor=torch.from_numpy(cloud.C.copy() ).float().to("cuda")
             elif self.model_params.values_mode()=="rgb+height":
                 rgb_tensor=torch.from_numpy(cloud.C).float().to("cuda")
-                height_tensor=torch.from_numpy(cloud.V[:,1]).unsqueeze(1).float().to("cuda")
+                height_tensor=torch.from_numpy(cloud.V[:,1].copy() ).unsqueeze(1).float().to("cuda")
                 values_tensor=torch.cat((rgb_tensor,height_tensor),1)
             elif self.model_params.values_mode()=="rgb+xyz":
-                rgb_tensor=torch.from_numpy(cloud.C).float().to("cuda")
-                xyz_tensor=torch.from_numpy(cloud.V).float().to("cuda")
+                rgb_tensor=torch.from_numpy(cloud.C.copy() ).float().to("cuda")
+                xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
                 values_tensor=torch.cat((rgb_tensor,xyz_tensor),1)
             elif self.model_params.values_mode()=="height":
-                height_tensor=torch.from_numpy(cloud.V[:,1]).unsqueeze(1).float().to("cuda")
+                height_tensor=torch.from_numpy(cloud.V[:,1].copy() ).unsqueeze(1).float().to("cuda")
                 values_tensor=height_tensor
             elif self.model_params.values_mode()=="xyz":
-                xyz_tensor=torch.from_numpy(cloud.V).float().to("cuda")
+                xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
                 values_tensor=xyz_tensor
             else:
                 err="values mode of ", self.model_params.values_mode() , " not implemented"
@@ -247,7 +247,7 @@ class LNN(torch.nn.Module):
 
 
             target=cloud.L_gt
-            target_tensor=torch.from_numpy(target).long().squeeze(1).to("cuda").squeeze(0)
+            target_tensor=torch.from_numpy(target.copy() ).long().squeeze(1).to("cuda").squeeze(0)
 
         return positions_tensor, values_tensor, target_tensor
 
