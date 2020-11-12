@@ -456,8 +456,11 @@ class GroupNormLatticeModule(torch.nn.Module):
     def __init__(self, nr_params, affine=True):
         super(GroupNormLatticeModule, self).__init__()
         nr_groups=32
-        if nr_params<=32:
-            nr_groups=int(nr_params/2)
+        #if the groups is not diivsalbe so for example if we have 80 params
+        if nr_params%nr_groups!=0:
+            nr_groups= int(nr_params/2)
+        # if nr_params<=32:
+            # nr_groups=int(nr_params/2)
 
 
         self.gn = torch.nn.GroupNorm(nr_groups, nr_params).to("cuda") #having 32 groups is the best as explained in the GroupNormalization paper
@@ -469,6 +472,7 @@ class GroupNormLatticeModule(torch.nn.Module):
         #group norm wants the tensor to be N, C, L  (nr_batches, channels, nr_samples)
         lattice_values=lattice_values.unsqueeze(0)
         lattice_values=lattice_values.transpose(1,2)
+        # print("lattice values is ", lattice_values.shape)
         lattice_values=self.gn(lattice_values)
         lattice_values=lattice_values.transpose(1,2)
         lattice_values=lattice_values.squeeze(0)
