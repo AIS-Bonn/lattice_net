@@ -172,11 +172,21 @@ class ConvLatticeModule(torch.nn.Module):
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
     def reset_parameters(self, filter_extent):
-        torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu') #pytorch uses default leaky relu but we use relu as here https://github.com/szagoruyko/binary-wide-resnet/blob/master/wrn_mcdonnell.py and as in here https://github.com/pytorch/vision/blob/19315e313511fead3597e23075552255d07fcb2a/torchvision/models/resnet.py#L156
+        # torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu') #pytorch uses default leaky relu but we use relu as here https://github.com/szagoruyko/binary-wide-resnet/blob/master/wrn_mcdonnell.py and as in here https://github.com/pytorch/vision/blob/19315e313511fead3597e23075552255d07fcb2a/torchvision/models/resnet.py#L156
+
+        fan = torch.nn.init._calculate_correct_fan(self.weight, "fan_out")
+        gain = torch.nn.init.calculate_gain("relu", 1)
+        std = gain / math.sqrt(fan)
+        bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+        with torch.no_grad():
+            self.weight.uniform_(-bound, bound)
+
+        # print("reset params, self use_bias is", self.use_bias)
         if self.bias is not None:
-            fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
-            bound = 1 / math.sqrt(fan_in)
+            fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_out)
             torch.nn.init.uniform_(self.bias, -bound, bound)
+
 
     def forward(self, lattice_values, lattice_structure, lattice_neighbours_values=None, lattice_neighbours_structure=None):
 
@@ -215,7 +225,19 @@ class CoarsenLatticeModule(torch.nn.Module):
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
     def reset_parameters(self, filter_extent):
-        torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu')
+        # torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu')
+
+        fan = torch.nn.init._calculate_correct_fan(self.weight, "fan_out")
+        #the fan out here actually refers to the fan in because we don't have a tranposed weight as pytorch usually expects it
+        #we reduce the fan because actually most of the vertices don't have any nieghbours
+        #half of them have filter_extent =1 and the other ones have filter extent the usual one of 9. So we settle for the middle and go for 5
+        fan=fan/2
+        
+        gain = torch.nn.init.calculate_gain("relu", 1)
+        std = gain / math.sqrt(fan) *2.0
+        bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+        with torch.no_grad():
+            self.weight.uniform_(-bound, bound)
         
 
     def forward(self, lattice_fine_values, lattice_fine_structure):
@@ -243,7 +265,21 @@ class FinefyLatticeModule(torch.nn.Module):
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
     def reset_parameters(self, filter_extent):
-        torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu')
+        # torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu')
+
+        fan = torch.nn.init._calculate_correct_fan(self.weight, "fan_out")
+        #the fan out here actually refers to the fan in because we don't have a tranposed weight as pytorch usually expects it
+        #we reduce the fan because actually most of the vertices don't have any nieghbours
+        #half of them have filter_extent =1 and the other ones have filter extent the usual one of 9. So we settle for the middle and go for 5
+        fan=fan/2
+        
+
+        gain = torch.nn.init.calculate_gain("relu", 1)
+        std = gain / math.sqrt(fan) *2.0
+        bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+        with torch.no_grad():
+            self.weight.uniform_(-bound, bound)
+
 
     def forward(self, lattice_coarse_values, lattice_coarse_structure, lattice_fine_structure):
         lattice_coarse_structure.set_values(lattice_coarse_values)
