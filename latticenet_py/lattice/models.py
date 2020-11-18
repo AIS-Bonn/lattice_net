@@ -6,8 +6,7 @@ import os
 from termcolor import colored
 
 
-from latticenet  import TrainParams
-from latticenet  import ModelParams
+
 from latticenet_py.lattice.lattice_py import LatticePy
 from latticenet_py.lattice.lattice_funcs import *
 from latticenet_py.lattice.lattice_modules import *
@@ -16,7 +15,57 @@ from functools import reduce
 from torch.nn.modules.module import _addindent
 
 
-#
+def prepare_cloud(cloud, model_params):
+       
+
+    with torch.set_grad_enabled(False):
+
+        if model_params.positions_mode()=="xyz":
+            positions_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
+        elif model_params.positions_mode()=="xyz+rgb":
+            xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
+            rgb_tensor=torch.from_numpy(cloud.C.copy() ).float().to("cuda")
+            positions_tensor=torch.cat((xyz_tensor,rgb_tensor),1)
+        elif model_params.positions_mode()=="xyz+intensity":
+            xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
+            intensity_tensor=torch.from_numpy(cloud.I.copy() ).float().to("cuda")
+            positions_tensor=torch.cat((xyz_tensor,intensity_tensor),1)
+        else:
+            err="positions mode of ", model_params.positions_mode() , " not implemented"
+            sys.exit(err)
+
+
+        if model_params.values_mode()=="none":
+            values_tensor=torch.zeros(positions_tensor.shape[0], 1).to("cuda") #not really necessary but at the moment I have no way of passing an empty value array
+        elif model_params.values_mode()=="intensity":
+            values_tensor=torch.from_numpy(cloud.I.copy() ).float().to("cuda")
+        elif model_params.values_mode()=="rgb":
+            values_tensor=torch.from_numpy(cloud.C.copy() ).float().to("cuda")
+        elif model_params.values_mode()=="rgb+height":
+            rgb_tensor=torch.from_numpy(cloud.C).float().to("cuda")
+            height_tensor=torch.from_numpy(cloud.V[:,1].copy() ).unsqueeze(1).float().to("cuda")
+            values_tensor=torch.cat((rgb_tensor,height_tensor),1)
+        elif model_params.values_mode()=="rgb+xyz":
+            rgb_tensor=torch.from_numpy(cloud.C.copy() ).float().to("cuda")
+            xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
+            values_tensor=torch.cat((rgb_tensor,xyz_tensor),1)
+        elif model_params.values_mode()=="height":
+            height_tensor=torch.from_numpy(cloud.V[:,1].copy() ).unsqueeze(1).float().to("cuda")
+            values_tensor=height_tensor
+        elif model_params.values_mode()=="xyz":
+            xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
+            values_tensor=xyz_tensor
+        else:
+            err="values mode of ", model_params.values_mode() , " not implemented"
+            sys.exit(err)
+
+
+        target=cloud.L_gt
+        target_tensor=torch.from_numpy(target.copy() ).long().squeeze(1).to("cuda").squeeze(0)
+
+    return positions_tensor, values_tensor, target_tensor
+
+
 
 class LNN(torch.nn.Module):
     def __init__(self, nr_classes, model_params):
@@ -201,55 +250,7 @@ class LNN(torch.nn.Module):
         return logsoftmax, sv
         # return logsoftmax, s_final
 
-    def prepare_cloud(self, cloud):
-       
 
-        with torch.set_grad_enabled(False):
-
-            if self.model_params.positions_mode()=="xyz":
-                positions_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
-            elif self.model_params.positions_mode()=="xyz+rgb":
-                xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
-                rgb_tensor=torch.from_numpy(cloud.C.copy() ).float().to("cuda")
-                positions_tensor=torch.cat((xyz_tensor,rgb_tensor),1)
-            elif self.model_params.positions_mode()=="xyz+intensity":
-                xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
-                intensity_tensor=torch.from_numpy(cloud.I.copy() ).float().to("cuda")
-                positions_tensor=torch.cat((xyz_tensor,intensity_tensor),1)
-            else:
-                err="positions mode of ", self.model_params.positions_mode() , " not implemented"
-                sys.exit(err)
-
-
-            if self.model_params.values_mode()=="none":
-                values_tensor=torch.zeros(positions_tensor.shape[0], 1) #not really necessary but at the moment I have no way of passing an empty value array
-            elif self.model_params.values_mode()=="intensity":
-                values_tensor=torch.from_numpy(cloud.I.copy() ).float().to("cuda")
-            elif self.model_params.values_mode()=="rgb":
-                values_tensor=torch.from_numpy(cloud.C.copy() ).float().to("cuda")
-            elif self.model_params.values_mode()=="rgb+height":
-                rgb_tensor=torch.from_numpy(cloud.C).float().to("cuda")
-                height_tensor=torch.from_numpy(cloud.V[:,1].copy() ).unsqueeze(1).float().to("cuda")
-                values_tensor=torch.cat((rgb_tensor,height_tensor),1)
-            elif self.model_params.values_mode()=="rgb+xyz":
-                rgb_tensor=torch.from_numpy(cloud.C.copy() ).float().to("cuda")
-                xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
-                values_tensor=torch.cat((rgb_tensor,xyz_tensor),1)
-            elif self.model_params.values_mode()=="height":
-                height_tensor=torch.from_numpy(cloud.V[:,1].copy() ).unsqueeze(1).float().to("cuda")
-                values_tensor=height_tensor
-            elif self.model_params.values_mode()=="xyz":
-                xyz_tensor=torch.from_numpy(cloud.V.copy() ).float().to("cuda")
-                values_tensor=xyz_tensor
-            else:
-                err="values mode of ", self.model_params.values_mode() , " not implemented"
-                sys.exit(err)
-
-
-            target=cloud.L_gt
-            target_tensor=torch.from_numpy(target.copy() ).long().squeeze(1).to("cuda").squeeze(0)
-
-        return positions_tensor, values_tensor, target_tensor
 
     #like in here https://github.com/drethage/fully-convolutional-point-network/blob/60b36e76c3f0cc0512216e9a54ef869dbc8067ac/data.py 
     #also the Enet paper seems to have a similar weighting
@@ -318,4 +319,5 @@ class LNN(torch.nn.Module):
         if file is not None:
             print(string, file=file)
         return count
+
 

@@ -9,6 +9,9 @@ from tqdm import tqdm
 
 from easypbr  import *
 from dataloaders import *
+from latticenet  import TrainParams
+from latticenet  import ModelParams
+from latticenet  import EvalParams
 from lattice.lattice_py import LatticePy
 from lattice.models import *
 
@@ -113,8 +116,8 @@ def run():
                     #forward
                     with torch.set_grad_enabled(is_training):
                         cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
-                        positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
-                        pred_logsoftmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+                        positions, values, target = prepare_cloud(cloud, model_params) #prepares the cloud for pytorch, returning tensors alredy in cuda
+                        pred_logsoftmax, pred_raw =model(lattice, positions, values)
 
 
                         #debug 
@@ -131,7 +134,7 @@ def run():
                             # now that all the parameters are created we can fill them with a model from a file
                             model.load_state_dict(torch.load(eval_params.checkpoint_path()))
                             #need to rerun forward with the new parameters to get an accurate prediction
-                            pred_logsoftmax, pred_raw, delta_weight_error_sum=model(lattice, positions, values)
+                            pred_logsoftmax, pred_raw =model(lattice, positions, values)
 
                         cb.after_forward_pass(pred_softmax=pred_logsoftmax, target=target, cloud=cloud, loss=0, loss_dice=0, phase=phase, lr=0) #visualizes the prediction 
                         pbar.update(1)

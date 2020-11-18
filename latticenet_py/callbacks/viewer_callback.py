@@ -22,20 +22,23 @@ class ViewerCallback(Callback):
         Scene.show(mesh_pred, "mesh_pred")
 
     def show_difference_cloud(self,pred_softmax, cloud):
-        mesh_pred=cloud.clone()
-        l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy() #(nr_points, )
-        l_gt=cloud.L_gt  #(nr_points,1)
-        l_pred=np.expand_dims(l_pred,1) #(nr_points,1)
+        has_gt= cloud.L_gt.size != 0
 
-        diff=l_pred!=cloud.L_gt
-        diff_repeated=np.repeat(diff, 3,1) #repeat 3 times on axis 1 so to obtain a (nr_points,3)
+        if has_gt:
+            mesh_pred=cloud.clone()
+            l_pred=pred_softmax.detach().argmax(axis=1).cpu().numpy() #(nr_points, )
+            l_gt=cloud.L_gt  #(nr_points,1)
+            l_pred=np.expand_dims(l_pred,1) #(nr_points,1)
 
-        mesh_pred.C=diff_repeated
-        mesh_pred.m_vis.m_point_size=4
-        mesh_pred.m_vis.set_color_pervertcolor()
-        # mesh_pred.move_in_z(-cloud.get_scale()) #good for shapenetpartseg
-        mesh_pred.translate_model_matrix([0.0, 0.0, -2.0]) #good for shapenetpartseg
-        Scene.show(mesh_pred, "mesh_diff")
+            diff=l_pred!=cloud.L_gt
+            diff_repeated=np.repeat(diff, 3,1) #repeat 3 times on axis 1 so to obtain a (nr_points,3)
+
+            mesh_pred.C=diff_repeated
+            mesh_pred.m_vis.m_point_size=4
+            mesh_pred.m_vis.set_color_pervertcolor()
+            # mesh_pred.move_in_z(-cloud.get_scale()) #good for shapenetpartseg
+            mesh_pred.translate_model_matrix([0.0, 0.0, -2.0]) #good for shapenetpartseg
+            Scene.show(mesh_pred, "mesh_diff")
 
     def show_confidence_cloud(self, pred_softmax, cloud):
         mesh_pred=cloud.clone()

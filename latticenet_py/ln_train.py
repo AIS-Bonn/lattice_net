@@ -10,6 +10,9 @@ import time
 
 from easypbr  import *
 from dataloaders import *
+from latticenet  import TrainParams
+from latticenet  import ModelParams
+from latticenet  import EvalParams
 from latticenet_py.lattice.lattice_py import LatticePy
 from latticenet_py.lattice.diceloss import GeneralizedSoftDiceLoss
 from latticenet_py.lattice.lovasz_loss import LovaszSoftmax
@@ -22,9 +25,9 @@ from latticenet_py.callbacks.state_callback import *
 from latticenet_py.callbacks.phase import *
 
 
-config_file="ln_train_shapenet_example.cfg"
+# config_file="ln_train_shapenet_example.cfg"
 # config_file="lnn_train_shapenet.cfg"
-#config_file="lnn_train_semantic_kitti.cfg"
+config_file="lnn_train_semantic_kitti.cfg"
 # config_file="lnn_train_scannet.cfg"
 
 torch.manual_seed(0)
@@ -52,7 +55,7 @@ def create_loader(dataset_name, config_file):
 def sanity_check(lattice):
     nr_positions=lattice.lattice.m_positions.shape[0]
 
-    print("lattice has nr of vertices", lattice.nr_lattice_vertices())
+    print("lattice has nr of vertices", lattice.nr_lattice_vertices() , " and nr positions is ", nr_positions)
     if(lattice.nr_lattice_vertices()<100):
         print(colored("-------------------------------", 'yellow'))
         print(colored("The number of lattice vertice is bellow 100. This could be a sign of a bug like too big of a sigma set in the config file. If you believe this is correct, feel free to ignore this.", 'yellow'))
@@ -139,7 +142,7 @@ def run():
                     #forward
                     with torch.set_grad_enabled(is_training):
                         cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
-                        positions, values, target = model.prepare_cloud(cloud) #prepares the cloud for pytorch, returning tensors alredy in cuda
+                        positions, values, target = prepare_cloud(cloud, model_params) #prepares the cloud for pytorch, returning tensors alredy in cuda
 
                         TIME_START("forward")
                         pred_logsoftmax, pred_raw =model(lattice, positions, values)
@@ -154,7 +157,9 @@ def run():
                         if first_time:
                             first_time=False
                             optimizer=torch.optim.AdamW(model.parameters(), lr=train_params.lr(), weight_decay=train_params.weight_decay(), amsgrad=True)
-                            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
+                            # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True, factor=0.1)
+                            if train_params.dataset_name()=="semantickitti":
+                                scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=3)
 
                             #sanity check that the lattice has enough vertices
                             sanity_check(lattice)
