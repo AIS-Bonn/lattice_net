@@ -61,8 +61,8 @@ def run():
     lattice.create(config_path, "splated_lattice")
 
     cb_list = []
-    if(eval_params.with_viewer()):
-        cb_list.append(ViewerCallback())
+    # if(eval_params.with_viewer()):
+        # cb_list.append(ViewerCallback())
     cb_list.append(StateCallback())
     cb = CallbacksGroup(cb_list)
 
@@ -72,7 +72,7 @@ def run():
     bag=RosBagPlayer.create(config_path)
     loader=DataLoaderCloudRos(config_path)
     label_file="/media/rosu/Data/data/semantic_kitti/colorscheme_and_labels/labels.txt"
-    colorscheme_file="/media/rosu/Data/data/semantic_kitti/colorscheme_and_labels/color_scheme.txt"
+    colorscheme_file="/media/rosu/Data/data/semantic_kitti/colorscheme_and_labels/color_scheme_compacted_colors.txt"
     freq_file="/media/rosu/Data/data/semantic_kitti/colorscheme_and_labels/frequency.txt"
     label_mngr=LabelMngr(label_file, colorscheme_file, freq_file, 0)
 
@@ -108,7 +108,9 @@ def run():
                     with torch.set_grad_enabled(is_training):
                         cb.before_forward_pass(lattice=lattice) #sets the appropriate sigma for the lattice
                         positions, values, target = prepare_cloud(cloud, model_params) #prepares the cloud for pytorch, returning tensors alredy in cuda
+                        TIME_START("forward")
                         pred_logsoftmax, pred_raw =model(lattice, positions, values)
+                        TIME_END("forward")
 
 
                         #debug 
@@ -130,6 +132,27 @@ def run():
 
                         cb.after_forward_pass(pred_softmax=pred_logsoftmax, target=target, cloud=cloud, loss=0, loss_dice=0, phase=phase, lr=0) #visualizes the prediction 
                         pbar.update(1)
+
+                        #show and accumulate the cloud
+                        if(eval_params.with_viewer()):
+                            mesh_pred=cloud.clone()
+                            l_pred=pred_logsoftmax.detach().argmax(axis=1).cpu().numpy()
+                            mesh_pred.L_pred=l_pred
+                            mesh_pred.m_vis.m_point_size=4
+                            mesh_pred.m_vis.set_color_semanticpred()
+                            # Scene.show(mesh_pred, "mesh_pred_"+str(phase.iter_nr) )
+                            Scene.show(mesh_pred, "mesh_pred" )
+
+                            # #get only the points that correspond to person
+                            # person_idx=label_mngr.label2idx("person")
+                            # mask_static=l_pred!=person_idx #is a vector of 1 for the point that are NOT person
+                            # mesh_dyn=mesh_pred.clone()
+                            # new_V=mesh_dyn.V.copy()
+                            # new_V[mask_static]=0
+                            # mesh_dyn.V=new_V
+                            # Scene.show(mesh_dyn, "mesh_dyn" )
+
+
 
 
 
