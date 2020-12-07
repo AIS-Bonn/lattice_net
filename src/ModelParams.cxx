@@ -57,7 +57,7 @@ std::string ModelParams::positions_mode(){
 std::string ModelParams::values_mode(){
     return m_values_mode;
 }
-Eigen::Vector3i ModelParams::pointnet_layers(){
+Eigen::VectorXi ModelParams::pointnet_layers(){
     return m_pointnet_layers;
 }
 int ModelParams::pointnet_start_nr_channels(){
