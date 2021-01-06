@@ -591,7 +591,7 @@ class PointNetModule(torch.nn.Module):
             nr_points_per_simplex=nr_points_per_simplex.unsqueeze(1)
             minimum_points_per_simplex=4
             simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
-            distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
+            distributed_reduced=distributed_reduced.masked_fill(simplexes_with_few_points, 0)
         else:
             distributed_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
 
@@ -612,10 +612,13 @@ class PointNetModule(torch.nn.Module):
 
             minimum_points_per_simplex=4
             simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
-            distributed_reduced.masked_fill_(simplexes_with_few_points, 0)
+            distributed_reduced=distributed_reduced.masked_fill(simplexes_with_few_points, 0)
 
 
-        distributed_reduced[0,:]=0 #the first layers corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
+        # distributed_reduced[0,:]=0 #the first layers corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
+        index = torch.tensor([0]).to("cuda")
+        distributed_reduced=torch.index_fill(distributed_reduced, dim=0, index=index, value=0) #the first row corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
+
 
 
         lattice_py.set_values(distributed_reduced)

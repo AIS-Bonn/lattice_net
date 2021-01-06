@@ -85,7 +85,9 @@ class DistributeLattice(Function):
             pass
         else:
             mean_positions = torch_scatter.scatter_mean(distributed_positions, indices_long, dim=0 )
-            mean_positions[0,:]=0 #the first lattice vertex corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
+            # mean_positions[0,:]=0 #the first lattice vertex corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
+            index = torch.tensor([0]).to("cuda")
+            mean_positions=torch.index_fill(mean_positions, dim=0, index=index, value=0) 
             #by setting the first row of mean_positions to 0 it means that all the point that splat onto vertex zero will have a wrong mean. We will set those distributed_mean_substracted to also zero later
             #the distributed means now has shape nr_positions x pos_dim but we want to substract each distributed position (shape  (nr_positions x m_pos_dim+1) x pos_dim   ) with its corresponding mean. We can do a index_select with splatting indices to get the means
             distributed_mean_positions=torch.index_select(mean_positions, 0, indices_long)
@@ -97,7 +99,9 @@ class DistributeLattice(Function):
 
 
    
-        distributed.masked_fill_(positions_that_splat_onto_vertex_zero_or_are_invalid, 0)
+        # distributed.masked_fill_(positions_that_splat_onto_vertex_zero_or_are_invalid, 0)
+        distributed=distributed.masked_fill(positions_that_splat_onto_vertex_zero_or_are_invalid, 0)
+
 
         return distributed, lattice_py.splatting_indices()
 
