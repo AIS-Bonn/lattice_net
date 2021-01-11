@@ -24,15 +24,15 @@ class LatticePy(torch.Tensor):
     def begin_splat_modify_only_values(self):
         self.lattice.begin_splat_modify_only_values()
     def splat_standalone(self, positions, values ):
-        self.lattice.splat_standalone(positions, values )
+       return self.lattice.splat_standalone(positions, values )
     def distribute(self, positions, values):
-        self.lattice.distribute(positions, values)
-    def blur_standalone(self):
-        blurred_lattice=self.lattice.blur_standalone()
-        blurred_lattice_py=LatticePy()
-        blurred_lattice_py.lattice=blurred_lattice
+        return self.lattice.distribute(positions, values)
+    # def blur_standalone(self):
+    #     blurred_lattice=self.lattice.blur_standalone()
+    #     blurred_lattice_py=LatticePy()
+    #     blurred_lattice_py.lattice=blurred_lattice
 
-        return blurred_lattice_py
+    #     return blurred_lattice_py
     # def convolve_standalone(self, filter_bank):
     #     convolved_lattice=self.lattice.convolve_standalone(filter_bank)
     #     convolved_lattice_py=LatticePy()
@@ -55,23 +55,23 @@ class LatticePy(torch.Tensor):
 
     #     return convolved_lattice_py
 
-    def depthwise_convolve(self, filter_bank, dilation, lattice_neighbours=None, use_center_vertex_from_lattice_neighbours=True, flip_neighbours=False):
-        # print("running convolve")
-        # if lattice_neighbours is not None:
-            # print("lattice py doing convolve with lattic eneighbours")
-        # else:
-            # print("lattice_py, doing convolve with lattice neighbous being none ")
+    # def depthwise_convolve(self, filter_bank, dilation, lattice_neighbours=None, use_center_vertex_from_lattice_neighbours=True, flip_neighbours=False):
+    #     # print("running convolve")
+    #     # if lattice_neighbours is not None:
+    #         # print("lattice py doing convolve with lattic eneighbours")
+    #     # else:
+    #         # print("lattice_py, doing convolve with lattice neighbous being none ")
 
-        if lattice_neighbours is None:
-            convolved_lattice=self.lattice.depthwise_convolve(filter_bank, dilation, self.lattice, use_center_vertex_from_lattice_neighbours, flip_neighbours)
-        else:
-            convolved_lattice=self.lattice.depthwise_convolve(filter_bank, dilation, lattice_neighbours.lattice, use_center_vertex_from_lattice_neighbours, flip_neighbours)
-        # print("finished convolve")
-        convolved_lattice_py=LatticePy()
-        convolved_lattice_py.lattice=convolved_lattice
+    #     if lattice_neighbours is None:
+    #         convolved_lattice=self.lattice.depthwise_convolve(filter_bank, dilation, self.lattice, use_center_vertex_from_lattice_neighbours, flip_neighbours)
+    #     else:
+    #         convolved_lattice=self.lattice.depthwise_convolve(filter_bank, dilation, lattice_neighbours.lattice, use_center_vertex_from_lattice_neighbours, flip_neighbours)
+    #     # print("finished convolve")
+    #     convolved_lattice_py=LatticePy()
+    #     convolved_lattice_py.lattice=convolved_lattice
 
-        return convolved_lattice_py
-        # return LatticePy(blurred_lattice)
+    #     return convolved_lattice_py
+    #     # return LatticePy(blurred_lattice)
 
     def convolve_im2row_standalone(self, filter_bank, dilation, lattice_neighbours=None, use_center_vertex_from_lattice_neighbours=True, flip_neighbours=False):
         # print("running convolve")
@@ -103,8 +103,8 @@ class LatticePy(torch.Tensor):
 
 
     def just_create_verts(self, positions):
-        self.lattice.just_create_verts(positions, False) #false is for the with_homogeneous coord
-        return self
+        splatting_indices, splatting_weights=  self.lattice.just_create_verts(positions, False) #false is for the with_homogeneous coord
+        return splatting_indices, splatting_weights
 
     def create_coarse_verts(self):
         coarsened_lattice=self.lattice.create_coarse_verts()
@@ -123,17 +123,17 @@ class LatticePy(torch.Tensor):
     def slice_standalone_no_precomputation(self, positions ):
         return self.lattice.slice_standalone_no_precomputation(positions )
 
-    def slice_elevated_verts(self, lattice_to_slice_from):
-        sliced_lattice = self.lattice.slice_elevated_verts(lattice_to_slice_from.lattice) 
-        sliced_lattice_py=LatticePy()
-        sliced_lattice_py.lattice=sliced_lattice
-        return sliced_lattice_py
+    # def slice_elevated_verts(self, lattice_to_slice_from):
+    #     sliced_lattice = self.lattice.slice_elevated_verts(lattice_to_slice_from.lattice) 
+    #     sliced_lattice_py=LatticePy()
+    #     sliced_lattice_py.lattice=sliced_lattice
+    #     return sliced_lattice_py
 
     def gather_standalone_no_precomputation(self, positions):
         return self.lattice.gather_standalone_no_precomputation(positions)
 
-    def gather_standalone_with_precomputation(self, positions):
-        return self.lattice.gather_standalone_with_precomputation(positions)
+    def gather_standalone_with_precomputation(self, positions, splatting_indices, splatting_weights):
+        return self.lattice.gather_standalone_with_precomputation(positions, splatting_indices, splatting_weights)
 
     def gather_elevated_standalone_no_precomputation(self, lattice_to_gather_from):
         return self.lattice.gather_elevated_standalone_no_precomputation(lattice_to_gather_from.lattice)
@@ -159,7 +159,7 @@ class LatticePy(torch.Tensor):
         return mesh
 
     def show_lattice(self, name):
-        points_deelevated=self.lattice.deelevate(self.lattice.m_hash_table.m_keys_tensor)
+        points_deelevated=self.lattice.deelevate(self.lattice.hash_table().m_keys_tensor)
 
         #set in red the vertices that no neigbhours, the one for which lattice rowified has a row of zero
         color_no_neighbours=self.lattice.color_no_neighbours()
@@ -179,9 +179,9 @@ class LatticePy(torch.Tensor):
     def pos_dim(self):
         return self.lattice.pos_dim()
     def keys(self):
-        return self.lattice.m_hash_table.m_keys_tensor
+        return self.lattice.hash_table().m_keys_tensor
     def values(self):
-        return self.lattice.m_hash_table.m_values_tensor
+        return self.lattice.hash_table().m_values_tensor
     def sliced_values_hom(self):
         return self.lattice.m_sliced_values_hom_tensor
     def lattice_rowified(self):
@@ -197,23 +197,23 @@ class LatticePy(torch.Tensor):
     def capacity(self):
         return self.lattice.capacity()
     def positions(self):
-        return self.lattice.m_positions
+        return self.lattice.positions()
 
     #setters
-    def set_val_dim(self, val_dim):
-        self.lattice.set_val_dim(val_dim)
+    # def set_val_dim(self, val_dim):
+        # self.lattice.set_val_dim(val_dim)
     # def set_val_full_dim(self, val_dim):
         # self.lattice.set_val_full_dim(val_dim)
     def set_values(self, new_values):
         # self.lattice.m_hash_table.set_values(new_values)
         # if not new_values.is_contiguous():
             # new_values=new_values.contiguous()
-        self.lattice.m_hash_table.set_values(new_values)
-        self.set_val_dim(new_values.shape[1])
-        self.lattice.m_hash_table.update_impl()
+        self.lattice.hash_table().set_values(new_values)
+        # self.set_val_dim(new_values.shape[1])
+        self.lattice.hash_table().update_impl()
         #this tensor needs to have a shape so that the sizes of the forwards and backard pass match
-    def set_positions(self, positions):
-        self.lattice.m_positions=positions
+    # def set_positions(self, positions):
+        # self.lattice.m_positions=positions
     def set_splatting_indices(self, indices):
         self.lattice.m_splatting_indices_tensor=indices
     def set_splatting_weights(self, weights):

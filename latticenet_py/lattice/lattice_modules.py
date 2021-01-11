@@ -283,7 +283,7 @@ class FinefyLatticeModule(torch.nn.Module):
 
     def forward(self, lattice_coarse_values, lattice_coarse_structure, lattice_fine_structure):
         lattice_coarse_structure.set_values(lattice_coarse_values)
-        lattice_fine_structure.set_val_dim(lattice_coarse_structure.val_dim())
+        # lattice_fine_structure.set_val_dim(lattice_coarse_structure.val_dim())
 
         if(self.first_time):
             self.first_time=False
@@ -338,7 +338,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
 
 
         self.experiment=experiment
-    def forward(self, lv, ls, positions):
+    def forward(self, lv, ls, positions, splatting_indices, splatting_weights):
 
         ls.set_values(lv)
 
@@ -369,7 +369,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
 
      
 
-        sliced_bottleneck_rowified=GatherLattice.apply(lv_bottleneck, ls_bottleneck, positions)
+        sliced_bottleneck_rowified=GatherLattice.apply(lv_bottleneck, ls_bottleneck, positions, splatting_indices, splatting_weights)
        
 
         nr_vertices_per_simplex=ls.pos_dim()+1
@@ -432,7 +432,7 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
 
         ls.set_values(lv)
       
-        classes_logits = SliceClassifyLattice.apply(lv, ls, positions, delta_weights, self.linear_clasify.weight, self.linear_clasify.bias, self.nr_classes)
+        classes_logits = SliceClassifyLattice.apply(lv, ls, positions, delta_weights, self.linear_clasify.weight, self.linear_clasify.bias, self.nr_classes, splatting_indices, splatting_weights)
 
         return classes_logits
 
@@ -622,14 +622,16 @@ class PointNetModule(torch.nn.Module):
 
 
         lattice_py.set_values(distributed_reduced)
-        lattice_py.set_val_dim(distributed_reduced.shape[1])
+        # lattice_py.set_val_dim(distributed_reduced.shape[1])
 
-      
+
+        # print("calling last_conv") 
         distributed_reduced, lattice_py=self.last_conv(distributed_reduced, lattice_py)
+        # print("called last conv")
 
 
         lattice_py.set_values(distributed_reduced)
-        lattice_py.set_val_dim(distributed_reduced.shape[1])
+        # lattice_py.set_val_dim(distributed_reduced.shape[1])
 
         return distributed_reduced, lattice_py
 
@@ -958,9 +960,11 @@ class ResnetBlock(torch.nn.Module):
 
         identity=lv
 
-
+        # print("conv 1")
         lv, ls=self.conv1(lv,ls)
+        # print("conv 2")
         lv, ls=self.conv2(lv,ls)
+        # print("finished conv 2")
         # lv=lv*self.residual_gate
         lv+=identity
         ls.set_values(lv)

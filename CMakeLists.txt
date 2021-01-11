@@ -91,7 +91,10 @@ install(FILES "${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/jitify_op
 set(CUDA_NVCC_FLAGS "-arch=sm_60 -Xcudafe "--diag_suppress=integer_sign_change" " CACHE STRING "nvcc flags" FORCE)
 # message("NVCC flags are ", ${CUDA_NVCC_FLAGS})
 # set(CUDA_VERBOSE_BUILD ON CACHE BOOL "nvcc verbose" FORCE) 
-cuda_add_library(latticenet_cu  SHARED  ${CMAKE_SOURCE_DIR}/src/Lattice.cu 
+# cuda_add_library(latticenet_cu  SHARED  ${CMAKE_SOURCE_DIR}/src/Lattice.cxx
+# add_library(latticenet_cu  SHARED  ${CMAKE_SOURCE_DIR}/src/Lattice.cxx
+cuda_add_library(latticenet_cu  SHARED  ${CMAKE_SOURCE_DIR}/src/Lattice.cu
+                                        # ${CMAKE_SOURCE_DIR}/src/LatticeFuncs.cu
                                         ${CMAKE_SOURCE_DIR}/src/HashTable.cu  
                                         ${CMAKE_SOURCE_DIR}/src/ModelParams.cxx
                                         ${CMAKE_SOURCE_DIR}/src/TrainParams.cxx

@@ -31,7 +31,7 @@ class SplatLattice(Function):
     @staticmethod
     def forward(ctx, lattice_py, positions, values):
 
-        lattice_py.set_val_dim(values.shape[1])
+        # lattice_py.set_val_dim(values.shape[1])
 
         lattice_py.begin_splat()
         lattice_py.splat_standalone(positions, values )
@@ -59,23 +59,23 @@ class DistributeLattice(Function):
     def forward(ctx, lattice_py, positions, values, experiment):
 
         lattice_py.begin_splat()
-        lattice_py.distribute(positions, values)
-        lattice_py.set_values(lattice_py.distributed())
+        distributed, splatting_indices, splatting_weights = lattice_py.distribute(positions, values)
+        lattice_py.set_values(distributed )
 
         #store the positions that created this lattice
-        lattice_py.set_positions(positions)
+        # lattice_py.set_positions(positions)
 
 
 
 
         #subsctract mean from the positions so we have something like a local laplacian as a feature
-        distributed=lattice_py.distributed() 
+        # distributed=lattice_py.distributed() 
 
         experiments_that_imply_no_mean_substraction=["pointnet_no_local_mean", "pointnet_no_elevate_no_local_mean", "splat"]
-        indices=lattice_py.splatting_indices()
+        # indices=lattice_py.splatting_indices()
         distributed_positions=distributed[:,:3] #get the first 3 columns, the ones corresponding only to the xyz positions
 
-        indices_long=indices.long()
+        indices_long=splatting_indices.long()
 
         #some indices may be -1 because they were not inserted into the hashmap, this will cause an error for scatter_max so we just set them to 0
         indices_long[indices_long<0]=0
@@ -103,7 +103,7 @@ class DistributeLattice(Function):
         distributed=distributed.masked_fill(positions_that_splat_onto_vertex_zero_or_are_invalid, 0)
 
 
-        return distributed, lattice_py.splatting_indices()
+        return distributed, splatting_indices, splatting_weights
 
 
     @staticmethod
@@ -111,55 +111,55 @@ class DistributeLattice(Function):
         return None, None, None, None, None, None, None
 
 
-class DepthwiseConv(Function):
-    @staticmethod
-    def forward(ctx, lattice_values, lattice_py, filter_bank, dilation, lattice_neighbours_values=None, lattice_neighbours_structure=None, use_center_vertex_from_lattice_neighbours=False):
+# class DepthwiseConv(Function):
+#     @staticmethod
+#     def forward(ctx, lattice_values, lattice_py, filter_bank, dilation, lattice_neighbours_values=None, lattice_neighbours_structure=None, use_center_vertex_from_lattice_neighbours=False):
 
-        lattice_py.set_values(lattice_values)
-        if(lattice_neighbours_structure is not None):
-            lattice_neighbours_structure.set_values(lattice_neighbours_values)
+#         lattice_py.set_values(lattice_values)
+#         if(lattice_neighbours_structure is not None):
+#             lattice_neighbours_structure.set_values(lattice_neighbours_values)
 
 
-        convolved_lattice_py=lattice_py.depthwise_convolve(filter_bank, dilation, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours)
+#         convolved_lattice_py=lattice_py.depthwise_convolve(filter_bank, dilation, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours)
 
-        values=convolved_lattice_py.values()
-        convolved_lattice_py.set_values(values)
+#         values=convolved_lattice_py.values()
+#         convolved_lattice_py.set_values(values)
 
 
 
      
-        ctx.save_for_backward(filter_bank, lattice_values, lattice_neighbours_values ) 
-        ctx.lattice_py=lattice_py
-        ctx.lattice_neighbours_structure=lattice_neighbours_structure
-        ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
-        ctx.filter_extent=int(filter_bank.shape[0])
-        ctx.dilation=dilation
-        ctx.val_dim= lattice_py.lattice.val_dim()
+#         ctx.save_for_backward(filter_bank, lattice_values, lattice_neighbours_values ) 
+#         ctx.lattice_py=lattice_py
+#         ctx.lattice_neighbours_structure=lattice_neighbours_structure
+#         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
+#         ctx.filter_extent=int(filter_bank.shape[0])
+#         ctx.dilation=dilation
+#         ctx.val_dim= lattice_py.lattice.val_dim()
 
-        return values, convolved_lattice_py
+#         return values, convolved_lattice_py
 
-    @staticmethod
-    def backward(ctx, grad_lattice_values, grad_lattice_structure):
+#     @staticmethod
+#     def backward(ctx, grad_lattice_values, grad_lattice_structure):
         
 
-        lattice_py=ctx.lattice_py 
-        lattice_neighbours_structure=ctx.lattice_neighbours_structure
-        use_center_vertex_from_lattice_neighbours=ctx.use_center_vertex_from_lattice_neighbours
-        filter_extent=ctx.filter_extent
-        dilation=ctx.dilation
-        val_dim=ctx.val_dim
+#         lattice_py=ctx.lattice_py 
+#         lattice_neighbours_structure=ctx.lattice_neighbours_structure
+#         use_center_vertex_from_lattice_neighbours=ctx.use_center_vertex_from_lattice_neighbours
+#         filter_extent=ctx.filter_extent
+#         dilation=ctx.dilation
+#         val_dim=ctx.val_dim
 
-        filter_bank, lattice_values, lattice_neighbours_values =ctx.saved_tensors
-        filter_extent=int(filter_bank.shape[0]/val_dim)
+#         filter_bank, lattice_values, lattice_neighbours_values =ctx.saved_tensors
+#         filter_extent=int(filter_bank.shape[0]/val_dim)
 
 
 
-        ctx.lattice_py=0 #release this object so it doesnt leak
-        ctx.lattice_neighbours_structure=0
+#         ctx.lattice_py=0 #release this object so it doesnt leak
+#         ctx.lattice_neighbours_structure=0
 
-        print("backward fuction for deptwise conv is not implemented yet")
+#         print("backward fuction for deptwise conv is not implemented yet")
         
-        return lattice_py.values(), None, filter_bank,  None, None, None, None, None, None, None
+#         return lattice_py.values(), None, filter_bank,  None, None, None, None, None, None, None
         
 
 
@@ -186,7 +186,10 @@ class ConvIm2RowLattice(Function):
         ctx.filter_extent=int(filter_bank.shape[0]/lattice_values.shape[1])
         ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
-        ctx.val_dim= lattice_py.lattice.val_dim()
+        if lattice_neighbours_structure!=None:
+            ctx.val_dim= lattice_neighbours_structure.lattice.val_dim()
+        else: 
+            ctx.val_dim= lattice_py.lattice.val_dim()
 
         return values, convolved_lattice_py
 
@@ -298,7 +301,7 @@ class CoarsenLattice(Function):
         filter_bank_backwards=filter_bank_backwards.transpose(0,1).contiguous()  #makes it filter_extent x nr_filters x val_fim   #TODO the contigous may noy be needed because the reshape does may do a contigous if needed or may also just return a view, both work
         filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_dim)
         coarsened_lattice_py.set_values(grad_lattice_values)
-        lattice_fine_structure.set_val_dim(nr_filters) #setting val full dim to nr of filters because we will convolve the values of grad_lattice values and those have a row of size nr_filters
+        # lattice_fine_structure.set_val_dim(nr_filters) #setting val full dim to nr of filters because we will convolve the values of grad_lattice values and those have a row of size nr_filters
         #one hast o convolve at the fine positions, having the neighbour as the coarse ones because they are the ones with the errors
         grad_lattice_py=lattice_fine_structure.convolve_im2row_standalone(filter_bank_backwards, dilation,  coarsened_lattice_py, use_center_vertex_from_lattice_neighbours, True)
         grad_lattice=grad_lattice_py.values()
@@ -377,7 +380,7 @@ class FinefyLattice(Function):
     @staticmethod
     def forward(ctx, lattice_coarse_values, lattice_coarse_structure, lattice_fine_structure,  filter_bank, use_center_vertex_from_lattice_neighbours):
         lattice_coarse_structure.set_values(lattice_coarse_values)
-        lattice_fine_structure.set_val_dim(lattice_coarse_structure.val_dim())
+        # lattice_fine_structure.set_val_dim(lattice_coarse_structure.val_dim())
 
 
         dilation=1
@@ -426,7 +429,7 @@ class FinefyLattice(Function):
         filter_bank_backwards=filter_bank_backwards.reshape(filter_extent*nr_filters, val_dim)
         # print("finefy backwards: saved for backwards a coarsened lattice py with nr of keys", coarsened_lattice_py.nr_lattice_vertices())
         lattice_fine_structure.set_values(grad_lattice_values)
-        lattice_coarse_structure.set_val_dim(lattice_fine_structure.val_dim()) #setting val full dim to nr of filters because we will convolve the values of grad_lattice values and those have a row of size nr_filters
+        # lattice_coarse_structure.set_val_dim(lattice_fine_structure.val_dim()) #setting val full dim to nr of filters because we will convolve the values of grad_lattice values and those have a row of size nr_filters
         #one hast o convolve at the fine positions, having the neighbour as the coarse ones because they are the ones with the errors
         grad_lattice_py=lattice_coarse_structure.convolve_im2row_standalone(filter_bank_backwards, dilation,  lattice_fine_structure, use_center_vertex_from_lattice_neighbours, True)
         grad_lattice=grad_lattice_py.values()
@@ -450,11 +453,11 @@ class SliceLattice(Function):
 
         #attempt 2
         lattice_structure.set_values(lattice_values)
-        lattice_structure.set_val_dim(lattice_values.shape[1])
+        # lattice_structure.set_val_dim(lattice_values.shape[1])
 
-        sliced_values=lattice_structure.slice_standalone_no_precomputation(positions )
+        sliced_values, splatting_indices, splatting_weights=lattice_structure.slice_standalone_no_precomputation(positions )
 
-        ctx.save_for_backward(positions, lattice_structure.sliced_values_hom(), lattice_structure.splatting_indices(), lattice_structure.splatting_weights() )
+        ctx.save_for_backward(positions, sliced_values, splatting_indices, splatting_weights )
         ctx.lattice_structure = lattice_structure
 
 
@@ -471,15 +474,15 @@ class SliceLattice(Function):
         positions, sliced_values_hom, splatting_indices, splatting_weights =ctx.saved_tensors
         lattice_py = ctx.lattice_structure
 
-        lattice_py.set_splatting_indices(splatting_indices)
-        lattice_py.set_splatting_weights(splatting_weights)
+        # lattice_py.set_splatting_indices(splatting_indices)
+        # lattice_py.set_splatting_weights(splatting_weights)
 
 
  
         if(lattice_py.val_dim() is not grad_sliced_values.shape[1]):
             sys.exit("for some reason the values stored in the lattice are not the same dimension as the gradient. What?")
-        lattice_py.set_val_dim(grad_sliced_values.shape[1])
-        lattice_py.lattice.slice_backwards_standalone_with_precomputation_no_homogeneous(positions, grad_sliced_values) 
+        # lattice_py.set_val_dim(grad_sliced_values.shape[1])
+        lattice_py.lattice.slice_backwards_standalone_with_precomputation_no_homogeneous(positions, grad_sliced_values, splatting_indices, splatting_weights) 
         lattice_values=lattice_py.values() #we get a pointer to the values so they don't dissapear when we realease the lettice
        
         ctx.lattice_structure=0 # release the pointer to this so it gets cleaned up
@@ -491,19 +494,19 @@ class SliceLattice(Function):
 
 class SliceClassifyLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_values, lattice_structure, positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes):
+    def forward(ctx, lattice_values, lattice_structure, positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, splatting_indices, splatting_weights):
 
 
         lattice_structure.set_values(lattice_values)
-        lattice_structure.set_val_dim(lattice_values.shape[1])
+        # lattice_structure.set_val_dim(lattice_values.shape[1])
 
         initial_values=lattice_values #needed fo the backwards pass TODO maybe the clone is not needed?
 
 
-        class_logits=lattice_structure.lattice.slice_classify_with_precomputation(positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes)
+        class_logits=lattice_structure.lattice.slice_classify_with_precomputation(positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, splatting_indices, splatting_weights)
 
 
-        ctx.save_for_backward(positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias )
+        ctx.save_for_backward(positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias, splatting_indices, splatting_weights )
         ctx.lattice_structure = lattice_structure
         ctx.val_dim=lattice_values.shape[1]
         ctx.nr_classes=nr_classes
@@ -515,12 +518,12 @@ class SliceClassifyLattice(Function):
     @staticmethod
     def backward(ctx, grad_class_logits):
         
-        positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias =ctx.saved_tensors
+        positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias, splatting_indices, splatting_weights =ctx.saved_tensors
         lattice_py = ctx.lattice_structure
         val_dim=ctx.val_dim
         nr_classes=ctx.nr_classes
 
-        lattice_py.set_val_dim(val_dim)
+        # lattice_py.set_val_dim(val_dim)
 
 
         #create some tensors to host the gradient wrt to lattice_values, delta_weights, linear_weight and linear_bias
@@ -531,7 +534,8 @@ class SliceClassifyLattice(Function):
 
 
         lattice_py.lattice.slice_classify_backwards_with_precomputation(grad_class_logits, positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes,
-                                                                                    grad_lattice_values, grad_delta_weights, grad_linear_clasify_weight, grad_linear_clasify_bias) 
+                                                                                    grad_lattice_values, grad_delta_weights, grad_linear_clasify_weight, grad_linear_clasify_bias,
+                                                                                    splatting_indices, splatting_weights) 
 
        
         ctx.lattice_structure=0 # release the pointer to this so it gets cleaned up
@@ -541,16 +545,16 @@ class SliceClassifyLattice(Function):
 
 class GatherLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_values, lattice_structure, positions):
+    def forward(ctx, lattice_values, lattice_structure, positions, splatting_indices, splatting_weights):
 
         lattice_structure.set_values(lattice_values)
-        lattice_structure.set_val_dim(lattice_values.shape[1])
+        # lattice_structure.set_val_dim(lattice_values.shape[1])
 
 
-        gathered_values=lattice_structure.gather_standalone_with_precomputation(positions)
+        gathered_values=lattice_structure.gather_standalone_with_precomputation(positions, splatting_indices, splatting_weights)
 
     
-        ctx.save_for_backward(positions)
+        ctx.save_for_backward(positions, splatting_indices, splatting_weights)
         ctx.lattice_structure = lattice_structure
         ctx.val_dim=lattice_values.shape[1]
 
@@ -561,13 +565,13 @@ class GatherLattice(Function):
     @staticmethod
     def backward(ctx, grad_sliced_values):
         
-        positions, =ctx.saved_tensors
+        positions,splatting_indices, splatting_weights =ctx.saved_tensors
         lattice_py = ctx.lattice_structure
         val_dim=ctx.val_dim
 
 
-        lattice_py.set_val_dim(val_dim)
-        lattice_py.lattice.gather_backwards_standalone_with_precomputation(positions, grad_sliced_values) 
+        # lattice_py.set_val_dim(val_dim)
+        lattice_py.lattice.gather_backwards_standalone_with_precomputation(positions, grad_sliced_values, splatting_indices, splatting_weights) 
         lattice_values=lattice_py.values() #we get a pointer to the values so they don't dissapear when we realease the lettice
       
 

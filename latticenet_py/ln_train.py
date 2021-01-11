@@ -53,7 +53,7 @@ def create_loader(dataset_name, config_file):
     return loader
 
 def sanity_check(lattice):
-    nr_positions=lattice.lattice.m_positions.shape[0]
+    nr_positions=lattice.lattice.positions().shape[0]
 
     print("lattice has nr of vertices", lattice.nr_lattice_vertices() , " and nr positions is ", nr_positions)
     if(lattice.nr_lattice_vertices()<100):
@@ -104,7 +104,7 @@ def run():
     loader_train.set_mode_train()
     loader_train.start()
     loader_test=create_loader(train_params.dataset_name(), config_path)
-    loader_test.set_mode_test()
+    loader_test.set_mode_validation()
     if isinstance(loader_test, DataLoaderSemanticKitti):
         loader_test.set_sequence("all") #for smenantic kitti in case the train one only trains on only one sequence we still want to test on all
     if isinstance(loader_test, DataLoaderScanNet):
@@ -162,7 +162,7 @@ def run():
                                 scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=3)
 
                             #sanity check that the lattice has enough vertices
-                            sanity_check(lattice)
+                            # sanity_check(lattice)
 
 
                         cb.after_forward_pass(pred_softmax=pred_logsoftmax, target=target, cloud=cloud, loss=loss.item(), loss_dice=loss_dice.item(), phase=phase, lr=optimizer.param_groups[0]["lr"]) #visualizes the prediction 

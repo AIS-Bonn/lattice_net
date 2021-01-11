@@ -188,7 +188,7 @@ class LNN(torch.nn.Module):
     def forward(self, ls, positions, values):
 
         with torch.set_grad_enabled(False):
-            distributed, indices=self.distribute(ls, positions, values)
+            distributed, indices, weights=self.distribute(ls, positions, values)
 
         lv, ls=self.point_net(ls, distributed, indices)
 
@@ -201,6 +201,7 @@ class LNN(torch.nn.Module):
 
             #resnet blocks
             for j in range(self.nr_blocks_down_stage[i]):
+                # print("start downsample stage ", i , " resnet block ", j, "lv has shape", lv.shape, " ls has val dim", ls.val_dim() )
                 lv, ls = self.resnet_blocks_per_down_lvl_list[i][j] ( lv, ls) 
 
             #saving them for when we do finefy so we can concat them there
@@ -208,12 +209,15 @@ class LNN(torch.nn.Module):
             fine_values_list.append(lv)
 
             #now we do a downsample
+            # print("start coarsen stage ", i, "lv has shape", lv.shape, "ls has val_dim", ls.val_dim() )
             lv, ls = self.coarsens_list[i] ( lv, ls)
+            # print( "finished coarsen stage ", i, "lv has shape", lv.shape, "ls has val_dim", ls.val_dim() )
 
         # TIME_END("down_path")
 
         # #bottleneck
         for j in range(self.nr_blocks_bottleneck):
+            # print("bottleneck stage", j,  "lv has shape", lv.shape, "ls has val_dim", ls.val_dim()  )
             lv, ls = self.resnet_blocks_bottleneck[j] ( lv, ls) 
 
 
@@ -226,6 +230,7 @@ class LNN(torch.nn.Module):
 
 
             #finefy
+            # print("start finefy stage", i,  "lv has shape", lv.shape, "ls has val_dim ", ls.val_dim(),  "fine strcture has val dim ", fine_structure.val_dim() )
             lv, ls = self.finefy_list[i] ( lv, ls, fine_structure  )
 
             #concat or adding for the vertical connection
@@ -236,12 +241,13 @@ class LNN(torch.nn.Module):
 
             #resnet blocks
             for j in range(self.nr_blocks_up_stage[i]):
+                # print("start resnet block in upstage", i, "lv has shape", lv.shape, "ls has val dim" , ls.val_dim() )
                 lv, ls = self.resnet_blocks_per_up_lvl_list[i][j] ( lv, ls) 
         # TIME_END("up_path")
 
 
 
-        sv =self.slice_fast_cuda(lv, ls, positions)
+        sv =self.slice_fast_cuda(lv, ls, positions, indices, weights)
 
 
         logsoftmax=self.logsoftmax(sv)
