@@ -284,7 +284,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torc
     //if it's not initialized to the correct values we intialize the hashtable
     if(!m_hash_table->m_keys_tensor.defined()){
         m_hash_table->init(pos_dim, val_dim);
-        m_hash_table->to(torch::kCUDA);
+        // m_hash_table->to(torch::kCUDA);
     }
 
 

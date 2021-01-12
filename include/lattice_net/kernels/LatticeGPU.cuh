@@ -3279,6 +3279,27 @@ slice_backwards_with_precomputation_no_homogeneous(const int nr_positions, float
     //each positions will splat onto pos_dim+1 vertices
     float *grad_sliced_val = grad_sliced_values + idx * val_full_dim;
     // printf("grad_sliced_val_is %f val_full_dim is %d\n",*grad_sliced_val, val_full_dim);
+
+    //we will need to splat this gradient to 4 vertices, instead of reading this gradient 4 times from memory, we just read it once in shared mem and then read it from there 
+    //we load BLOCK_SIZE vertices so a matrix of rows=BLOCK_SIZE and cols=val_dim
+    // __shared__ float grad_sliced_val_shared[BLOCK_SIZE*val_full_dim];
+    // int block_nr=blockIdx.x;
+    // if (threadIdx.x == 0 ){
+    //     for (int r = 0; r < BLOCK_SIZE; r++) {
+    //         for (int c = 0; c < val_full_dim; c++) {
+    //             int row_to_copy_from=max(  r+block_nr*BLOCK_SIZE, nr_positions-1);
+    //             grad_sliced_val_shared[c+r*val_full_dim]= grad_sliced_values[ c+  row_to_copy_from*val_full_dim ];
+    //         }
+    //     }
+    // }
+    // __syncthreads();
+
+    //attempt 2 load into local memory which could be global but the optimizer might be smart and put it into register 
+    float grad_sliced_val_cur_pos[val_full_dim];
+    for (int j = 0; j < val_full_dim; j++) {
+        grad_sliced_val_cur_pos[j]=grad_sliced_val[j];
+    }
+
     
     for(int color=0; color<pos_dim+1; color++){
         // int index_into_m_entries=round(splatting_indices_and_weights[ idx * (pos_dim + 1)*2 + color*2 + 0]);
@@ -3299,7 +3320,9 @@ slice_backwards_with_precomputation_no_homogeneous(const int nr_positions, float
                 #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 200)
                     // printf("accumulating weighted gradient %f where gradient is %f and weight is %f  \n", grad_sliced_val[j]*weight, grad_sliced_val[j], weight );
                     // #warning CUDA ARCH IS FINE
-                    atomicAdd(valOut +j, grad_sliced_val[j]*weight);
+                    // atomicAdd(valOut +j, grad_sliced_val[j]*weight);
+                    atomicAdd(valOut +j, grad_sliced_val_cur_pos[j]*weight);
+                    // atomicAdd(valOut +j, grad_sliced_val_shared[j+threadIdx.x*val_full_dim]*weight);
                 #else 
                     #warning CUDA ARCH NEEDS TO BE AT LEAST 200 IN ORDER TO ENABLE ATOMIC OPERATIONS!
                 #endif
@@ -3312,6 +3335,11 @@ slice_backwards_with_precomputation_no_homogeneous(const int nr_positions, float
 
 
     }
+
+
+
+
+
 
 
 

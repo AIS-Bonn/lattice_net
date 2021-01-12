@@ -52,6 +52,7 @@ void HashTable::clear(){
         m_keys_tensor.fill_(0);
         m_entries_tensor.fill_(-1);
         m_nr_filled_tensor.fill_(0);
+        m_nr_filled_is_dirty=true;
     }
 }
 
