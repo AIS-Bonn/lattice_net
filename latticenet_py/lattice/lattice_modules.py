@@ -189,10 +189,10 @@ class FinefyLatticeModule(torch.nn.Module):
 class SliceLatticeModule(torch.nn.Module):
     def __init__(self ):
         super(SliceLatticeModule, self).__init__()
-    def forward(self, lattice_values, lattice_structure, positions):
+    def forward(self, lattice_values, lattice_structure, positions, splatting_indices=None, splatting_weights=None):
 
         lattice_structure.set_values(lattice_values)
-        return SliceLattice.apply(lattice_values, lattice_structure, positions)
+        return SliceLattice.apply(lattice_values, lattice_structure, positions, splatting_indices, splatting_weights)
 
 class GatherLatticeModule(torch.nn.Module):
     def __init__(self):
@@ -524,6 +524,23 @@ class PointNetModule(torch.nn.Module):
 
 
 
+class Conv1x1(torch.nn.Module):
+    def __init__(self, out_channels, bias):
+        super(Conv1x1, self).__init__()
+        self.out_channels=out_channels
+        self.linear=None
+        self.use_bias=bias
+    def forward(self, lv):
+
+        #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
+        if self.linear is None:
+            self.linear= torch.nn.Linear(lv.shape[1], self.out_channels, bias=self.use_bias).to("cuda") 
+            with torch.no_grad():
+                #https://towardsdatascience.com/understand-kaiming-initialization-and-implementation-detail-in-pytorch-f7aa967e9138
+                torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_in', nonlinearity='relu')
+
+        lv = self.linear(lv)
+        return lv
 
 class GnRelu1x1(torch.nn.Module):
     def __init__(self, out_channels, bias):

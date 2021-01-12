@@ -602,6 +602,50 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts_naive(torch::Tensor& posit
 }
 
 
+
+torch::Tensor Lattice::slice_standalone_with_precomputation(torch::Tensor& positions_raw, torch::Tensor& splatting_indices_tensor, torch::Tensor& splatting_weights_tensor){
+
+    check_positions(positions_raw); 
+    CHECK(val_dim()>0) << "m_val_dim is 0 or lwoer. We have to splat something first so that we have values from where to slice. Val dim is " << val_dim();
+    int nr_positions=positions_raw.size(0);
+    int pos_dim=positions_raw.size(1);
+    CHECK(pos_dim==this->pos_dim()) << " The position dimension do not coreespond with the ones we used for creating the lattice";
+
+
+     //to cuda
+    TIME_START("upload_cuda");
+    positions_raw=positions_raw.to("cuda");
+    m_sigmas_tensor=m_sigmas_tensor.to("cuda");
+    TIME_END("upload_cuda");
+
+    TIME_START("scale_by_sigma");
+    VLOG(3) << "slice standalone scaling by a sigma of " << m_sigmas_tensor;
+    Tensor positions=positions_raw/m_sigmas_tensor;
+    TIME_END("scale_by_sigma")
+
+    //initialize the output values to zero 
+    Tensor sliced_values_hom_tensor=torch::zeros({nr_positions, val_dim() }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+
+
+    //assume we have already splatting weight and indices
+    if( !splatting_indices_tensor.defined() || !splatting_weights_tensor.defined()  || splatting_indices_tensor.size(0)!=nr_positions*(this->pos_dim()+1) ||  splatting_weights_tensor.size(0)!=nr_positions*(this->pos_dim()+1)  ){
+        LOG(FATAL) << "Indices or wegiths tensor is not created or doesnt have the correct size. We are assuming it has size " << nr_positions*(this->pos_dim()+1) << "but indices has size " << splatting_indices_tensor.sizes() << " m_splatting_weights_tensor have size "  << splatting_weights_tensor.sizes();
+    }
+    m_hash_table->update_impl();
+
+
+
+
+    TIME_START("slice");
+    m_impl->slice_standalone_with_precomputation( positions.data_ptr<float>(), sliced_values_hom_tensor.data_ptr<float>(), this->pos_dim(), this->val_dim(),  nr_positions, splatting_indices_tensor.data_ptr<int>(), splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
+    TIME_END("slice");
+
+
+    return sliced_values_hom_tensor;
+
+
+}
+
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::slice_standalone_no_precomputation(torch::Tensor& positions_raw){
 
     check_positions(positions_raw); 
@@ -1112,6 +1156,15 @@ int Lattice::nr_lattice_vertices(){
     CHECK(nr_verts>=0) << "nr vertices cannot be negative. However it is " << nr_verts;
     CHECK(nr_verts<1e+8) << "nr vertices cannot be that high. However it is " << nr_verts;
     return nr_verts;
+
+
+    //attempt 2  
+    //check if the nr_latttice_vertices is dirty which means that a kernel has been executed that might have modified the nr of vertices
+    // if (dirty){
+        //do a memcpy and set the not dirty to false
+    // }else{
+        // return number lattice vertices that the cpu knows about
+    // }
 }
 int Lattice::get_filter_extent(const int neighborhood_size) {
     CHECK(neighborhood_size==1) << "At the moment we only have implemented a filter with a neighbourhood size of 1. I haven't yet written the more general formula for more neighbourshood size";

@@ -197,7 +197,25 @@ public:
             CUDA_CHECK_ERROR();
         }
 
-        void slice_standalone_no_precomputation(const float* positions, float* sliced_values, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
+        void slice_standalone_with_precomputation(const float* positions, float* sliced_values, const int pos_dim, const int val_dim, const int nr_positions, const int* splatting_indices, const float* splatting_weights,  const HashTableGPU& hash_table_gpu){
+
+            dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
+            dim3 blockSize(BLOCK_SIZE, 1, 1);
+            int cleanBlockSize = 128;
+            dim3 cleanBlocks((nr_positions - 1) / cleanBlockSize + 1, 2 * (pos_dim + 1), 1);
+
+            blockSize.y = 1;
+            CUresult res= m_lattice_program.kernel("slice_with_precomputation")
+                        .instantiate(pos_dim, val_dim)
+                        .configure(blocks, blockSize)
+                        .launch( positions, sliced_values, nr_positions, splatting_indices, splatting_weights, hash_table_gpu);
+            CUDA_CHECK_CURESULT(res);
+            CUDA_CHECK_ERROR();
+
+        }
+
+
+        void slice_standalone_no_precomputation(const float* positions, float* sliced_values, const int pos_dim, const int val_dim, const int nr_positions, int* splatting_indices, float* splatting_weights,  const HashTableGPU& hash_table_gpu){
 
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
@@ -2283,6 +2301,53 @@ slice(const int n, float *values, int* splatting_indices, float* splatting_weigh
 }
 
 
+
+template<int pos_dim, int val_dim>
+__global__ void 
+__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+slice_with_precomputation(const float* positions,  float* values, const int nr_positions, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+
+    int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
+
+
+    if(idx>=nr_positions){ //don't go out of bounds
+        return;
+    }
+
+
+
+    //here we accumulate the values and the homogeneous term
+    float val_hom[val_dim]{0};
+
+    for (int remainder = 0; remainder <= pos_dim; remainder++) {
+
+        int idx_val=splatting_indices[idx * (pos_dim + 1) + remainder];
+        float weight= splatting_weights[idx * (pos_dim + 1) + remainder];
+
+        float *val = const_cast<float *>(hash_table.m_values + idx_val * val_dim );
+
+        //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
+        if(idx_val!=-1){
+            for (int i = 0; i < val_dim ; i++){
+                val_hom[i]+= val[i]* weight;
+                // printf("val[i]  %f \n", val[i] );
+                // printf("barycentric  %f \n", barycentric[remainder] );
+            }
+        }
+    
+    }
+
+
+    //do not divicde by the homogeneous coordinate, rather just store the value as it is because we will afterwards need the homogeneous coordinate for the backwards passs
+    for (int i = 0; i < val_dim; i++){
+            values[idx*val_dim + i]= val_hom[i] ;
+    }
+
+
+
+}
+
+
 template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
@@ -2430,7 +2495,7 @@ slice_no_precomputation(const float* positions,  float* values, const int nr_pos
 
     //do not divicde by the homogeneous coordinate, rather just store the value as it is because we will afterwards need the homogeneous coordinate for the backwards passs
     for (int i = 0; i < val_dim; i++){
-            values[idx*val_full_dim + i]= val_hom[i] ;
+            values[idx*val_dim + i]= val_hom[i] ;
     }
 
 

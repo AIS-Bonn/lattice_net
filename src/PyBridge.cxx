@@ -59,6 +59,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def("just_create_verts",  &Lattice::just_create_verts )
     .def("create_coarse_verts",  &Lattice::create_coarse_verts )
     .def("create_coarse_verts_naive",  &Lattice::create_coarse_verts_naive )
+    .def("slice_standalone_with_precomputation", &Lattice::slice_standalone_with_precomputation )
     .def("slice_standalone_no_precomputation", &Lattice::slice_standalone_no_precomputation )
     // .def("slice_elevated_verts", &Lattice::slice_elevated_verts )
     .def("slice_classify_no_precomputation", &Lattice::slice_classify_no_precomputation )

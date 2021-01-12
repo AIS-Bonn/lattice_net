@@ -40,6 +40,7 @@ public:
     // torch::Tensor create_splatting_mask(const torch::Tensor& nr_points_per_simplex, const int nr_positions, const int max_nr_points);
     // void blur_standalone(torch::Tensor& positions_raw, torch::Tensor& values); 
     // std::shared_ptr<Lattice> blur_standalone(); 
+    torch::Tensor slice_standalone_with_precomputation(torch::Tensor& positions_raw, torch::Tensor& splatting_indices_tensor, torch::Tensor& splatting_weights_tensor);
     std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> slice_standalone_no_precomputation(torch::Tensor& positions_raw); //slice at the position and don't use the m_matrix, but rather query the simplex and get the barycentric coordinates and all that. This is useful for when we slice at a different position than the one used for splatting
     // std::shared_ptr<Lattice> slice_elevated_verts(const std::shared_ptr<Lattice> lattice_to_slice_from);    
     std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> gather_standalone_no_precomputation(torch::Tensor& positions_raw); //gathers the features of the neighbouring vertices and concats them all together, together with the barycentric weights. The output tensor will be size 1 x nr_positions x ( (m_pos_dim+1) x (val_full_dim +1) ). On each row we store sequencially the values of each vertex and then at the end we add the last m_pos_dim+1 barycentric weights

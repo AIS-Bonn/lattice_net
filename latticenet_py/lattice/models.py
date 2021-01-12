@@ -174,7 +174,9 @@ class LNN(torch.nn.Module):
                     print("adding up_bottleneck_block with nr of filters", cur_channels_count ) 
                     self.resnet_blocks_per_up_lvl_list[i].append( BottleneckBlock(cur_channels_count, [False,False,is_last_conv] ) )
 
-        self.slice_fast_cuda=SliceFastCUDALatticeModule(nr_classes=nr_classes, dropout_prob=dropout_last_layer, experiment=experiment)
+        # self.slice_fast_cuda=SliceFastCUDALatticeModule(nr_classes=nr_classes, dropout_prob=dropout_last_layer, experiment=experiment)
+        self.slice=SliceLatticeModule()
+        self.classify=Conv1x1(out_channels=nr_classes, bias=True)
        
         self.logsoftmax=torch.nn.LogSoftmax(dim=1)
 
@@ -247,7 +249,9 @@ class LNN(torch.nn.Module):
 
 
 
-        sv =self.slice_fast_cuda(lv, ls, positions, indices, weights)
+        # sv =self.slice_fast_cuda(lv, ls, positions, indices, weights)
+        sv =self.slice(lv, ls, positions, indices, weights)
+        sv=self.classify(sv)
 
 
         logsoftmax=self.logsoftmax(sv)

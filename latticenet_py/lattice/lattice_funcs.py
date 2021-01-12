@@ -314,7 +314,7 @@ class FinefyLattice(Function):
 
 class SliceLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_values, lattice_structure, positions):
+    def forward(ctx, lattice_values, lattice_structure, positions, splatting_indices=None, splatting_weights=None):
 
 
 
@@ -322,7 +322,10 @@ class SliceLattice(Function):
         lattice_structure.set_values(lattice_values)
         # lattice_structure.set_val_dim(lattice_values.shape[1])
 
-        sliced_values, splatting_indices, splatting_weights=lattice_structure.slice_standalone_no_precomputation(positions )
+        if splatting_indices==None and splatting_weights==None:
+            sliced_values, splatting_indices, splatting_weights=lattice_structure.slice_standalone_no_precomputation(positions )
+        else: 
+            sliced_values=lattice_structure.slice_standalone_with_precomputation(positions, splatting_indices, splatting_weights  )
 
         ctx.save_for_backward(positions, sliced_values, splatting_indices, splatting_weights )
         ctx.lattice_structure = lattice_structure
