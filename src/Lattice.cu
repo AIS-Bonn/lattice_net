@@ -115,7 +115,7 @@ void Lattice::init_params(const std::string config_file){
     for (int i=0; i < nr_sigmas; i++) {
         std::string param_name="sigma_"+std::to_string(i);
         std::string sigma_val_and_extent = (std::string)lattice_config[param_name];
-        std::vector<std::string> tokenized = split(sigma_val_and_extent, " ");
+        std::vector<std::string> tokenized = radu::utils::split(sigma_val_and_extent, " ");
         CHECK(tokenized.size()==2) << "For each sigma we must define its value and the extent(nr of dimensions it affects) in space separated string. So the nr of tokens split string should have would be 1. However the nr of tokens we have is" << tokenized.size();
         std::pair<float, int> sigma_params = std::make_pair<float,int> (  std::stof(tokenized[0]), std::stof(tokenized[1]) );
         m_sigmas_val_and_extent.push_back(sigma_params);
@@ -325,6 +325,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torc
 
 std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filter_bank, const int dilation, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex_from_lattice_neigbhours, const bool flip_neighbours){
 
+    if (!lattice_neighbours){
+        lattice_neighbours=shared_from_this();
+    }
 
     CHECK(filter_bank.defined()) << "Filter bank is undefined";
     CHECK(filter_bank.dim()==2) << "Filter bank should have dimension 2, corresponding with (filter_extent * val_dim) x nr_filters.  However it has dimension: " << filter_bank.dim();
@@ -475,6 +478,9 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
 torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const int filter_extent, const int dilation, const bool use_center_vertex_from_lattice_neigbhours, const bool flip_neighbours){
 
+    if (!lattice_neighbours){
+        lattice_neighbours=shared_from_this();
+    }
 
     CHECK(filter_extent == get_filter_extent(1) ) << "Filters should convolve over all the neighbours in the 1 hop plus the center vertex lattice. So the filter extent should be " << get_filter_extent(1) << ". However it is" << filter_extent;
 
@@ -505,6 +511,10 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
 }
 
 torch::Tensor Lattice::row2im(const torch::Tensor& lattice_rowified,  const int dilation, const int filter_extent, const int nr_filters, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex_from_lattice_neigbhours){
+
+    if (!lattice_neighbours){
+        lattice_neighbours=shared_from_this();
+    }
 
     int nr_vertices=nr_lattice_vertices();
     m_hash_table->m_values_tensor=torch::zeros({nr_vertices, nr_filters}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) ); 
@@ -1116,6 +1126,9 @@ torch::Tensor Lattice::positions(){
 std::shared_ptr<HashTable> Lattice::hash_table(){
     return m_hash_table;
 }
+torch::Tensor Lattice::values(){
+    return  m_hash_table->m_values_tensor;
+}
 
 
 
@@ -1133,5 +1146,11 @@ void Lattice::set_sigma(const float sigma){
 void Lattice::set_name(const std::string name){
     m_name=name;
 }
+void Lattice::set_values(const torch::Tensor& new_values){
+    // m_values_tensor=new_values.contiguous();
+    // update_impl();
+    m_hash_table->set_values(new_values);
+}
+ 
 
 

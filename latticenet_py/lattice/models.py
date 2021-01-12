@@ -7,7 +7,7 @@ from termcolor import colored
 
 
 
-from latticenet_py.lattice.lattice_py import LatticePy
+# from latticenet_py.lattice.lattice_py import LatticePy
 from latticenet_py.lattice.lattice_funcs import *
 from latticenet_py.lattice.lattice_modules import *
 

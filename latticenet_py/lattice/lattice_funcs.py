@@ -10,7 +10,7 @@ import numpy as np
 import time
 import math
 import torch_scatter
-from latticenet_py.lattice.lattice_py import LatticePy
+from latticenet_py.lattice.lattice_py import LatticeWrapper
 
 #Just to have something close to the macros we have in c++
 def profiler_start(name):
@@ -40,7 +40,7 @@ class SplatLattice(Function):
         lattice_py.set_positions(positions)
 
 
-        return lattice_py.values(), lattice_py
+        return lattice_py.values(), LatticeWrapper.wrap(lattice_py) #Pytorch functions requires all the return values to be torch.Variables so we wrap the lattice into one
 
       
 
@@ -171,11 +171,11 @@ class ConvIm2RowLattice(Function):
         if(lattice_neighbours_structure is not None):
             lattice_neighbours_structure.set_values(lattice_neighbours_values)
 
-        convolved_lattice_py=lattice_py.convolve_im2row_standalone(filter_bank, dilation, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours)
+        convolved_lattice_py=lattice_py.convolve_im2row_standalone(filter_bank, dilation, lattice_neighbours_structure, use_center_vertex_from_lattice_neighbours, False)
         
 
         values=convolved_lattice_py.values()
-        convolved_lattice_py.set_values(values)
+        # convolved_lattice_py.set_values(values)
 
 
 
@@ -187,11 +187,14 @@ class ConvIm2RowLattice(Function):
         ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
         if lattice_neighbours_structure!=None:
-            ctx.val_dim= lattice_neighbours_structure.lattice.val_dim()
+            ctx.val_dim= lattice_neighbours_structure.val_dim()
         else: 
-            ctx.val_dim= lattice_py.lattice.val_dim()
+            ctx.val_dim= lattice_py.val_dim()
 
-        return values, convolved_lattice_py
+        # help(convolved_lattice_py)
+        # help(torch.autograd.Variable)
+
+        return values, LatticeWrapper.wrap(convolved_lattice_py) #Pytorch functions requires all the return values to be torch.Variables so we wrap the lattice into one
 
     @staticmethod
     def backward(ctx, grad_lattice_values, grad_lattice_structure):
@@ -212,7 +215,8 @@ class ConvIm2RowLattice(Function):
         lattice_py.set_values(lattice_values)
         if(lattice_neighbours_structure is not None):
             lattice_neighbours_structure.set_values(lattice_neighbours_values)
-        lattice_rowified= lattice_py.im2row(filter_extent, lattice_neighbours_structure, dilation, use_center_vertex_from_lattice_neighbours, False)
+        lattice_rowified= lattice_py.im2row(lattice_neighbours_structure, filter_extent, dilation, use_center_vertex_from_lattice_neighbours, False)
+
 
 
         grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
@@ -254,7 +258,7 @@ class CoarsenLattice(Function):
 
         #convolve at this lattice vertices with the neighbours from lattice_fine
         dilation=1
-        convolved_lattice_py=coarsened_lattice_py.convolve_im2row_standalone(filter_bank, dilation, lattice_fine_structure, use_center_vertex_from_lattice_neighbours)
+        convolved_lattice_py=coarsened_lattice_py.convolve_im2row_standalone(filter_bank, dilation, lattice_fine_structure, use_center_vertex_from_lattice_neighbours, False)
      
         values=convolved_lattice_py.values()
         convolved_lattice_py.set_values(values)
@@ -267,11 +271,11 @@ class CoarsenLattice(Function):
         ctx.filter_extent=int(filter_bank.shape[0]/lattice_fine_values.shape[1])
         ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
-        ctx.val_dim= lattice_fine_structure.lattice.val_dim()
+        ctx.val_dim= lattice_fine_structure.val_dim()
 
      
 
-        return values, convolved_lattice_py
+        return values, LatticeWrapper.wrap(convolved_lattice_py) #Pytorch functions requires all the return values to be torch.Variables so we wrap the lattice into one
 
     @staticmethod
     def backward(ctx, grad_lattice_values, grad_lattice_structure):
@@ -291,7 +295,7 @@ class CoarsenLattice(Function):
 
         #reconstruct lattice_rowified 
         lattice_fine_structure.set_values(lattice_fine_values)
-        lattice_rowified= coarsened_lattice_py.im2row(filter_extent, lattice_fine_structure, dilation, use_center_vertex_from_lattice_neighbours, False)
+        lattice_rowified= coarsened_lattice_py.im2row(lattice_fine_structure, filter_extent, dilation, use_center_vertex_from_lattice_neighbours, False)
 
 
         grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
@@ -316,65 +320,65 @@ class CoarsenLattice(Function):
         return grad_lattice, None, grad_filter, None, None, None #THe good one
        
 
-class CoarsenAndReturnLatticeRowified(Function):
-    @staticmethod
-    def forward(ctx, lattice_fine_values, lattice_fine_structure, use_center_vertex_from_lattice_neighbours):
-        lattice_fine_structure.set_values(lattice_fine_values)
+# class CoarsenAndReturnLatticeRowified(Function):
+#     @staticmethod
+#     def forward(ctx, lattice_fine_values, lattice_fine_structure, use_center_vertex_from_lattice_neighbours):
+#         lattice_fine_structure.set_values(lattice_fine_values)
 
-        #create a structure for the coarse lattice, the values of the coarse vertices will be zero
-        positions=lattice_fine_structure.positions()
+#         #create a structure for the coarse lattice, the values of the coarse vertices will be zero
+#         positions=lattice_fine_structure.positions()
 
-        coarsened_lattice_py=lattice_fine_structure.create_coarse_verts_naive(positions)
+#         coarsened_lattice_py=lattice_fine_structure.create_coarse_verts_naive(positions)
 
 
-        val_dim=lattice_fine_values.shape[1]
-        filter_extent=coarsened_lattice_py.lattice.get_filter_extent(1)
-        nr_vertices=coarsened_lattice_py.nr_lattice_vertices()
-        coarse_lattice_rowified=coarsened_lattice_py.im2row(filter_extent=filter_extent, lattice_neighbours=lattice_fine_structure,  dilation=1, use_center_vertex_from_lattice_neighbours=True, flip_neighbours=False)
+#         val_dim=lattice_fine_values.shape[1]
+#         filter_extent=coarsened_lattice_py.lattice.get_filter_extent(1)
+#         nr_vertices=coarsened_lattice_py.nr_lattice_vertices()
+#         coarse_lattice_rowified=coarsened_lattice_py.im2row(filter_extent=filter_extent, lattice_neighbours=lattice_fine_structure,  dilation=1, use_center_vertex_from_lattice_neighbours=True, flip_neighbours=False)
 
       
-        ctx.coarsened_lattice_py=coarsened_lattice_py
-        ctx.lattice_fine_structure=lattice_fine_structure
-        ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
-        ctx.val_dim= lattice_fine_structure.lattice.val_dim()
-        ctx.filter_extent=filter_extent
+#         ctx.coarsened_lattice_py=coarsened_lattice_py
+#         ctx.lattice_fine_structure=lattice_fine_structure
+#         ctx.use_center_vertex_from_lattice_neighbours=use_center_vertex_from_lattice_neighbours
+#         ctx.val_dim= lattice_fine_structure.val_dim()
+#         ctx.filter_extent=filter_extent
        
 
-        return coarse_lattice_rowified, coarsened_lattice_py
+#         return coarse_lattice_rowified, LatticeWrapper.wrap(convolved_lattice_py) #Pytorch functions requires all the return values to be torch.Variables so we wrap the lattice into one
 
-    @staticmethod
-    def backward(ctx, grad_lattice_rowified, grad_lattice_structure):
+#     @staticmethod
+#     def backward(ctx, grad_lattice_rowified, grad_lattice_structure):
         
 
 
-        coarsened_lattice_py=ctx.coarsened_lattice_py
-        lattice_fine_structure=ctx.lattice_fine_structure
-        use_center_vertex_from_lattice_neighbours=ctx.use_center_vertex_from_lattice_neighbours
-        val_dim=ctx.val_dim
-        filter_extent=ctx.filter_extent
+#         coarsened_lattice_py=ctx.coarsened_lattice_py
+#         lattice_fine_structure=ctx.lattice_fine_structure
+#         use_center_vertex_from_lattice_neighbours=ctx.use_center_vertex_from_lattice_neighbours
+#         val_dim=ctx.val_dim
+#         filter_extent=ctx.filter_extent
   
 
 
-        values=lattice_fine_structure.values()
-        if (values.shape[1] is not val_dim):
-            # print("COARSEN AND RETURN LATTICE ROWIFIED BACKWARD, lattice fine values has val full dim of shape ", values.shape[1]) 
-            # sys.exit("During row2im we are accumulating the gradient into the values of the current fine lattice. It should have size nr_vertices x val_full_dim, wher val full dim. But apartenyl it's not")
-            values=torch.zeros( (values.shape[0], val_dim), device="cuda" )
-        else:
-            values=values.fill_(0)
-        lattice_fine_structure.set_values(values)
+#         values=lattice_fine_structure.values()
+#         if (values.shape[1] is not val_dim):
+#             # print("COARSEN AND RETURN LATTICE ROWIFIED BACKWARD, lattice fine values has val full dim of shape ", values.shape[1]) 
+#             # sys.exit("During row2im we are accumulating the gradient into the values of the current fine lattice. It should have size nr_vertices x val_full_dim, wher val full dim. But apartenyl it's not")
+#             values=torch.zeros( (values.shape[0], val_dim), device="cuda" )
+#         else:
+#             values=values.fill_(0)
+#         lattice_fine_structure.set_values(values)
 
-        grad_lattice=lattice_fine_structure.lattice.row2im(grad_lattice_rowified, 1, filter_extent, val_dim, coarsened_lattice_py.lattice, use_center_vertex_from_lattice_neighbours, False)
+#         grad_lattice=lattice_fine_structure.lattice.row2im(grad_lattice_rowified, 1, filter_extent, val_dim, coarsened_lattice_py.lattice, use_center_vertex_from_lattice_neighbours, False)
 
  
-        #release
-        ctx.coarsened_lattice_py=0
-        ctx.lattice_fine_structure=0
+#         #release
+#         ctx.coarsened_lattice_py=0
+#         ctx.lattice_fine_structure=0
 
 
-        # sys.exit("exit after the coarsening backwards")
+#         # sys.exit("exit after the coarsening backwards")
 
-        return grad_lattice, None, None, None, None #THe good one
+#         return grad_lattice, None, None, None, None #THe good one
 
 class FinefyLattice(Function):
     @staticmethod
@@ -384,7 +388,7 @@ class FinefyLattice(Function):
 
 
         dilation=1
-        convolved_lattice_py=lattice_fine_structure.convolve_im2row_standalone(filter_bank, dilation,lattice_coarse_structure, use_center_vertex_from_lattice_neighbours)
+        convolved_lattice_py=lattice_fine_structure.convolve_im2row_standalone(filter_bank, dilation,lattice_coarse_structure, use_center_vertex_from_lattice_neighbours, False)
        
         values=convolved_lattice_py.values()
         convolved_lattice_py.set_values(values)
@@ -397,10 +401,10 @@ class FinefyLattice(Function):
         ctx.filter_extent=int(filter_bank.shape[0]/lattice_coarse_values.shape[1])
         ctx.nr_filters= int(filter_bank.shape[1])#i hope it doesnt leak any memory
         ctx.dilation=dilation
-        ctx.val_dim= lattice_coarse_structure.lattice.val_dim()
+        ctx.val_dim= lattice_coarse_structure.val_dim()
 
 
-        return values, convolved_lattice_py
+        return values, LatticeWrapper.wrap(convolved_lattice_py) #Pytorch functions requires all the return values to be torch.Variables so we wrap the lattice into one
 
     @staticmethod
     def backward(ctx, grad_lattice_values, grad_lattice_structure):
@@ -418,7 +422,7 @@ class FinefyLattice(Function):
 
         #reconstruct lattice_rowified 
         lattice_coarse_structure.set_values(lattice_coarse_values)
-        lattice_rowified= lattice_fine_structure.im2row(filter_extent, lattice_coarse_structure, dilation, use_center_vertex_from_lattice_neighbours, False)
+        lattice_rowified= lattice_fine_structure.im2row(lattice_coarse_structure, filter_extent, dilation, use_center_vertex_from_lattice_neighbours, False)
 
 
         grad_filter=lattice_rowified.transpose(0,1).mm(grad_lattice_values) 
@@ -482,7 +486,7 @@ class SliceLattice(Function):
         if(lattice_py.val_dim() is not grad_sliced_values.shape[1]):
             sys.exit("for some reason the values stored in the lattice are not the same dimension as the gradient. What?")
         # lattice_py.set_val_dim(grad_sliced_values.shape[1])
-        lattice_py.lattice.slice_backwards_standalone_with_precomputation_no_homogeneous(positions, grad_sliced_values, splatting_indices, splatting_weights) 
+        lattice_py.slice_backwards_standalone_with_precomputation_no_homogeneous(positions, grad_sliced_values, splatting_indices, splatting_weights) 
         lattice_values=lattice_py.values() #we get a pointer to the values so they don't dissapear when we realease the lettice
        
         ctx.lattice_structure=0 # release the pointer to this so it gets cleaned up
@@ -503,7 +507,7 @@ class SliceClassifyLattice(Function):
         initial_values=lattice_values #needed fo the backwards pass TODO maybe the clone is not needed?
 
 
-        class_logits=lattice_structure.lattice.slice_classify_with_precomputation(positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, splatting_indices, splatting_weights)
+        class_logits=lattice_structure.slice_classify_with_precomputation(positions, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes, splatting_indices, splatting_weights)
 
 
         ctx.save_for_backward(positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias, splatting_indices, splatting_weights )
@@ -533,7 +537,7 @@ class SliceClassifyLattice(Function):
         grad_linear_clasify_bias=torch.zeros_like(linear_clasify_bias)
 
 
-        lattice_py.lattice.slice_classify_backwards_with_precomputation(grad_class_logits, positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes,
+        lattice_py.slice_classify_backwards_with_precomputation(grad_class_logits, positions, initial_values, delta_weights, linear_clasify_weight, linear_clasify_bias, nr_classes,
                                                                                     grad_lattice_values, grad_delta_weights, grad_linear_clasify_weight, grad_linear_clasify_bias,
                                                                                     splatting_indices, splatting_weights) 
 
@@ -571,7 +575,7 @@ class GatherLattice(Function):
 
 
         # lattice_py.set_val_dim(val_dim)
-        lattice_py.lattice.gather_backwards_standalone_with_precomputation(positions, grad_sliced_values, splatting_indices, splatting_weights) 
+        lattice_py.gather_backwards_standalone_with_precomputation(positions, grad_sliced_values, splatting_indices, splatting_weights) 
         lattice_values=lattice_py.values() #we get a pointer to the values so they don't dissapear when we realease the lettice
       
 

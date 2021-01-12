@@ -31,11 +31,11 @@ PYBIND11_MODULE(latticenet, m) {
     // py::module::import("torch");
     // py::object variable = (py::object) py::module::import("torch").attr("autograd").attr("Variable"); //from here but it segment faults https://pybind11.readthedocs.io/en/stable/advanced/misc.html
     py::class_<HashTable, std::shared_ptr<HashTable>   > (m, "HashTable")
-    .def_readonly("m_values_tensor", &HashTable::m_values_tensor) //careful when using this because setting it and not using update_impl is a big bug
+    // .def_readonly("m_values_tensor", &HashTable::m_values_tensor) //careful when using this because setting it and not using update_impl is a big bug
     .def_readonly("m_keys_tensor", &HashTable::m_keys_tensor) //careful when using this because setting it and not using update_impl is a big bug
     .def_readonly("m_nr_filled_tensor", &HashTable::m_nr_filled_tensor) ////careful when using this because setting it and not using update_impl is a big bug
-    .def("update_impl", &HashTable::update_impl)
-    .def("set_values", &HashTable::set_values)
+    // .def("update_impl", &HashTable::update_impl)
+    // .def("set_values", &HashTable::set_values)
     ;
 
     py::class_<Lattice, std::shared_ptr<Lattice>   > (m, "Lattice")
@@ -86,6 +86,8 @@ PYBIND11_MODULE(latticenet, m) {
     .def("positions", &Lattice::positions )
     .def("sigmas_tensor", &Lattice::sigmas_tensor)
     .def("hash_table", &Lattice::hash_table)
+    .def("values", &Lattice::values)
+    .def("set_values", &Lattice::set_values)
     // .def_readwrite("m_hash_table", &Lattice::m_hash_table )
     // .def_readwrite("m_sliced_values_hom_tensor", &Lattice::m_sliced_values_hom_tensor )
     // .def_readwrite("m_lattice_rowified", &Lattice::m_lattice_rowified )
@@ -147,3 +149,6 @@ PYBIND11_MODULE(latticenet, m) {
 
 
 }
+
+
+

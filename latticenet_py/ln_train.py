@@ -13,7 +13,7 @@ from dataloaders import *
 from latticenet  import TrainParams
 from latticenet  import ModelParams
 from latticenet  import EvalParams
-from latticenet_py.lattice.lattice_py import LatticePy
+# from latticenet_py.lattice.lattice_py import LatticePy
 from latticenet_py.lattice.diceloss import GeneralizedSoftDiceLoss
 from latticenet_py.lattice.lovasz_loss import LovaszSoftmax
 from latticenet_py.lattice.models import *
@@ -87,8 +87,7 @@ def run():
     first_time=True
 
     #torch stuff 
-    lattice=LatticePy()
-    lattice.create(config_path, "splated_lattice")
+    lattice=Lattice.create(config_path, "lattice")
 
     cb_list = []
     if(train_params.with_visdom()):

@@ -12,9 +12,14 @@ import torch_scatter
 
 # # https://discuss.pytorch.org/t/subclassing-torch-tensor/23754
 # class LatticePy(torch._C._TensorBase): 
-class LatticePy(torch.Tensor): 
+class LatticeWrapper(torch.Tensor): 
 # class LatticePy(torch.Tensor): 
 # class LatticePy(torch.autograd.Variable): 
+    @staticmethod
+    def wrap(lattice):
+        ls_wrap=LatticeWrapper()
+        ls_wrap.lattice=lattice
+        return ls_wrap
 
     def create(self, config_file, name):
         self.lattice=Lattice.create(config_file, name)

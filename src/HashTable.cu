@@ -82,6 +82,8 @@ void HashTable::update_impl(){
 
 }
 
+
+
 //getters 
 int HashTable::pos_dim(){
     return m_keys_tensor.size(1);

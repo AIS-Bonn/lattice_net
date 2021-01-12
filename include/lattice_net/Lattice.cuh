@@ -19,6 +19,7 @@ class HashTable;
 // class Lattice : public torch::autograd::Variable, public std::enable_shared_from_this<Lattice>{
 // class Lattice : public at::Tensor, public std::enable_shared_from_this<Lattice>{
 class Lattice : public std::enable_shared_from_this<Lattice>{
+// class Lattice : public torch::Tensor, public std::enable_shared_from_this<Lattice>{
 // class Lattice :public THPVariable, public std::enable_shared_from_this<Lattice>{
 public:
     template <class ...Args>
@@ -88,11 +89,13 @@ public:
     torch::Tensor sigmas_tensor();
     torch::Tensor positions(); 
     std::shared_ptr<HashTable> hash_table();
+    torch::Tensor values();
    
 
     //setters
     void set_sigma(const float sigma);
     void set_name(const std::string name);
+    void set_values(const torch::Tensor& new_values); //use this to set new values because it will also call update_impl to set the float pointers to the correct place in the implementation
 
 
 
