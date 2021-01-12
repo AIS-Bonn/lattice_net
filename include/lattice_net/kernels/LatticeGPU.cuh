@@ -157,7 +157,7 @@ public:
         }
 
         //creates a lattice rowified by grabbing the values of the neighbours from the hash_table_neighbours. The neigbhours are the neighbours of the keys in hash_table_query. Useful for lattices which are at different coarsenes levels
-        void im2row(const int nr_vertices, const int pos_dim, const int val_dim, const int dilation, float* im2row_out, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neighbours, const bool flip_neighbours, const bool debug_kernel){
+        void im2row(const int nr_vertices, const int pos_dim, const int val_dim, const int dilation, float* im2row_out, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool flip_neighbours, const bool debug_kernel){
 
             int nr_blocks=nr_vertices/BLOCK_SIZE;
             // check for partial block at the end
@@ -166,13 +166,13 @@ public:
             CUresult res= m_lattice_program.kernel("im2row")
                     .instantiate(pos_dim, val_dim)
                     .configure(nr_blocks, BLOCK_SIZE)
-                    .launch( nr_vertices, im2row_out, filter_extent, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, use_center_vertex_from_lattice_neighbours, flip_neighbours, debug_kernel);
+                    .launch( nr_vertices, im2row_out, filter_extent, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, flip_neighbours, debug_kernel);
             CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
         }
 
 
-        void row2im(const int hash_table_capacity, const int pos_dim, const int val_full_dim, const int dilation, float* im2row_in, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neighbours, const bool do_test){
+        void row2im(const int hash_table_capacity, const int pos_dim, const int val_full_dim, const int dilation, float* im2row_in, const int filter_extent, const HashTableGPU& hash_table_query, const HashTableGPU& hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool do_test){
 
 
             dim3 blocks((hash_table_capacity - 1) / BLOCK_SIZE + 1, 1, 1);
@@ -180,7 +180,7 @@ public:
             CUresult res= m_lattice_program.kernel("row2im")
                     .instantiate(pos_dim, val_full_dim)
                     .configure(blocks, BLOCK_SIZE)
-                    .launch( hash_table_capacity, im2row_in, filter_extent, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, use_center_vertex_from_lattice_neighbours, do_test);
+                    .launch( hash_table_capacity, im2row_in, filter_extent, dilation, hash_table_query, hash_table_neighbours, query_lvl, neighbours_lvl, do_test);
             CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
         }
@@ -928,17 +928,6 @@ splatCacheNaive(const int nr_positions, float *values, int* splatting_indices, f
                     #warning CUDA ARCH NEEDS TO BE AT LEAST 200 IN ORDER TO ENABLE ATOMIC OPERATIONS!
                 #endif
             }
-
-            if(with_homogeneous_coord){
-                //homogeneous coordinate
-                #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 200)
-                    // #warning CUDA ARCH IS FINE
-                    atomicAdd(valOut +val_dim, 1.0*weight);
-                #else 
-                    #warning CUDA ARCH NEEDS TO BE AT LEAST 200 IN ORDER TO ENABLE ATOMIC OPERATIONS!
-                #endif
-            }
-
         
         }else{
             // printf("idx is %d, has an invalid splatting_idx at position %d and the splatting idx is %d \n", idx, idx * (pos_dim + 1) + color, splatting_idx );
@@ -1441,7 +1430,7 @@ depthwise_convolve(int nr_vertices, float* values_out, float* filter_bank, int d
 template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
-im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neigbhours, bool flip_neighbours, bool debug_kernel) {
+im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl,  bool flip_neighbours, bool debug_kernel) {
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a lattice vertex
     if (idx >= nr_vertices) return;
@@ -1507,16 +1496,18 @@ im2row(int nr_vertices, float* im2row_out, int filter_extent, int dilation, Hash
     }
     
     //if we have fractional coords it means we are in a fine lattice which is embeddeed in a coarser one. So the keys were multiplied by 0.5 or something like that. That means that we will not find any center vertex
-    if(use_center_vertex_from_lattice_neigbhours && has_all_coords_integer){
+    // if(use_center_vertex_from_lattice_neigbhours && has_all_coords_integer){
+    if(has_all_coords_integer){
         int query_offset = hash_table_neighbours.retrieve(key_query_int); 
         if(query_offset>=0){
-            valMe = hash_table_neighbours.m_values + val_dim * query_offset;
+            valMe = hash_table_neighbours.m_values + val_dim * query_offset; //the hash_table_neighbours can actually be pointing to the one of the current lattice
             center_vertex_has_valid_value=true;
         }
-    }else if (!use_center_vertex_from_lattice_neigbhours){
-        valMe= hash_table_query.m_values + val_dim * idx;
-        center_vertex_has_valid_value=true;
     }
+    // }else if (!use_center_vertex_from_lattice_neigbhours){
+    //     valMe= hash_table_query.m_values + val_dim * idx;
+    //     center_vertex_has_valid_value=true;
+    // }
 
 
     bool should_check_neighbours=true;
@@ -1811,7 +1802,7 @@ test_row2im(int capacity, float* im2row_in, int filter_extent, int dilation, Has
 template<int pos_dim, int val_dim>
 __global__ void 
 __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
-row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool use_center_vertex_from_lattice_neigbhours, const bool do_test) {
+row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTableGPU hash_table_query, HashTableGPU hash_table_neighbours, const int query_lvl, const int neighbours_lvl, const bool do_test) {
 
     // printf("inside row2im use_center_vertex is %d\n", use_center_vertex);
     // printf("capacity is %d",capacity );
@@ -2007,7 +1998,8 @@ row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTabl
     //on the current row we also store the values of the vertex 
 
     //if we have fractional coords it means we are in a fine lattice which is embeddeed in a coarser one. So the keys were multiplied by 0.5 or something like that. That means that we will not find any center vertex
-    if(use_center_vertex_from_lattice_neigbhours && has_all_coords_integer){
+    // if(use_center_vertex_from_lattice_neigbhours && has_all_coords_integer){
+    if(has_all_coords_integer){
         int query_offset = hash_table_neighbours.retrieve(key_query_int); 
         if(query_offset>=0){
             float *row = im2row_in + row_size * query_offset; //this is the row where we will find our value
@@ -2022,24 +2014,25 @@ row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTabl
                         printf("the values don't correspond. val_me_out is %f and start of my values is %f\n ", val_me_out[i], start_of_my_values[i]);
                     }
                 }
-        }
-        }
-    }else if (!use_center_vertex_from_lattice_neigbhours){
-        float *row = im2row_in + row_size * idx; //this is the row where we will find our value
-        int idx_within_row= row_size - val_dim; 
-        float* start_of_my_values=row + idx_within_row;
-        for (int i = 0; i < val_dim; i++){
-            // val_me_out[i]+=start_of_my_values[i];
-            if(!do_test){
-                val_me_out[i]+=start_of_my_values[i];
-            }
-            if(do_test){
-                if(val_me_out[i] != start_of_my_values[i]){
-                    printf("the values don't correspond. val_me_out is %f and start of my values is %f\n ", val_me_out[i], start_of_my_values[i]);
-                }
             }
         }
     }
+    // }else if (!use_center_vertex_from_lattice_neigbhours){
+    //     float *row = im2row_in + row_size * idx; //this is the row where we will find our value
+    //     int idx_within_row= row_size - val_dim; 
+    //     float* start_of_my_values=row + idx_within_row;
+    //     for (int i = 0; i < val_dim; i++){
+    //         // val_me_out[i]+=start_of_my_values[i];
+    //         if(!do_test){
+    //             val_me_out[i]+=start_of_my_values[i];
+    //         }
+    //         if(do_test){
+    //             if(val_me_out[i] != start_of_my_values[i]){
+    //                 printf("the values don't correspond. val_me_out is %f and start of my values is %f\n ", val_me_out[i], start_of_my_values[i]);
+    //             }
+    //         }
+    //     }
+    // }
 
 
 

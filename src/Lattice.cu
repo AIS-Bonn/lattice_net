@@ -182,6 +182,8 @@ std::tuple<torch::Tensor, torch::Tensor> Lattice::splat_standalone(torch::Tensor
     int pos_dim=positions_raw.size(1);
     int val_dim=values.size(1);
 
+    m_positions=positions_raw; //raw positions which created this lattice
+
 
     //if it's not initialized to the correct values we intialize the hashtable
     if( !m_hash_table->m_keys_tensor.defined() ){
@@ -323,7 +325,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torc
 
 
 
-std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filter_bank, const int dilation, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex_from_lattice_neigbhours, const bool flip_neighbours){
+std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filter_bank, const int dilation, std::shared_ptr<Lattice> lattice_neighbours,  const bool flip_neighbours){
 
     if (!lattice_neighbours){
         lattice_neighbours=shared_from_this();
@@ -355,7 +357,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
     Tensor lattice_rowified=torch::zeros({nr_vertices, filter_extent* lattice_neighbours->val_dim() }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
 
     
-    m_impl->im2row(nr_vertices, this->pos_dim(), lattice_neighbours->val_dim(), dilation, lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, false);
+    m_impl->im2row(nr_vertices, this->pos_dim(), lattice_neighbours->val_dim(), dilation, lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, flip_neighbours, false);
     
 
 
@@ -476,7 +478,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
 // }
 
-torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const int filter_extent, const int dilation, const bool use_center_vertex_from_lattice_neigbhours, const bool flip_neighbours){
+torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const int filter_extent, const int dilation, const bool flip_neighbours){
 
     if (!lattice_neighbours){
         lattice_neighbours=shared_from_this();
@@ -504,13 +506,13 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
     // }
 
 
-    m_impl->im2row(nr_vertices, this->pos_dim(), lattice_neighbours->val_dim(), dilation, lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, flip_neighbours, false);
+    m_impl->im2row(nr_vertices, this->pos_dim(), lattice_neighbours->val_dim(), dilation, lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, flip_neighbours, false);
 
     return lattice_rowified;
 
 }
 
-torch::Tensor Lattice::row2im(const torch::Tensor& lattice_rowified,  const int dilation, const int filter_extent, const int nr_filters, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex_from_lattice_neigbhours){
+torch::Tensor Lattice::row2im(const torch::Tensor& lattice_rowified,  const int dilation, const int filter_extent, const int nr_filters, std::shared_ptr<Lattice> lattice_neighbours){
 
     if (!lattice_neighbours){
         lattice_neighbours=shared_from_this();
@@ -525,7 +527,7 @@ torch::Tensor Lattice::row2im(const torch::Tensor& lattice_rowified,  const int 
 
     // m_val_dim=nr_filters;
 
-    m_impl->row2im(m_hash_table->capacity(), this->pos_dim(), lattice_neighbours->val_dim(), dilation, lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, use_center_vertex_from_lattice_neigbhours, /*do_test*/false);
+    m_impl->row2im(m_hash_table->capacity(), this->pos_dim(), lattice_neighbours->val_dim(), dilation, lattice_rowified.data_ptr<float>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, /*do_test*/false);
 
     return m_hash_table->m_values_tensor;
 }
