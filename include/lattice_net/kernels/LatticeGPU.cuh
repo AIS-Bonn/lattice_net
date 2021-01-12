@@ -20,7 +20,7 @@
 #endif
 
 
-#define BLOCK_SIZE 256 
+#define BLOCK_SIZE 256
 
 class LatticeGPU { 
 public:

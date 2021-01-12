@@ -90,6 +90,8 @@ Lattice::Lattice(Lattice* other):
         m_hash_table->m_values_tensor=other->m_hash_table->m_values_tensor;
         m_hash_table->m_entries_tensor=other->m_hash_table->m_entries_tensor;
         m_hash_table->m_nr_filled_tensor=other->m_hash_table->m_nr_filled_tensor.clone(); //deep copy for this one as the new lattice may have different number of vertices
+        m_hash_table->m_nr_filled=m_hash_table->m_nr_filled;
+        m_hash_table->m_nr_filled_is_dirty=m_hash_table->m_nr_filled_is_dirty;
         m_hash_table->update_impl();
 
 }
@@ -173,6 +175,7 @@ void Lattice::check_positions_and_values(const torch::Tensor& positions_raw, con
 
 void Lattice::begin_splat(){
     m_hash_table->clear(); 
+    m_hash_table->m_nr_filled_is_dirty=true;
 }
 
 
@@ -212,6 +215,7 @@ std::tuple<torch::Tensor, torch::Tensor> Lattice::splat_standalone(torch::Tensor
     TIME_START("splat");
     m_impl->splat_standalone(positions.data_ptr<float>(), values.data_ptr<float>(), nr_positions, pos_dim, val_dim, 
                             splatting_indices_tensor.data_ptr<int>(), splatting_weights_tensor.data_ptr<float>(),  *(m_hash_table->m_impl) );
+    m_hash_table->m_nr_filled_is_dirty=true;
 
     
     TIME_END("splat");
@@ -256,7 +260,7 @@ std::tuple<torch::Tensor, torch::Tensor> Lattice::just_create_verts(torch::Tenso
 
     m_impl->just_create_verts(positions.data_ptr<float>(), nr_positions, this->pos_dim(), this->val_dim(), 
                             splatting_indices_tensor.data_ptr<int>(), splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
-
+    m_hash_table->m_nr_filled_is_dirty=true;
 
 
     // VLOG(3) << "after just_create_verts nr_verts is " << nr_lattice_vertices();
@@ -304,7 +308,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torc
 
     m_impl->distribute(positions.data_ptr<float>(), values.data_ptr<float>(), distributed_tensor.data_ptr<float>(), nr_positions, pos_dim, val_dim, 
                             splatting_indices_tensor.data_ptr<int>(), splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
-
+    m_hash_table->m_nr_filled_is_dirty=true;
 
     VLOG(3) << "after distributing nr_verts is " << nr_lattice_vertices();
 
@@ -550,6 +554,7 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts(){
     coarse_lattice->m_hash_table->m_keys_tensor=torch::zeros({capacity, pos_dim}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
     coarse_lattice->m_hash_table->m_entries_tensor=torch::zeros({capacity}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) ) ;
     coarse_lattice->m_hash_table->m_nr_filled_tensor=torch::zeros({1}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
+    coarse_lattice->m_hash_table->m_nr_filled_is_dirty=true;
     coarse_lattice->m_hash_table->clear();
     coarse_lattice->m_hash_table->update_impl();
 
@@ -587,6 +592,7 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts_naive(torch::Tensor& posit
     coarse_lattice->m_hash_table->m_keys_tensor=torch::zeros({capacity, pos_dim}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
     coarse_lattice->m_hash_table->m_entries_tensor=torch::zeros({capacity}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) ) ;
     coarse_lattice->m_hash_table->m_nr_filled_tensor=torch::zeros({1}, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
+    coarse_lattice->m_hash_table->m_nr_filled_is_dirty=true;
     coarse_lattice->m_hash_table->clear();
     coarse_lattice->m_hash_table->update_impl();
 
@@ -1149,22 +1155,36 @@ std::string Lattice::name(){
 }
 int Lattice::nr_lattice_vertices(){
   
-    m_impl->wait_to_create_vertices(); //we synchronize the event and wait until whatever kernel was launched to create vertices has also finished
-    // cudaEventSynchronize(m_event_nr_vertices_lattice_changed);  //we synchronize the event and wait until whatever kernel was launched to create vertices has also finished
-    int nr_verts=0;
-    cudaMemcpy ( &nr_verts,  m_hash_table->m_nr_filled_tensor.data_ptr<int>(), sizeof(int), cudaMemcpyDeviceToHost );
-    CHECK(nr_verts>=0) << "nr vertices cannot be negative. However it is " << nr_verts;
-    CHECK(nr_verts<1e+8) << "nr vertices cannot be that high. However it is " << nr_verts;
-    return nr_verts;
+    // m_impl->wait_to_create_vertices(); //we synchronize the event and wait until whatever kernel was launched to create vertices has also finished
+    // // cudaEventSynchronize(m_event_nr_vertices_lattice_changed);  //we synchronize the event and wait until whatever kernel was launched to create vertices has also finished
+    // int nr_verts=0;
+    // cudaMemcpy ( &nr_verts,  m_hash_table->m_nr_filled_tensor.data_ptr<int>(), sizeof(int), cudaMemcpyDeviceToHost );
+    // CHECK(nr_verts>=0) << "nr vertices cannot be negative. However it is " << nr_verts;
+    // CHECK(nr_verts<1e+8) << "nr vertices cannot be that high. However it is " << nr_verts;
+    // return nr_verts;
 
 
     //attempt 2  
     //check if the nr_latttice_vertices is dirty which means that a kernel has been executed that might have modified the nr of vertices
-    // if (dirty){
-        //do a memcpy and set the not dirty to false
-    // }else{
+    int nr_verts=0;
+    if (m_hash_table->m_nr_filled_is_dirty){
+        m_hash_table->m_nr_filled_is_dirty=false;
+        cudaMemcpy ( &nr_verts,  m_hash_table->m_nr_filled_tensor.data_ptr<int>(), sizeof(int), cudaMemcpyDeviceToHost );
+        m_hash_table->m_nr_filled=nr_verts;
+    }else{
         // return number lattice vertices that the cpu knows about
-    // }
+        nr_verts=m_hash_table->m_nr_filled;
+
+        // //sanity check if the value is the same as we read it again
+        // int check_nr_verts;
+        // cudaMemcpy ( &check_nr_verts,  m_hash_table->m_nr_filled_tensor.data_ptr<int>(), sizeof(int), cudaMemcpyDeviceToHost );
+        // CHECK(check_nr_verts==nr_verts) << "Value is not the same. Checked nr of verts is " << check_nr_verts << " nr verts that we wanted to return is " << nr_verts;
+    }
+
+    CHECK(nr_verts>=0) << "nr vertices cannot be negative. However it is " << nr_verts;
+    CHECK(nr_verts<1e+8) << "nr vertices cannot be that high. However it is " << nr_verts;
+
+    return nr_verts;
 }
 int Lattice::get_filter_extent(const int neighborhood_size) {
     CHECK(neighborhood_size==1) << "At the moment we only have implemented a filter with a neighbourhood size of 1. I haven't yet written the more general formula for more neighbourshood size";
