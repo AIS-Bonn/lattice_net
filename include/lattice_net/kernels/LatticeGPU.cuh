@@ -2681,299 +2681,299 @@ gather_with_precomputation(const float* positions,  float* gathered_values, cons
 
 }
 
-template<int pos_dim, int val_full_dim>
-__global__ void 
-__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
-gather_elevated_no_precomputation(const int* keys,  float* gathered_values, const int nr_vertices, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table_to_gather_from, const int lattice_to_gather_from_lvl, const int elevated_verts_lvl) {
+// template<int pos_dim, int val_full_dim>
+// __global__ void 
+// __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+// gather_elevated_no_precomputation(const int* keys,  float* gathered_values, const int nr_vertices, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table_to_gather_from, const int lattice_to_gather_from_lvl, const int elevated_verts_lvl) {
 
-    int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
-
-
-    if(idx>=nr_vertices){ //don't go out of bounds
-        return;
-    }
-
-    float elevated[pos_dim + 1];
-    const int *key_elevated_vert = keys + idx * pos_dim;
-    //get the elevated key which is just the full m_pos_dim+1 key
-    int key_sum=0;
-    for (int i = 0; i < pos_dim; i++) {
-        elevated[i]=key_elevated_vert[i];
-        key_sum+=key_elevated_vert[i];
-    }
-    elevated[pos_dim] = -key_sum;
-
-    //in case the elevated verts and the hash table to slice from are at different lattice levels, we would need to scale them
-    int lvl_diff=elevated_verts_lvl-lattice_to_gather_from_lvl; 
-    float scale=pow(2.0f, (float)lvl_diff); 
-    // printf("scale is %f \n", scale);
-    for (int i = 0; i < pos_dim+1; i++) {
-        elevated[i] = elevated[i]*scale; 
-    }
+//     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
 
 
-    // elevate<pos_dim>(elevated, position);
-    int rem0[pos_dim + 1];
-    int rank[pos_dim + 1];
+//     if(idx>=nr_vertices){ //don't go out of bounds
+//         return;
+//     }
 
-    
+//     float elevated[pos_dim + 1];
+//     const int *key_elevated_vert = keys + idx * pos_dim;
+//     //get the elevated key which is just the full m_pos_dim+1 key
+//     int key_sum=0;
+//     for (int i = 0; i < pos_dim; i++) {
+//         elevated[i]=key_elevated_vert[i];
+//         key_sum+=key_elevated_vert[i];
+//     }
+//     elevated[pos_dim] = -key_sum;
 
-
-    // Find the closest 0-colored simplex through rounding
-    // greedily search for the closest zero-colored lattice point
-    int sum = 0;
-    for (int i = 0; i <= pos_dim; i++) {
-        float v = elevated[i] * (1.0 / (pos_dim + 1));
-        float up = ceil(v) * (pos_dim + 1);
-        float down = floor(v) * (pos_dim + 1);
-        if (up - elevated[i] < elevated[i] - down) {
-            rem0[i] = (int) up;
-        } else {
-            rem0[i] = (int) down;
-        }
-        sum += rem0[i];
-    }
-    sum /= pos_dim + 1;
-
-
-    // Find the simplex we are in and store it in rank (where rank describes what position coordinate i has in the sorted order of the features values)
-    for (int i = 0; i <= pos_dim; i++)
-        rank[i] = 0;
-    for (int i = 0; i < pos_dim; i++) {
-        double di = elevated[i] - rem0[i];
-        for (int j = i + 1; j <= pos_dim; j++)
-            if (di < elevated[j] - rem0[j])
-                rank[i]++;
-            else
-                rank[j]++;
-    }
-
-    // If the point doesn't lie on the plane (sum != 0) bring it back
-    for (int i = 0; i <= pos_dim; i++) {
-        rank[i] += sum;
-        if (rank[i] < 0) {
-            rank[i] += pos_dim + 1;
-            rem0[i] += pos_dim + 1;
-        } else if (rank[i] > pos_dim) {
-            rank[i] -= pos_dim + 1;
-            rem0[i] -= pos_dim + 1;
-        }
-    }
+//     //in case the elevated verts and the hash table to slice from are at different lattice levels, we would need to scale them
+//     int lvl_diff=elevated_verts_lvl-lattice_to_gather_from_lvl; 
+//     float scale=pow(2.0f, (float)lvl_diff); 
+//     // printf("scale is %f \n", scale);
+//     for (int i = 0; i < pos_dim+1; i++) {
+//         elevated[i] = elevated[i]*scale; 
+//     }
 
 
-
-    float barycentric[pos_dim + 2]{0};
-    // Compute the barycentric coordinates (p.10 in [Adams etal 2010])
-    for (int i = 0; i <= pos_dim; i++) {
-        float delta = (elevated[i] - rem0[i]) * (1.0 / (pos_dim + 1));
-        barycentric[pos_dim - rank[i]] += delta;
-        barycentric[pos_dim + 1 - rank[i]] -= delta;
-    }
-    // Wrap around
-    barycentric[0] += 1.0 + barycentric[pos_dim + 1];
-
-
-
-    //here we accumulate the values and the homogeneous term
-    // float ga[val_full_dim]{0};
-    int row_size_gathered=(pos_dim+1)*(val_full_dim+1);
-    float* gathered_row = gathered_values + idx * row_size_gathered;
-
-    int key[pos_dim];
-    for (int remainder = 0; remainder <= pos_dim; remainder++) {
-        // Compute the location of the lattice point explicitly (all but
-        // the last coordinate - it's redundant because they sum to zero)
-        for (int i = 0; i < pos_dim; i++) {
-            key[i] = static_cast<int>(rem0[i] + remainder);
-            if (rank[i] > pos_dim - remainder)
-                key[i] -= (pos_dim + 1);
-        }
-
-        // Retrieve pointer to the value at this vertex.
-        int idx_val=hash_table_to_gather_from.retrieve(key);
-        float *val = const_cast<float *>(hash_table_to_gather_from.m_values + idx_val * val_full_dim );
-        // printf("idx_val  %d \n", idx_val );
-
-        //store also the splatting indices and weight so that they can be used for the backwards pass
-        if(idx_val>=0 && barycentric[remainder]>0.00001){ //we ignore the vertices that are too far awa when we slice a vertex that is on top of another one we will get some vertices with barycentric coordines zero and which one we get is arbitrary
-            splatting_indices[idx * (pos_dim + 1) + remainder]=idx_val; //it indexes in m_keys
-            splatting_weights[idx * (pos_dim + 1) + remainder]=barycentric[remainder];
-        }else{
-            // printf("Slicing around a lattice vertex that is not yet created at positions idx %d \n", idx);
-        }
-
-        //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
-        if(idx_val!=-1 && barycentric[remainder]>0.00001){
-            int idx_in_row=remainder*( val_full_dim + 1 );
-            for (int i = 0; i < val_full_dim ; i++){
-                // gathered_row[idx_in_row + i] = val[i];
-                gathered_row[idx_in_row + i] = val[i]*barycentric[remainder];
-            }
-            gathered_row[idx_in_row+val_full_dim]=barycentric[remainder];
-        }
-    
-    }
-
-
-
-}
-
-template<int pos_dim, int val_full_dim>
-__global__ void 
-__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
-slice_elevated_verts(float* values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table_to_slice_from, HashTableGPU hash_table_elevated_verts, const int lattice_to_slice_from_lvl, const int elevated_verts_lvl) {
-
-    int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
-
-    if (idx >= *hash_table_elevated_verts.m_nr_filled){
-        return;
-    }
-
+//     // elevate<pos_dim>(elevated, position);
+//     int rem0[pos_dim + 1];
+//     int rank[pos_dim + 1];
 
     
-    float elevated[pos_dim + 1];
-    const int *key_elevated_vert = hash_table_elevated_verts.m_keys + idx * pos_dim;
-    //get the elevated key which is just the full m_pos_dim+1 key
-    int key_sum=0;
-    for (int i = 0; i < pos_dim; i++) {
-        elevated[i]=key_elevated_vert[i];
-        key_sum+=key_elevated_vert[i];
-    }
-    elevated[pos_dim] = -key_sum;
-
-    //in case the elevated verts and the hash table to slice from are at different lattice levels, we would need to scale them
-    int lvl_diff=elevated_verts_lvl-lattice_to_slice_from_lvl; 
-    float scale=pow(2.0f, (float)lvl_diff); 
-    // printf("scale is %f \n", scale);
-    for (int i = 0; i < pos_dim+1; i++) {
-        elevated[i] = elevated[i]*scale; 
-    }
 
 
-    // elevate<pos_dim>(elevated, position);
-    int rem0[pos_dim + 1];
-    int rank[pos_dim + 1];
+//     // Find the closest 0-colored simplex through rounding
+//     // greedily search for the closest zero-colored lattice point
+//     int sum = 0;
+//     for (int i = 0; i <= pos_dim; i++) {
+//         float v = elevated[i] * (1.0 / (pos_dim + 1));
+//         float up = ceil(v) * (pos_dim + 1);
+//         float down = floor(v) * (pos_dim + 1);
+//         if (up - elevated[i] < elevated[i] - down) {
+//             rem0[i] = (int) up;
+//         } else {
+//             rem0[i] = (int) down;
+//         }
+//         sum += rem0[i];
+//     }
+//     sum /= pos_dim + 1;
 
 
+//     // Find the simplex we are in and store it in rank (where rank describes what position coordinate i has in the sorted order of the features values)
+//     for (int i = 0; i <= pos_dim; i++)
+//         rank[i] = 0;
+//     for (int i = 0; i < pos_dim; i++) {
+//         double di = elevated[i] - rem0[i];
+//         for (int j = i + 1; j <= pos_dim; j++)
+//             if (di < elevated[j] - rem0[j])
+//                 rank[i]++;
+//             else
+//                 rank[j]++;
+//     }
 
-    // Find the closest 0-colored simplex through rounding
-    // greedily search for the closest zero-colored lattice point
-    int sum = 0;
-    for (int i = 0; i <= pos_dim; i++) {
-        float v = elevated[i] * (1.0 / (pos_dim + 1));
-        float up = ceil(v) * (pos_dim + 1);
-        float down = floor(v) * (pos_dim + 1);
-        if (up - elevated[i] < elevated[i] - down) {
-            rem0[i] = (int) up;
-        } else {
-            rem0[i] = (int) down;
-        }
-        sum += rem0[i];
-    }
-    sum /= pos_dim + 1;
-
-
-    // Find the simplex we are in and store it in rank (where rank describes what position coordinate i has in the sorted order of the features values)
-    for (int i = 0; i <= pos_dim; i++)
-        rank[i] = 0;
-    for (int i = 0; i < pos_dim; i++) {
-        double di = elevated[i] - rem0[i];
-        for (int j = i + 1; j <= pos_dim; j++)
-            if (di < elevated[j] - rem0[j])
-                rank[i]++;
-            else
-                rank[j]++;
-    }
-
-    // If the point doesn't lie on the plane (sum != 0) bring it back
-    for (int i = 0; i <= pos_dim; i++) {
-        rank[i] += sum;
-        if (rank[i] < 0) {
-            rank[i] += pos_dim + 1;
-            rem0[i] += pos_dim + 1;
-        } else if (rank[i] > pos_dim) {
-            rank[i] -= pos_dim + 1;
-            rem0[i] -= pos_dim + 1;
-        }
-    }
+//     // If the point doesn't lie on the plane (sum != 0) bring it back
+//     for (int i = 0; i <= pos_dim; i++) {
+//         rank[i] += sum;
+//         if (rank[i] < 0) {
+//             rank[i] += pos_dim + 1;
+//             rem0[i] += pos_dim + 1;
+//         } else if (rank[i] > pos_dim) {
+//             rank[i] -= pos_dim + 1;
+//             rem0[i] -= pos_dim + 1;
+//         }
+//     }
 
 
 
-    float barycentric[pos_dim + 2]{0};
-    // Compute the barycentric coordinates (p.10 in [Adams etal 2010])
-    for (int i = 0; i <= pos_dim; i++) {
-        float delta = (elevated[i] - rem0[i]) * (1.0 / (pos_dim + 1));
-        barycentric[pos_dim - rank[i]] += delta;
-        barycentric[pos_dim + 1 - rank[i]] -= delta;
-    }
-    // Wrap around
-    barycentric[0] += 1.0 + barycentric[pos_dim + 1];
+//     float barycentric[pos_dim + 2]{0};
+//     // Compute the barycentric coordinates (p.10 in [Adams etal 2010])
+//     for (int i = 0; i <= pos_dim; i++) {
+//         float delta = (elevated[i] - rem0[i]) * (1.0 / (pos_dim + 1));
+//         barycentric[pos_dim - rank[i]] += delta;
+//         barycentric[pos_dim + 1 - rank[i]] -= delta;
+//     }
+//     // Wrap around
+//     barycentric[0] += 1.0 + barycentric[pos_dim + 1];
 
 
 
-    //here we accumulate the values and the homogeneous term
-    float val_hom[val_full_dim]{0};
+//     //here we accumulate the values and the homogeneous term
+//     // float ga[val_full_dim]{0};
+//     int row_size_gathered=(pos_dim+1)*(val_full_dim+1);
+//     float* gathered_row = gathered_values + idx * row_size_gathered;
 
-    int key[pos_dim];
-    int nr_vertices_allocated=0;
-    for (int remainder = 0; remainder <= pos_dim; remainder++) {
-        // Compute the location of the lattice point explicitly (all but
-        // the last coordinate - it's redundant because they sum to zero)
-        for (int i = 0; i < pos_dim; i++) {
-            key[i] = static_cast<int>(rem0[i] + remainder);
-            if (rank[i] > pos_dim - remainder)
-                key[i] -= (pos_dim + 1);
-        }
+//     int key[pos_dim];
+//     for (int remainder = 0; remainder <= pos_dim; remainder++) {
+//         // Compute the location of the lattice point explicitly (all but
+//         // the last coordinate - it's redundant because they sum to zero)
+//         for (int i = 0; i < pos_dim; i++) {
+//             key[i] = static_cast<int>(rem0[i] + remainder);
+//             if (rank[i] > pos_dim - remainder)
+//                 key[i] -= (pos_dim + 1);
+//         }
 
-        // Retrieve pointer to the value at this vertex.
-        int idx_val=hash_table_to_slice_from.retrieve(key);
-        float *val = const_cast<float *>(hash_table_to_slice_from.m_values + idx_val * val_full_dim );
-        // printf("idx_val  %d \n", idx_val );
+//         // Retrieve pointer to the value at this vertex.
+//         int idx_val=hash_table_to_gather_from.retrieve(key);
+//         float *val = const_cast<float *>(hash_table_to_gather_from.m_values + idx_val * val_full_dim );
+//         // printf("idx_val  %d \n", idx_val );
 
-        //store also the splatting indices and weight so that they can be used for the backwards pass
-        if(idx_val>=0 && barycentric[remainder]>0.00001){ //we ignore the vertices that are too far awa when we slice a vertex that is on top of another one we will get some vertices with barycentric coordines zero and which one we get is arbitrary
-            splatting_indices[idx * (pos_dim + 1) + remainder]=idx_val; //it indexes in m_keys
-            splatting_weights[idx * (pos_dim + 1) + remainder]=barycentric[remainder];
-            nr_vertices_allocated++;
-        }else{
-            // printf("Slicing around a lattice vertex that is not yet created at positions idx %d \n", idx);
-        }
+//         //store also the splatting indices and weight so that they can be used for the backwards pass
+//         if(idx_val>=0 && barycentric[remainder]>0.00001){ //we ignore the vertices that are too far awa when we slice a vertex that is on top of another one we will get some vertices with barycentric coordines zero and which one we get is arbitrary
+//             splatting_indices[idx * (pos_dim + 1) + remainder]=idx_val; //it indexes in m_keys
+//             splatting_weights[idx * (pos_dim + 1) + remainder]=barycentric[remainder];
+//         }else{
+//             // printf("Slicing around a lattice vertex that is not yet created at positions idx %d \n", idx);
+//         }
 
-        //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
-        if(idx_val!=-1 && barycentric[remainder]>0.00001){
-            for (int i = 0; i < val_full_dim ; i++){
-                val_hom[i]+= val[i]* barycentric[remainder];
-                // printf("val[i]  %f \n", val[i] );
-                // printf("barycentric  %f \n", barycentric[remainder] );
-            }
-        }
+//         //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
+//         if(idx_val!=-1 && barycentric[remainder]>0.00001){
+//             int idx_in_row=remainder*( val_full_dim + 1 );
+//             for (int i = 0; i < val_full_dim ; i++){
+//                 // gathered_row[idx_in_row + i] = val[i];
+//                 gathered_row[idx_in_row + i] = val[i]*barycentric[remainder];
+//             }
+//             gathered_row[idx_in_row+val_full_dim]=barycentric[remainder];
+//         }
     
-    }
-
-    if(nr_vertices_allocated==0){
-        printf("Slicing around a positions which has no vertices around it at idx %d \n", idx);
-    }
-
-    //divide by the homogeneous coord but only if the val_full_dim>1 because if it's 1 then the val_dim is 0 so we are left with nothing
-    // if(do_normalization){
-    // for (int i = 0; i < val_dim; i++){
-    //     float weight=val_hom[val_dim];
-    //     if(weight!=0.0){ //to avoid divisionz by 0
-    //         values[idx*val_dim + i]= val_hom[i] / weight;
-    //     }else{ //the weight is 0 which means we landed in a simplex that is not allocated. The value will just be 0 then
-    //         values[idx*val_dim + i]= 0.0;
-    //     }
-    // }
-
-
-    //do not divicde by the homogeneous coordinate, rather just store the value as it is because we will afterwards need the homogeneous coordinate for the backwards passs
-    for (int i = 0; i < val_full_dim; i++){
-        values[idx*val_full_dim + i]= val_hom[i] ;
-    }
+//     }
 
 
 
-}
+// }
+
+// template<int pos_dim, int val_full_dim>
+// __global__ void 
+// __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+// slice_elevated_verts(float* values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table_to_slice_from, HashTableGPU hash_table_elevated_verts, const int lattice_to_slice_from_lvl, const int elevated_verts_lvl) {
+
+//     int idx = blockIdx.x * blockDim.x + threadIdx.x; //each thread will deal with a new value
+
+//     if (idx >= *hash_table_elevated_verts.m_nr_filled){
+//         return;
+//     }
+
+
+    
+//     float elevated[pos_dim + 1];
+//     const int *key_elevated_vert = hash_table_elevated_verts.m_keys + idx * pos_dim;
+//     //get the elevated key which is just the full m_pos_dim+1 key
+//     int key_sum=0;
+//     for (int i = 0; i < pos_dim; i++) {
+//         elevated[i]=key_elevated_vert[i];
+//         key_sum+=key_elevated_vert[i];
+//     }
+//     elevated[pos_dim] = -key_sum;
+
+//     //in case the elevated verts and the hash table to slice from are at different lattice levels, we would need to scale them
+//     int lvl_diff=elevated_verts_lvl-lattice_to_slice_from_lvl; 
+//     float scale=pow(2.0f, (float)lvl_diff); 
+//     // printf("scale is %f \n", scale);
+//     for (int i = 0; i < pos_dim+1; i++) {
+//         elevated[i] = elevated[i]*scale; 
+//     }
+
+
+//     // elevate<pos_dim>(elevated, position);
+//     int rem0[pos_dim + 1];
+//     int rank[pos_dim + 1];
+
+
+
+//     // Find the closest 0-colored simplex through rounding
+//     // greedily search for the closest zero-colored lattice point
+//     int sum = 0;
+//     for (int i = 0; i <= pos_dim; i++) {
+//         float v = elevated[i] * (1.0 / (pos_dim + 1));
+//         float up = ceil(v) * (pos_dim + 1);
+//         float down = floor(v) * (pos_dim + 1);
+//         if (up - elevated[i] < elevated[i] - down) {
+//             rem0[i] = (int) up;
+//         } else {
+//             rem0[i] = (int) down;
+//         }
+//         sum += rem0[i];
+//     }
+//     sum /= pos_dim + 1;
+
+
+//     // Find the simplex we are in and store it in rank (where rank describes what position coordinate i has in the sorted order of the features values)
+//     for (int i = 0; i <= pos_dim; i++)
+//         rank[i] = 0;
+//     for (int i = 0; i < pos_dim; i++) {
+//         double di = elevated[i] - rem0[i];
+//         for (int j = i + 1; j <= pos_dim; j++)
+//             if (di < elevated[j] - rem0[j])
+//                 rank[i]++;
+//             else
+//                 rank[j]++;
+//     }
+
+//     // If the point doesn't lie on the plane (sum != 0) bring it back
+//     for (int i = 0; i <= pos_dim; i++) {
+//         rank[i] += sum;
+//         if (rank[i] < 0) {
+//             rank[i] += pos_dim + 1;
+//             rem0[i] += pos_dim + 1;
+//         } else if (rank[i] > pos_dim) {
+//             rank[i] -= pos_dim + 1;
+//             rem0[i] -= pos_dim + 1;
+//         }
+//     }
+
+
+
+//     float barycentric[pos_dim + 2]{0};
+//     // Compute the barycentric coordinates (p.10 in [Adams etal 2010])
+//     for (int i = 0; i <= pos_dim; i++) {
+//         float delta = (elevated[i] - rem0[i]) * (1.0 / (pos_dim + 1));
+//         barycentric[pos_dim - rank[i]] += delta;
+//         barycentric[pos_dim + 1 - rank[i]] -= delta;
+//     }
+//     // Wrap around
+//     barycentric[0] += 1.0 + barycentric[pos_dim + 1];
+
+
+
+//     //here we accumulate the values and the homogeneous term
+//     float val_hom[val_full_dim]{0};
+
+//     int key[pos_dim];
+//     int nr_vertices_allocated=0;
+//     for (int remainder = 0; remainder <= pos_dim; remainder++) {
+//         // Compute the location of the lattice point explicitly (all but
+//         // the last coordinate - it's redundant because they sum to zero)
+//         for (int i = 0; i < pos_dim; i++) {
+//             key[i] = static_cast<int>(rem0[i] + remainder);
+//             if (rank[i] > pos_dim - remainder)
+//                 key[i] -= (pos_dim + 1);
+//         }
+
+//         // Retrieve pointer to the value at this vertex.
+//         int idx_val=hash_table_to_slice_from.retrieve(key);
+//         float *val = const_cast<float *>(hash_table_to_slice_from.m_values + idx_val * val_full_dim );
+//         // printf("idx_val  %d \n", idx_val );
+
+//         //store also the splatting indices and weight so that they can be used for the backwards pass
+//         if(idx_val>=0 && barycentric[remainder]>0.00001){ //we ignore the vertices that are too far awa when we slice a vertex that is on top of another one we will get some vertices with barycentric coordines zero and which one we get is arbitrary
+//             splatting_indices[idx * (pos_dim + 1) + remainder]=idx_val; //it indexes in m_keys
+//             splatting_weights[idx * (pos_dim + 1) + remainder]=barycentric[remainder];
+//             nr_vertices_allocated++;
+//         }else{
+//             // printf("Slicing around a lattice vertex that is not yet created at positions idx %d \n", idx);
+//         }
+
+//         //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
+//         if(idx_val!=-1 && barycentric[remainder]>0.00001){
+//             for (int i = 0; i < val_full_dim ; i++){
+//                 val_hom[i]+= val[i]* barycentric[remainder];
+//                 // printf("val[i]  %f \n", val[i] );
+//                 // printf("barycentric  %f \n", barycentric[remainder] );
+//             }
+//         }
+    
+//     }
+
+//     if(nr_vertices_allocated==0){
+//         printf("Slicing around a positions which has no vertices around it at idx %d \n", idx);
+//     }
+
+//     //divide by the homogeneous coord but only if the val_full_dim>1 because if it's 1 then the val_dim is 0 so we are left with nothing
+//     // if(do_normalization){
+//     // for (int i = 0; i < val_dim; i++){
+//     //     float weight=val_hom[val_dim];
+//     //     if(weight!=0.0){ //to avoid divisionz by 0
+//     //         values[idx*val_dim + i]= val_hom[i] / weight;
+//     //     }else{ //the weight is 0 which means we landed in a simplex that is not allocated. The value will just be 0 then
+//     //         values[idx*val_dim + i]= 0.0;
+//     //     }
+//     // }
+
+
+//     //do not divicde by the homogeneous coordinate, rather just store the value as it is because we will afterwards need the homogeneous coordinate for the backwards passs
+//     for (int i = 0; i < val_full_dim; i++){
+//         values[idx*val_full_dim + i]= val_hom[i] ;
+//     }
+
+
+
+// }
 
 
 template<int pos_dim, int val_dim>
@@ -3056,6 +3056,14 @@ slice_classify_no_precomputation(const float* positions,  float* class_logits, c
 
     const float* delta_weights_row=delta_weights+idx*(pos_dim+1); //delta_weights has shape nr_positions x (pos_dim+1)
 
+    
+    //attempt 2 load into local memory which could be global but the optimizer might be smart and put it into register 
+    float delta_weights_row_vec[(pos_dim+1)];
+    for (int j = 0; j < (pos_dim+1); j++) {
+        delta_weights_row_vec[j]=delta_weights_row[j];
+    }
+
+
     int key[pos_dim];
     for (int remainder = 0; remainder <= pos_dim; remainder++) {
         // Compute the location of the lattice point explicitly (all but
@@ -3082,7 +3090,8 @@ slice_classify_no_precomputation(const float* positions,  float* class_logits, c
         //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
         if(idx_val!=-1){
             for (int i = 0; i < val_dim ; i++){
-                val_hom[i]+= val[i]* (barycentric[remainder]+delta_weights_row[remainder]);
+                // val_hom[i]+= val[i]* (barycentric[remainder]+delta_weights_row[remainder]);
+                val_hom[i]+= val[i]* (barycentric[remainder]+delta_weights_row_vec[remainder]);
                 // val_hom[i]+= val[i]* (delta_weights_row[remainder]);
                 // printf("val[i]  %f \n", val[i] );
                 // printf("barycentric  %f \n", barycentric[remainder] );
@@ -3096,8 +3105,21 @@ slice_classify_no_precomputation(const float* positions,  float* class_logits, c
     //now the value need to pass through a linear layer
     float* logits_out_for_cur_position=class_logits+idx*nr_classes;//class_logits has shape nr_positions x nr_classes
 
+    //load the weights of the linear layers into shared mem 
+    __shared__ float linear_weights_shared[nr_classes*val_dim];
+    if (threadIdx.x == 0 ){
+        for (int i = 0; i < nr_classes*val_dim; i++) {
+            linear_weights_shared[i]=linear_clasify_weight[i];
+        }
+    }
+    __syncthreads();
+
+
+
+
     for (int c = 0; c < nr_classes; c++) {
-        const float* weight_for_class= linear_clasify_weight+ c*val_dim;
+        // const float* weight_for_class= linear_clasify_weight+ c*val_dim;
+        const float* weight_for_class= linear_weights_shared+ c*val_dim;
         for (int val_idx = 0; val_idx < val_dim; val_idx++) {
             //WARNING linear clasify weight has shape nr_classes x val_Full_dim. So in the tranposed way that we would expect if it was just a mtrix multiply
             // if (c==0 && val_idx==0){
@@ -3137,6 +3159,12 @@ slice_classify_with_precomputation(const float* positions,  float* class_logits,
 
     const float* delta_weights_row=delta_weights+idx*(pos_dim+1); //delta_weights has shape nr_positions x (pos_dim+1)
 
+    //attempt 2 load into local memory which could be global but the optimizer might be smart and put it into register 
+    float delta_weights_row_vec[(pos_dim+1)];
+    for (int j = 0; j < (pos_dim+1); j++) {
+        delta_weights_row_vec[j]=delta_weights_row[j];
+    }
+
     for (int remainder = 0; remainder <= pos_dim; remainder++) {
         int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + remainder];
         if(splatting_idx>=0){
@@ -3145,7 +3173,8 @@ slice_classify_with_precomputation(const float* positions,  float* class_logits,
 
             //if the vertex exists accumulate its value weighted by the barycentric weight (accumulates also the homogeneous coordinate)
             for (int i = 0; i < val_dim ; i++){
-                val_hom[i]+= val[i]* (weight+delta_weights_row[remainder]);
+                // val_hom[i]+= val[i]* (weight+delta_weights_row[remainder]);
+                val_hom[i]+= val[i]* (weight+delta_weights_row_vec[remainder]);
             }
 
         }
@@ -3188,76 +3217,76 @@ slice_classify_with_precomputation(const float* positions,  float* class_logits,
 }
 
 
-template<int pos_dim, int val_dim>
-__global__ void 
-__launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
-slice_backwards_with_precomputation(const int nr_positions, float* sliced_values_hom, float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
+// template<int pos_dim, int val_dim>
+// __global__ void 
+// __launch_bounds__(BLOCK_SIZE) //since the block size is known at compile time we can specify it to the kernel and therefore cuda doesnt need to use heuristics based on code complexity to minimize registry usage
+// slice_backwards_with_precomputation(const int nr_positions, float* sliced_values_hom, float* grad_sliced_values, int* splatting_indices, float* splatting_weights,  HashTableGPU hash_table) {
 
-    //values_vertices refers to the values that the lattice had in the forward pass. it has size m_hash_table_capcity x (val_dim+1)
-    //grad_sliced_values is the gradient of the loss with respect to the sliced out values which has size nr_positions x val_dim
-
-
-
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x; // each thread will deal with one position
-    if(idx >= nr_positions){
-        return;
-    }
-
-    //each positions will splat onto pos_dim+1 vertices
-    float *grad_sliced_val = grad_sliced_values + idx * val_dim;
-    float *sliced_value_hom = sliced_values_hom + idx * ( val_dim +1);
-    float one_div_valHom = 1.0/sliced_value_hom[val_dim];
-    float one_div_valHom_2 = 1.0/(sliced_value_hom[val_dim] * sliced_value_hom[val_dim]);
-    //compute the gradient of the homogeneous coordinate (check the leather notebook for more info)
-    float grad_hom_val=0.0;
-    for (int j = 0; j < val_dim; j++) {
-        grad_hom_val+=grad_sliced_val[j]*sliced_value_hom[j];
-    }
-    grad_hom_val*=one_div_valHom_2;
+//     //values_vertices refers to the values that the lattice had in the forward pass. it has size m_hash_table_capcity x (val_dim+1)
+//     //grad_sliced_values is the gradient of the loss with respect to the sliced out values which has size nr_positions x val_dim
 
 
-    for(int color=0; color<pos_dim+1; color++){
-        // int index_into_m_entries=round(splatting_indices_and_weights[ idx * (pos_dim + 1)*2 + color*2 + 0]);
-        int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + color];
-        if(splatting_idx>=0){
 
-            // float weight = splatting_indices_and_weights[ idx * (pos_dim + 1)*2 + color*2 + 1];
-            float weight = splatting_weights[ idx * (pos_dim + 1) + color];
-            float *valOut = hash_table.m_values + splatting_idx * (val_dim+1);
-            // float *val_forward_vertex = values_forward_vertices + splatting_idx * (val_dim+1);
+//     const int idx = blockIdx.x * blockDim.x + threadIdx.x; // each thread will deal with one position
+//     if(idx >= nr_positions){
+//         return;
+//     }
 
-            //get v3h which is the sliced value in homogeneous coordinates
+//     //each positions will splat onto pos_dim+1 vertices
+//     float *grad_sliced_val = grad_sliced_values + idx * val_dim;
+//     float *sliced_value_hom = sliced_values_hom + idx * ( val_dim +1);
+//     float one_div_valHom = 1.0/sliced_value_hom[val_dim];
+//     float one_div_valHom_2 = 1.0/(sliced_value_hom[val_dim] * sliced_value_hom[val_dim]);
+//     //compute the gradient of the homogeneous coordinate (check the leather notebook for more info)
+//     float grad_hom_val=0.0;
+//     for (int j = 0; j < val_dim; j++) {
+//         grad_hom_val+=grad_sliced_val[j]*sliced_value_hom[j];
+//     }
+//     grad_hom_val*=one_div_valHom_2;
 
 
-            //acumulate the values
-            // float sum_values_homogeneous=0;
-            for (int j = 0; j < val_dim; j++) {
-                float grad_local=weight/sliced_value_hom[val_dim]; //the gradient of the sliced value (and normalized) wrt to the lattice vertex 
-                #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 200)
-                    // #warning CUDA ARCH IS FINE
-                    atomicAdd(valOut +j, grad_sliced_val[j] * grad_local);
-                    // atomicAdd(valOut +j, grad_sliced_val[j]*weight);
-                #else 
-                    #warning CUDA ARCH NEEDS TO BE AT LEAST 200 IN ORDER TO ENABLE ATOMIC OPERATIONS!
-                #endif
-            }
+//     for(int color=0; color<pos_dim+1; color++){
+//         // int index_into_m_entries=round(splatting_indices_and_weights[ idx * (pos_dim + 1)*2 + color*2 + 0]);
+//         int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + color];
+//         if(splatting_idx>=0){
 
-            // //homogeneous coordinate grad
-            #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 200)
-                // #warning CUDA ARCH IS FINE
-                atomicAdd(valOut +val_dim, -weight * grad_hom_val);
-            #else 
-                #warning CUDA ARCH NEEDS TO BE AT LEAST 200 IN ORDER TO ENABLE ATOMIC OPERATIONS!
-            #endif
+//             // float weight = splatting_indices_and_weights[ idx * (pos_dim + 1)*2 + color*2 + 1];
+//             float weight = splatting_weights[ idx * (pos_dim + 1) + color];
+//             float *valOut = hash_table.m_values + splatting_idx * (val_dim+1);
+//             // float *val_forward_vertex = values_forward_vertices + splatting_idx * (val_dim+1);
+
+//             //get v3h which is the sliced value in homogeneous coordinates
+
+
+//             //acumulate the values
+//             // float sum_values_homogeneous=0;
+//             for (int j = 0; j < val_dim; j++) {
+//                 float grad_local=weight/sliced_value_hom[val_dim]; //the gradient of the sliced value (and normalized) wrt to the lattice vertex 
+//                 #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 200)
+//                     // #warning CUDA ARCH IS FINE
+//                     atomicAdd(valOut +j, grad_sliced_val[j] * grad_local);
+//                     // atomicAdd(valOut +j, grad_sliced_val[j]*weight);
+//                 #else 
+//                     #warning CUDA ARCH NEEDS TO BE AT LEAST 200 IN ORDER TO ENABLE ATOMIC OPERATIONS!
+//                 #endif
+//             }
+
+//             // //homogeneous coordinate grad
+//             #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 200)
+//                 // #warning CUDA ARCH IS FINE
+//                 atomicAdd(valOut +val_dim, -weight * grad_hom_val);
+//             #else 
+//                 #warning CUDA ARCH NEEDS TO BE AT LEAST 200 IN ORDER TO ENABLE ATOMIC OPERATIONS!
+//             #endif
         
-        }
+//         }
 
-    }
-
-
+//     }
 
 
-}
+
+
+// }
 
 
 
@@ -3381,6 +3410,12 @@ slice_classify_backwards_with_precomputation(const int nr_positions, float* grad
     //each positions will splat onto pos_dim+1 vertices
     float *grad_class_logits_cur_position = grad_class_logits + idx * nr_classes;
 
+    //attempt 2 load into local memory which could be global but the optimizer might be smart and put it into register 
+    float grad_class_logits_cur_position_vec[nr_classes];
+    for (int j = 0; j < nr_classes; j++) {
+        grad_class_logits_cur_position_vec[j]=grad_class_logits_cur_position[j];
+    }
+
 
     //GRAD LATTICE VERTICES (need to so some atomic add over all the vertices from whic we sliced)
     for(int color=0; color<pos_dim+1; color++){
@@ -3399,7 +3434,8 @@ slice_classify_backwards_with_precomputation(const int nr_positions, float* grad
                     // if( linear_clasify_weight[v+c*val_full_dim]!=linear_weights_shared[v+c*val_full_dim] ){
                     //     printf("The global value is not the same as the shared one, global is %f and shared is %f \n",linear_clasify_weight[v+c*val_full_dim],linear_weights_shared[v+c*val_full_dim]  );
                     // }
-                    grad+=grad_class_logits_cur_position[c]*linear_weights_shared[v+c*val_dim]*(splat_weight+splat_delta_weight);
+                    // grad+=grad_class_logits_cur_position[c]*linear_weights_shared[v+c*val_dim]*(splat_weight+splat_delta_weight);
+                    grad+=grad_class_logits_cur_position_vec[c]*linear_weights_shared[v+c*val_dim]*(splat_weight+splat_delta_weight);
                 }
                 atomicAdd(grad_lattice_vertex_out+v, grad);
             }
@@ -3430,14 +3466,16 @@ slice_classify_backwards_with_precomputation(const int nr_positions, float* grad
     //Now we accumulate the gradient into the LINEAR CLASIFY WEIGHT 
     for (int c = 0; c < nr_classes; c++) {
         for (int v = 0; v < val_dim; v++) {
-            atomicAdd(grad_linear_clasify_weight+v +c*val_dim, sliced_value[v]*grad_class_logits_cur_position[c]);
+            // atomicAdd(grad_linear_clasify_weight+v +c*val_dim, sliced_value[v]*grad_class_logits_cur_position[c]);
+            atomicAdd(grad_linear_clasify_weight+v +c*val_dim, sliced_value[v]*grad_class_logits_cur_position_vec[c]);
         }
     }
 
 
     //GRAD LINEAR CLASIFY BIAS (need to do some atomic add over the nr_classes biases)
     for (int c = 0; c < nr_classes; c++) {
-        atomicAdd(grad_linear_clasify_bias + c , grad_class_logits_cur_position[c]);
+        // atomicAdd(grad_linear_clasify_bias + c , grad_class_logits_cur_position[c]);
+        atomicAdd(grad_linear_clasify_bias + c , grad_class_logits_cur_position_vec[c]);
     }
 
 
@@ -3458,7 +3496,8 @@ slice_classify_backwards_with_precomputation(const int nr_positions, float* grad
                     // }
                     grad_output_wrt_dw+=vertex_value[v]*linear_weights_shared[v +c*val_dim];
                 }
-                grad+=grad_output_wrt_dw*grad_class_logits_cur_position[c];
+                // grad+=grad_output_wrt_dw*grad_class_logits_cur_position[c];
+                grad+=grad_output_wrt_dw*grad_class_logits_cur_position_vec[c];
             }
         }
         atomicAdd(grad_delta_weights + color + idx*(pos_dim+1) , grad);
@@ -3489,8 +3528,15 @@ gather_backwards_with_precomputation(const int nr_positions, float* grad_sliced_
     // }
 
     //each positions will splat onto pos_dim+1 vertices
-    int row_size_grad_sliced= (pos_dim+1)*(val_full_dim+1);
+    const int row_size_grad_sliced= (pos_dim+1)*(val_full_dim+1);
     float *grad_sliced_val = grad_sliced_values + idx * row_size_grad_sliced;
+
+     //attempt 2 load into local memory which could be global but the optimizer might be smart and put it into register 
+    float grad_sliced_val_cur_pos[row_size_grad_sliced];
+    for (int j = 0; j < row_size_grad_sliced; j++) {
+        grad_sliced_val_cur_pos[j]=grad_sliced_val[j];
+    }
+
     
     for(int color=0; color<pos_dim+1; color++){
         int splatting_idx = splatting_indices[ idx * (pos_dim + 1) + color];
@@ -3504,7 +3550,8 @@ gather_backwards_with_precomputation(const int nr_positions, float* grad_sliced_
             int idx_in_row=color*(val_full_dim+1);
             for (int j = 0; j < val_full_dim; j++) {
                 #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 200)
-                    atomicAdd(valOut +j, grad_sliced_val[j + idx_in_row]*weight );
+                    // atomicAdd(valOut +j, grad_sliced_val[j + idx_in_row]*weight );
+                    atomicAdd(valOut +j, grad_sliced_val_cur_pos[j + idx_in_row]*weight );
                     // atomicAdd(valOut +j, grad_sliced_val[j + idx_in_row] );
                 #else 
                     #warning CUDA ARCH NEEDS TO BE AT LEAST 200 IN ORDER TO ENABLE ATOMIC OPERATIONS!
