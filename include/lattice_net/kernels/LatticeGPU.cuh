@@ -72,19 +72,20 @@ public:
         }
 
 
-        void just_create_verts(const float* positions, const int nr_positions, const int pos_dim, const int val_dim,  const int* splatting_indices, const float* splatting_weights, const HashTableGPU& hash_table_gpu){
+        void just_create_verts(const float* positions, const int nr_positions, const int pos_dim, const int val_dim, const bool return_indices_and_weights,  const int* splatting_indices, const float* splatting_weights, const HashTableGPU& hash_table_gpu){
    
             dim3 blocks((nr_positions - 1) / BLOCK_SIZE + 1, 1, 1);
             dim3 blockSize(BLOCK_SIZE, 1, 1);
             CUresult res= m_lattice_program.kernel("kernel_splat")
                         .instantiate(pos_dim, val_dim)
                         .configure(blocks, blockSize)
-                        .launch( positions, nr_positions, splatting_indices, splatting_weights, hash_table_gpu, false );
+                        .launch( positions, nr_positions, splatting_indices, splatting_weights, hash_table_gpu, return_indices_and_weights );
             cudaEventRecord (m_event_nr_vertices_lattice_changed);
             CUDA_CHECK_CURESULT(res);
             CUDA_CHECK_ERROR();
 
         }
+
 
 
 

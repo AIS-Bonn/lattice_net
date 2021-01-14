@@ -32,6 +32,7 @@ config_file="lnn_train_semantic_kitti.cfg"
 
 torch.manual_seed(0)
 # torch.autograd.set_detect_anomaly(True)
+# torch.backends.cudnn.benchmark = True
 config_path=os.path.join( os.path.dirname( os.path.realpath(__file__) ) , '../config', config_file)
 
 # #initialize the parameters used for training

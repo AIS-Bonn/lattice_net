@@ -49,6 +49,7 @@ PYBIND11_MODULE(latticenet, m) {
     // .def("begin_splat_modify_only_values",  &Lattice::begin_splat_modify_only_values )
     .def("splat_standalone",  &Lattice::splat_standalone )
     .def("distribute",  &Lattice::distribute )
+    .def("expand",  &Lattice::expand )
     // .def("create_splatting_mask",  &Lattice::create_splatting_mask )
     // .def("blur_standalone",  &Lattice::blur_standalone )
     // .def("convolve_standalone",  &Lattice::convolve_standalone )

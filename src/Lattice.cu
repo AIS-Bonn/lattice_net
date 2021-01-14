@@ -227,7 +227,7 @@ std::tuple<torch::Tensor, torch::Tensor> Lattice::splat_standalone(torch::Tensor
 }
 
 
-std::tuple<torch::Tensor, torch::Tensor> Lattice::just_create_verts(torch::Tensor& positions_raw ){
+std::tuple<torch::Tensor, torch::Tensor> Lattice::just_create_verts(torch::Tensor& positions_raw, const bool return_indices_and_weights ){
     check_positions(positions_raw);
     int nr_positions=positions_raw.size(0);
     int pos_dim=positions_raw.size(1);
@@ -238,18 +238,15 @@ std::tuple<torch::Tensor, torch::Tensor> Lattice::just_create_verts(torch::Tenso
         m_hash_table->to(torch::kCUDA);
     }
 
-    //we DO NOT initialize the indices and weights to -1 because we call this function only for creating vertices, and usually in that case we just propagate the indices and weights from the previous lattice.
-    // if( !m_splatting_indices_tensor.defined() || m_splatting_indices_tensor.size(0)!=nr_positions*(m_pos_dim+1)  ){
-    //     m_splatting_indices_tensor = torch::zeros({nr_positions*(m_pos_dim+1) }, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
-    //     m_splatting_weights_tensor = torch::zeros({nr_positions*(m_pos_dim+1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
-    // }
-    // m_splatting_indices_tensor.fill_(-1);
-    // m_splatting_weights_tensor.fill_(-1);
 
-    Tensor splatting_indices_tensor = torch::empty({nr_positions*(pos_dim+1) }, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
-    Tensor splatting_weights_tensor = torch::empty({nr_positions*(pos_dim+1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
-    splatting_indices_tensor.fill_(-1);
-    splatting_weights_tensor.fill_(-1);
+    Tensor splatting_indices_tensor;
+    Tensor splatting_weights_tensor;
+    if (return_indices_and_weights){
+        splatting_indices_tensor = torch::empty({nr_positions*(pos_dim+1) }, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
+        splatting_weights_tensor = torch::empty({nr_positions*(pos_dim+1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+        splatting_indices_tensor.fill_(-1);
+        splatting_weights_tensor.fill_(-1);
+    }
 
 
     //to cuda
@@ -258,8 +255,16 @@ std::tuple<torch::Tensor, torch::Tensor> Lattice::just_create_verts(torch::Tenso
 
     Tensor positions=positions_raw/m_sigmas_tensor;
 
-    m_impl->just_create_verts(positions.data_ptr<float>(), nr_positions, this->pos_dim(), this->val_dim(), 
-                            splatting_indices_tensor.data_ptr<int>(), splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
+    if (return_indices_and_weights){
+        m_impl->just_create_verts(positions.data_ptr<float>(), nr_positions, this->pos_dim(), this->val_dim(), 
+                                return_indices_and_weights,
+                                splatting_indices_tensor.data_ptr<int>(), splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
+    }else{ 
+        m_impl->just_create_verts(positions.data_ptr<float>(), nr_positions, this->pos_dim(), this->val_dim(), 
+                                return_indices_and_weights,
+                                nullptr, nullptr, *(m_hash_table->m_impl) );
+    }
+    
     m_hash_table->m_nr_filled_is_dirty=true;
 
 
@@ -268,6 +273,64 @@ std::tuple<torch::Tensor, torch::Tensor> Lattice::just_create_verts(torch::Tenso
     auto ret = std::make_tuple (splatting_indices_tensor, splatting_weights_tensor ); 
     return ret;
   
+}
+
+std::shared_ptr<Lattice> Lattice::expand(torch::Tensor& positions_raw, const int point_multiplier, const float noise_stddev, const bool expand_values ){
+    check_positions(positions_raw);
+    int pos_dim=positions_raw.size(1);
+
+    //if it's not initialized to the correct values we intialize the hashtable
+    if( !m_hash_table->m_keys_tensor.defined() ){
+        m_hash_table->init(pos_dim, 1 );
+        m_hash_table->to(torch::kCUDA);
+    }
+
+    //to cuda
+    positions_raw=positions_raw.to("cuda");
+    m_sigmas_tensor=m_sigmas_tensor.to("cuda");
+
+    //expand the positopns
+    Tensor positions_expanded=positions_raw.repeat({point_multiplier, 1});
+
+    //noise 
+    Tensor noise = torch::randn({ positions_expanded.size(0), positions_expanded.size(1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
+    noise=noise*noise_stddev;
+    positions_expanded+=noise;
+
+
+    std::shared_ptr<Lattice> expanded_lattice=create(this); //create a lattice with no config but takes the config from this one
+    expanded_lattice->m_name="expanded_lattice";
+    expanded_lattice->m_hash_table->m_values_tensor=torch::zeros({1, this->val_dim()}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) ); //we just create some dummy values just so that the clear that we will do not will not destroy the current values. We will create the values when we know how many vertices we have
+    expanded_lattice->m_hash_table->m_keys_tensor= this->m_hash_table->m_keys_tensor.clone();
+    expanded_lattice->m_hash_table->m_entries_tensor= this->m_hash_table->m_entries_tensor.clone();
+    expanded_lattice->m_hash_table->m_nr_filled_tensor= this->m_hash_table->m_nr_filled_tensor.clone();
+    expanded_lattice->m_hash_table->update_impl();
+
+
+
+
+    // int nr_positions=positions_expanded.size(0);
+    expanded_lattice->just_create_verts(positions_expanded, false );
+    expanded_lattice->m_hash_table->m_nr_filled_is_dirty=true;
+
+
+    if (expand_values){
+        int nr_values_diff= expanded_lattice->nr_lattice_vertices() - nr_lattice_vertices();
+        CHECK(nr_values_diff>=0) << "Nr of values in the difference is negative, we should always create more vertices, never substract so this doesnt make sense. In the current lattice we have " << nr_lattice_vertices() << " and in the expanded one we have " <<  expanded_lattice->nr_lattice_vertices();
+
+        std::vector<int64_t> pad_values { 0,0,0,nr_values_diff  }; //left, right, top, bottom
+        torch::nn::functional::PadFuncOptions option (pad_values);
+        option.mode(torch::kConstant);
+        Tensor expanded_values = torch::nn::functional::pad( values(), option);
+        expanded_lattice->set_values(expanded_values);
+
+        CHECK(expanded_lattice->values().size(0) == expanded_lattice->nr_lattice_vertices() ) << "The nr of lattice vertices and the nr of rows in the values should be the same. However we have nr of vertices " << expanded_lattice->nr_lattice_vertices() << " and the values have nr of rows " <<expanded_lattice->values().size(0);
+
+    }
+
+
+    return expanded_lattice;
+
 }
 
 
@@ -600,7 +663,7 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts_naive(torch::Tensor& posit
     coarse_lattice->begin_splat();
     coarse_lattice->m_hash_table->update_impl();
 
-    coarse_lattice->just_create_verts(positions_raw);
+    coarse_lattice->just_create_verts(positions_raw, false);
 
 
     return coarse_lattice;

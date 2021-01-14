@@ -96,6 +96,40 @@ class DistributeLattice(Function):
         return None, None, None, None, None, None, None
 
 
+
+class ExpandLattice(Function):
+    @staticmethod
+    def forward(ctx, lattice_values, lattice_structure, positions, point_multiplier, noise_stddev, expand_values):
+
+        # lattice.begin_splat()
+        # distributed, splatting_indices, splatting_weights = lattice.distribute(positions, values)
+
+        lattice_structure.set_values(lattice_values)
+
+        expanded_lattice=lattice_structure.expand(positions, point_multiplier, noise_stddev, expand_values)     
+
+        
+        ctx.nr_values_original_lattice=lattice_structure.nr_lattice_vertices()
+
+        return expanded_lattice.values(), LatticeWrapper.wrap(expanded_lattice) #Pytorch functions requires all the return values to be torch.Variables so we wrap the lattice into one
+
+
+    @staticmethod
+    def backward(ctx, grad_lattice_values, grad_lattice_structure):
+        # print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
+
+        nr_values_original_lattice=ctx.nr_values_original_lattice
+
+        grad_original_lattice=grad_lattice_values[0:nr_values_original_lattice, :]
+
+        return grad_original_lattice, None, None, None, None, None, None
+        # return None, None, None, None, None, None, None
+
+
+
+
+
+
 class ConvIm2RowLattice(Function):
     @staticmethod
     def forward(ctx, lattice_values, lattice, filter_bank, dilation):

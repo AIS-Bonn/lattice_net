@@ -44,8 +44,27 @@ class DistributeLatticeModule(torch.nn.Module):
     def __init__(self, experiment):
         super(DistributeLatticeModule, self).__init__()
         self.experiment=experiment
-    def forward(self, lattice_py, positions, values):
-        return DistributeLattice.apply(lattice_py, positions, values, self.experiment )
+    def forward(self, lattice, positions, values):
+        return DistributeLattice.apply(lattice, positions, values, self.experiment )
+
+class ExpandLatticeModule(torch.nn.Module): #creates lattice vertiex not directly around the positions but also further away by applying random noise to the positions
+    def __init__(self, point_multiplier, noise_stddev, expand_values ):
+        super(ExpandLatticeModule, self).__init__()
+        self.point_multiplier=point_multiplier
+        self.noise_stddev=noise_stddev 
+        self.expand_values=expand_values
+    def forward(self, lattice_values, lattice_structure, positions):
+        lattice_structure.set_values(lattice_values)
+
+        lv, ls_wrap = ExpandLattice.apply(lattice_values ,lattice_structure, positions, self.point_multiplier, self.noise_stddev, self.expand_values)
+        ls=ls_wrap.lattice
+
+        ls.set_values(lv)
+
+        return lv, ls
+        
+
+
         
 
 
@@ -81,6 +100,8 @@ class ConvLatticeModule(torch.nn.Module):
 
 
     def forward(self, lattice_values, lattice_structure):
+
+        lattice_structure.set_values(lattice_values)
 
         if(self.first_time):
             self.first_time=False
@@ -140,8 +161,11 @@ class CoarsenLatticeModule(torch.nn.Module):
                 self.reset_parameters(filter_extent)
 
         lv, ls_wrap= CoarsenLattice.apply(lattice_fine_values, lattice_fine_structure, self.weight ) #this just does a convolution, we also need batch norm an non linearity
+        ls=ls_wrap.lattice
 
-        return lv, ls_wrap.lattice
+        ls.set_values(lv)
+
+        return lv, ls
 
 class FinefyLatticeModule(torch.nn.Module):
     def __init__(self, nr_filters ):
@@ -182,8 +206,11 @@ class FinefyLatticeModule(torch.nn.Module):
                 self.reset_parameters(filter_extent)
 
         lv, ls_wrap= FinefyLattice.apply(lattice_coarse_values, lattice_coarse_structure, lattice_fine_structure, self.weight ) #this just does a convolution, we also need batch norm an non linearity
+        ls = ls_wrap.lattice
 
-        return lv, ls_wrap.lattice
+        ls.set_values(lv)
+
+        return lv, ls
 
 
 class SliceLatticeModule(torch.nn.Module):
@@ -552,6 +579,8 @@ class GnRelu1x1(torch.nn.Module):
         self.use_bias=bias
     def forward(self, lv, ls):
 
+        ls.set_values(lv)
+
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv.shape[1])
@@ -577,6 +606,8 @@ class GnGelu1x1(torch.nn.Module):
         self.use_bias=bias
     def forward(self, lv, ls):
 
+        ls.set_values(lv)
+
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv.shape[1])
@@ -600,6 +631,8 @@ class Gn(torch.nn.Module):
         self.norm= None
     def forward(self, lv, ls):
 
+        ls.set_values(lv)
+
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv.shape[1])
@@ -620,6 +653,8 @@ class GnReluDepthwiseConv(torch.nn.Module):
         if with_dropout:
             self.drop=DropoutLattice(0.2)
     def forward(self, lv, ls ):
+
+        ls.set_values(lv)
 
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
         if self.norm is None:
@@ -648,6 +683,8 @@ class GnReluConv(torch.nn.Module):
         # self.relu = torch.nn.ReLU()
     def forward(self, lv, ls):
 
+        ls.set_values(lv)
+
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv.shape[1])
@@ -673,6 +710,8 @@ class GnGeluConv(torch.nn.Module):
             self.drop=DropoutLattice(0.2)
     def forward(self, lv, ls):
 
+        ls.set_values(lv)
+
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv.shape[1])
@@ -695,6 +734,8 @@ class BnReluConv(torch.nn.Module):
         self.relu = torch.nn.ReLU(inplace=True)
     def forward(self, lv, ls):
 
+        ls.set_values(lv)
+
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
         if self.bn is None:
             self.bn = BatchNormLatticeModule(lv.shape[1])
@@ -715,6 +756,8 @@ class GnCoarsen(torch.nn.Module):
         self.coarse=CoarsenLatticeModule(nr_filters=nr_filters)
         self.norm= None
     def forward(self, lv, ls, concat_connection=None):
+
+        ls.set_values(lv)
 
         #similar to densenet and resnet: bn, relu, conv
         if self.norm is None:
@@ -740,6 +783,8 @@ class GnReluCoarsen(torch.nn.Module):
         self.relu = torch.nn.ReLU(inplace=True)
     def forward(self, lv, ls, concat_connection=None):
 
+        ls.set_values(lv)
+
         #similar to densenet and resnet: bn, relu, conv
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv.shape[1])
@@ -763,6 +808,8 @@ class GnGeluCoarsen(torch.nn.Module):
         self.coarse=CoarsenLatticeModule(nr_filters=nr_filters)
         self.norm= None
     def forward(self, lv, ls, concat_connection=None):
+
+        ls.set_values(lv)
 
         #similar to densenet and resnet: bn, relu, conv
         if self.norm is None:
@@ -791,6 +838,8 @@ class GnReluFinefy(torch.nn.Module):
         self.relu = torch.nn.ReLU(inplace=True)
     def forward(self, lv_coarse, ls_coarse, ls_fine):
 
+        ls_coarse.set_values(lv_coarse)
+
         #similar to densenet and resnet: bn, relu, conv
         if self.norm is None:
             self.norm = GroupNormLatticeModule(lv_coarse.shape[1])
@@ -809,6 +858,8 @@ class GnGeluFinefy(torch.nn.Module):
         self.fine=FinefyLatticeModule(nr_filters=nr_filters)
         self.norm= None
     def forward(self, lv_coarse, ls_coarse, ls_fine):
+
+        ls_coarse.set_values(lv_coarse)
 
         #similar to densenet and resnet: bn, relu, conv
         if self.norm is None:
@@ -829,6 +880,8 @@ class GnFinefy(torch.nn.Module):
         self.fine=FinefyLatticeModule(nr_filters=nr_filters)
         self.norm= None
     def forward(self, lv_coarse, ls_coarse, ls_fine):
+
+        ls_coarse.set_values(lv_coarse)
 
         #similar to densenet and resnet: bn, relu, conv
         if self.norm is None:
@@ -864,6 +917,8 @@ class ResnetBlock(torch.nn.Module):
 
         identity=lv
 
+        ls.set_values(lv)
+
         # print("conv 1")
         lv, ls=self.conv1(lv,ls)
         # print("conv 2")
@@ -887,6 +942,9 @@ class BottleneckBlock(torch.nn.Module):
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 
     def forward(self, lv, ls):
+
+        ls.set_values(lv)
+
         identity=lv
         lv, ls=self.contract(lv,ls)
         lv, ls=self.conv(lv,ls)
@@ -909,6 +967,8 @@ class DensenetBlock(torch.nn.Module):
             self.layers.append( GnReluConv( nr_filters, dilation_list[i]) )
 
     def forward(self, lv, ls):
+
+        ls.set_values(lv)
 
         stack=lv
         output=[]
