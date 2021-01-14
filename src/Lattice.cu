@@ -158,11 +158,13 @@ void Lattice::check_positions(const torch::Tensor& positions_raw){
     CHECK(positions_raw.dim()==2) << "positions should have dim 2 correspondin to HW. However it has sizes" << positions_raw.sizes();
     int pos_dim=positions_raw.size(1);
     CHECK(m_sigmas.size()==pos_dim) <<"One must set sigmas for each dimension of the positions. Use set_sigmas. m_sigmas is " << m_sigmas.size() << " m_pos dim is " <<pos_dim;
+    CHECK(positions_raw.is_contiguous()) << "Positions raw is not contiguous. Please call .contiguous() on it";
 
 }
 void Lattice::check_values(const torch::Tensor& values){
     CHECK(values.scalar_type()==at::kFloat) << "values should be of type float";
     CHECK(values.dim()==2) << "values should have dim 2 correspondin to HW. However it has sizes" << values.sizes();
+    CHECK(values.is_contiguous()) << "Values is not contiguous. Please call .contiguous() on it";
 }
 void Lattice::check_positions_and_values(const torch::Tensor& positions_raw, const torch::Tensor& values){
     //check input
@@ -400,6 +402,7 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
     CHECK(filter_bank.defined()) << "Filter bank is undefined";
     CHECK(filter_bank.dim()==2) << "Filter bank should have dimension 2, corresponding with (filter_extent * val_dim) x nr_filters.  However it has dimension: " << filter_bank.dim();
+    filter_bank=filter_bank.contiguous();
 
     int nr_filters=filter_bank.size(1) ;
     int filter_extent=filter_bank.size(0) / lattice_neighbours->val_dim();
@@ -581,6 +584,8 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
 
 torch::Tensor Lattice::row2im(const torch::Tensor& lattice_rowified,  const int dilation, const int filter_extent, const int nr_filters, std::shared_ptr<Lattice> lattice_neighbours){
 
+    CHECK(lattice_rowified.is_contiguous()) << "lattice rowified is not contiguous. Please call .contiguous() on it";
+
     if (!lattice_neighbours){
         lattice_neighbours=shared_from_this();
     }
@@ -638,6 +643,8 @@ std::shared_ptr<Lattice> Lattice::create_coarse_verts(){
 
 std::shared_ptr<Lattice> Lattice::create_coarse_verts_naive(torch::Tensor& positions_raw){
 
+    check_positions(positions_raw);
+
     int capacity=m_hash_table->capacity();
     int val_dim=m_hash_table->val_dim();
     int pos_dim=m_hash_table->pos_dim();
@@ -679,6 +686,8 @@ torch::Tensor Lattice::slice_standalone_with_precomputation(torch::Tensor& posit
     int nr_positions=positions_raw.size(0);
     int pos_dim=positions_raw.size(1);
     CHECK(pos_dim==this->pos_dim()) << " The position dimension do not coreespond with the ones we used for creating the lattice";
+    splatting_indices_tensor=splatting_indices_tensor.contiguous();
+    splatting_weights_tensor=splatting_weights_tensor.contiguous();
 
 
      //to cuda
@@ -811,6 +820,8 @@ torch::Tensor Lattice::gather_standalone_with_precomputation(torch::Tensor& posi
     int nr_positions=positions_raw.size(0);
     int pos_dim=positions_raw.size(1);
     CHECK(pos_dim==this->pos_dim()) << " The position dimension do not coreespond with the ones we used for creating the lattice";
+    splatting_indices_tensor=splatting_indices_tensor.contiguous();
+    splatting_weights_tensor=splatting_weights_tensor.contiguous();
 
 
      //to cuda
@@ -852,6 +863,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>  Lattice::slice_classify
     int nr_positions=positions_raw.size(0);
     int pos_dim=positions_raw.size(1);
     CHECK(pos_dim==this->pos_dim()) << " The position dimension do not coreespond with the ones we used for creating the lattice";
+    delta_weights=delta_weights.contiguous();
+    linear_clasify_weight=linear_clasify_weight.contiguous();
+    linear_clasify_bias=linear_clasify_bias.contiguous();
+
 
 
      //to cuda
@@ -909,6 +924,12 @@ torch::Tensor Lattice::slice_classify_with_precomputation(torch::Tensor& positio
     int nr_positions=positions_raw.size(0);
     int pos_dim=positions_raw.size(1);
     CHECK(pos_dim==this->pos_dim()) << " The position dimension do not coreespond with the ones we used for creating the lattice";
+    delta_weights=delta_weights.contiguous();
+    linear_clasify_weight=linear_clasify_weight.contiguous();
+    linear_clasify_bias=linear_clasify_bias.contiguous();
+    splatting_indices_tensor=splatting_indices_tensor.contiguous();
+    splatting_weights_tensor=splatting_weights_tensor.contiguous();
+
 
 
      //to cuda
@@ -966,6 +987,10 @@ void Lattice::slice_backwards_standalone_with_precomputation(torch::Tensor& posi
     int nr_positions=positions_raw.size(0);
     int pos_dim=positions_raw.size(1);
     CHECK(pos_dim==this->pos_dim()) << " The position dimension do not coreespond with the ones we used for creating the lattice";
+    CHECK(grad_sliced_values.is_contiguous()) << "Grad sliced values needs to be contiguous. Please call .contiguous() on it";
+    CHECK(sliced_values_hom.is_contiguous()) << "sliced_values_hom needs to be contiguous. Please call .contiguous() on it";
+    splatting_indices_tensor=splatting_indices_tensor.contiguous();
+    splatting_weights_tensor=splatting_weights_tensor.contiguous();
 
 
 
@@ -985,6 +1010,9 @@ void Lattice::slice_backwards_standalone_with_precomputation_no_homogeneous(torc
     int pos_dim=positions_raw.size(1);
     CHECK(pos_dim==this->pos_dim()) << " The position dimension do not coreespond with the ones we used for creating the lattice";
     CHECK(grad_sliced_values.dim()==2) <<"grad_sliced_values should be nr_positions x m_val_dim, so it should have 2 dimensions. However it has "<< grad_sliced_values.dim();
+    CHECK(grad_sliced_values.is_contiguous()) << "Grad sliced values needs to be contiguous. Please call .contiguous() on it";
+    splatting_indices_tensor=splatting_indices_tensor.contiguous();
+    splatting_weights_tensor=splatting_weights_tensor.contiguous();
 
     m_hash_table->m_values_tensor=torch::zeros({nr_lattice_vertices(), grad_sliced_values.size(1)},  torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  );
     m_hash_table->update_impl();
@@ -1007,6 +1035,13 @@ void Lattice::slice_classify_backwards_with_precomputation(const torch::Tensor& 
     CHECK(pos_dim==this->pos_dim()) << " The position dimension do not coreespond with the ones we used for creating the lattice";
     CHECK(grad_class_logits.dim()==2) <<"grad_class_logits should be  nr_positions x nr_classes, so it should have 2 dimensions. However it has "<< grad_class_logits.dim();
     // m_val_dim=initial_values.size(1);
+    CHECK(grad_class_logits.is_contiguous()) << "grad_class_logits needs to be contiguous. Please call .contiguous() on it";
+    initial_values=initial_values.contiguous();
+    delta_weights=delta_weights.contiguous();
+    linear_clasify_weight=linear_clasify_weight.contiguous();
+    linear_clasify_bias=linear_clasify_bias.contiguous();
+    splatting_indices_tensor=splatting_indices_tensor.contiguous();
+    splatting_weights_tensor=splatting_weights_tensor.contiguous();
 
 
     // TIME_START("slice_clasify_back");
@@ -1026,6 +1061,10 @@ void Lattice::gather_backwards_standalone_with_precomputation(const torch::Tenso
     int val_dim=grad_sliced_values.size(1)/(pos_dim+1)-1; //we will acumulate the gradient into the value tensor. And it should have the same val_dim as the values that were in the lattice_we_gathered from
     CHECK(pos_dim==this->pos_dim()) << " The position dimension do not coreespond with the ones we used for creating the lattice";
     CHECK(grad_sliced_values.dim()==2) <<"grad_sliced_values should be nr_positions x ((m_val_dim+1)*(m_pos_dim+1)), so it should have 2 dimensions. However it has "<< grad_sliced_values.dim();
+    CHECK(grad_sliced_values.is_contiguous()) << "Grad sliced values needs to be contiguous. Please call .contiguous() on it";
+    splatting_indices_tensor=splatting_indices_tensor.contiguous();
+    splatting_weights_tensor=splatting_weights_tensor.contiguous();
+
 
 
     m_hash_table->m_values_tensor=torch::zeros({nr_lattice_vertices(), val_dim },  torch::dtype(torch::kFloat32).device(torch::kCUDA, 0)  );
