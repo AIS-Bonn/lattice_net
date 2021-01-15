@@ -87,12 +87,14 @@ def run():
 
     first_time=True
 
+    experiment_name="s_1"
+
     #torch stuff 
     lattice=Lattice.create(config_path, "lattice")
 
     cb_list = []
     if(train_params.with_visdom()):
-        cb_list.append(VisdomCallback())
+        cb_list.append(VisdomCallback(experiment_name))
     if(train_params.with_viewer()):
         cb_list.append(ViewerCallback())
     cb_list.append(StateCallback())

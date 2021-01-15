@@ -1328,6 +1328,9 @@ void Lattice::set_values(const torch::Tensor& new_values){
     // update_impl();
     m_hash_table->set_values(new_values);
 }
+void Lattice::set_positions( const torch::Tensor& positions_raw ){
+    m_positions=positions_raw;
+}
  
 
 

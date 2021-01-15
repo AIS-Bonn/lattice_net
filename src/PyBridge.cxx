@@ -90,6 +90,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def("hash_table", &Lattice::hash_table)
     .def("values", &Lattice::values)
     .def("set_values", &Lattice::set_values)
+    .def("set_positions", &Lattice::set_positions)
     // .def_readwrite("m_hash_table", &Lattice::m_hash_table )
     // .def_readwrite("m_sliced_values_hom_tensor", &Lattice::m_sliced_values_hom_tensor )
     // .def_readwrite("m_lattice_rowified", &Lattice::m_lattice_rowified )

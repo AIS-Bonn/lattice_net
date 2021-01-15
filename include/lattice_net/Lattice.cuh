@@ -98,7 +98,7 @@ public:
     void set_sigma(const float sigma);
     void set_name(const std::string name);
     void set_values(const torch::Tensor& new_values); //use this to set new values because it will also call update_impl to set the float pointers to the correct place in the implementation
-
+    void set_positions( const torch::Tensor& positions_raw ); // the positions that were used to create this lattice
 
 
 

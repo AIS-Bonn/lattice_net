@@ -37,8 +37,8 @@ class SplatLatticeModule(torch.nn.Module):
     def __init__(self):
         super(SplatLatticeModule, self).__init__()
     def forward(self, lattice_py, positions, values):
-        lv, ls_wrap=SplatLattice.apply(lattice_py, positions, values )
-        return lv, ls_wrap.lattice
+        lv, ls_wrap, indices, weights=SplatLattice.apply(lattice_py, positions, values )
+        return lv, ls_wrap.lattice, indices, weights
 
 class DistributeLatticeModule(torch.nn.Module):
     def __init__(self, experiment):
@@ -411,8 +411,9 @@ class GroupNormLatticeModule(torch.nn.Module):
         #if the groups is not diivsalbe so for example if we have 80 params
         if nr_params%nr_groups!=0:
             nr_groups= int(nr_params/2)
-        # if nr_params<=32:
-            # nr_groups=int(nr_params/2)
+        #if we have less than 64 we make groups of 4 channels each. Less than 4 channels per group will probably be bad
+        if nr_params<=64:
+            nr_groups=int(nr_params/4)
 
 
         self.gn = torch.nn.GroupNorm(nr_groups, nr_params).to("cuda") #having 32 groups is the best as explained in the GroupNormalization paper
