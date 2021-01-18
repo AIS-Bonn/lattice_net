@@ -468,7 +468,7 @@ class PointNetModule(torch.nn.Module):
         self.nr_outputs_last_layer=nr_outputs_last_layer
         self.nr_linear_layers=len(self.nr_output_channels_per_layer)
         self.layers=torch.nn.ModuleList([])
-        self.norm_layers=torch.nn.ModuleList([])
+        # self.norm_layers=torch.nn.ModuleList([])
         self.relu=torch.nn.ReLU(inplace=False)
         self.tanh=torch.nn.Tanh()
         self.leaky=torch.nn.LeakyReLU(negative_slope=0.1, inplace=False)
@@ -491,7 +491,7 @@ class PointNetModule(torch.nn.Module):
                     self.layers.append( torch.nn.Linear(nr_input_channels, nr_output_channels, bias=True).to("cuda")  )
                     with torch.no_grad():
                         torch.nn.init.kaiming_normal_(self.layers[-1].weight, mode='fan_in', nonlinearity='relu')
-                    self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
+                    # self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
                     nr_input_channels=nr_output_channels
                     nr_layers=nr_layers+1
 
@@ -525,7 +525,8 @@ class PointNetModule(torch.nn.Module):
                 if (self.experiment=="attention_pool"):
                     distributed=self.layers[i] (distributed)
                     # distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
-                    distributed=self.relu(distributed) 
+                    if( i < len(self.layers)-1): 
+                        distributed=self.relu(distributed) 
                 else:
                     distributed=self.layers[i] (distributed)
                     # if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
