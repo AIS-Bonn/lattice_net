@@ -220,7 +220,7 @@ class ConvIm2RowLattice(Function):
 
 class CoarsenLattice(Function):
     @staticmethod
-    def forward(ctx, lattice_fine_values, lattice_fine_structure, filter_bank):
+    def forward(ctx, lattice_fine_values, lattice_fine_structure, filter_bank, coarsened_lattice=None): #Can offer a precomputed coarsened lattice
         lattice_fine_structure.set_values(lattice_fine_values)
 
         #create a structure for the coarse lattice, the values of the coarse vertices will be zero
@@ -229,7 +229,8 @@ class CoarsenLattice(Function):
         # print("fine lattice has keys", lattice_fine_structure.keys()) 
         #coarsened_lattice_py=lattice_fine_structure.create_coarse_verts()
         # print("lattice fine structure has indices", lattice_fine_structure.splatting_indices())
-        coarsened_lattice=lattice_fine_structure.create_coarse_verts_naive(positions)
+        if (coarsened_lattice==None):
+            coarsened_lattice=lattice_fine_structure.create_coarse_verts_naive(positions)
       
 
 

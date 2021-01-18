@@ -164,11 +164,13 @@ class ConvLatticeModule(torch.nn.Module):
 
 
 class CoarsenLatticeModule(torch.nn.Module):
-    def __init__(self, nr_filters ):
+    def __init__(self, nr_filters, bias=False ):
         super(CoarsenLatticeModule, self).__init__()
         self.first_time=True
         self.nr_filters=nr_filters
         self.neighbourhood_size=1
+        self.bias=None
+        self.use_bias=bias
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
     def reset_parameters(self, filter_extent):
@@ -185,9 +187,14 @@ class CoarsenLatticeModule(torch.nn.Module):
         bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
         with torch.no_grad():
             self.weight.uniform_(-bound, bound)
+
+        if self.bias is not None:
+            fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_out)
+            torch.nn.init.uniform_(self.bias, -bound, bound)
         
 
-    def forward(self, lattice_fine_values, lattice_fine_structure):
+    def forward(self, lattice_fine_values, lattice_fine_structure, coarsened_lattice=None):
         lattice_fine_structure.set_values(lattice_fine_values)
 
         if(self.first_time):
@@ -195,22 +202,28 @@ class CoarsenLatticeModule(torch.nn.Module):
             filter_extent=lattice_fine_structure.get_filter_extent(self.neighbourhood_size) 
             val_dim=lattice_fine_structure.val_dim()
             self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
+            if self.use_bias:
+                self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
             with torch.no_grad():
                 self.reset_parameters(filter_extent)
 
-        lv, ls_wrap= CoarsenLattice.apply(lattice_fine_values, lattice_fine_structure, self.weight ) #this just does a convolution, we also need batch norm an non linearity
+        lv, ls_wrap= CoarsenLattice.apply(lattice_fine_values, lattice_fine_structure, self.weight, coarsened_lattice ) #this just does a convolution, we also need batch norm an non linearity
         ls=ls_wrap.lattice
 
+        if self.use_bias:
+            lv+=self.bias
         ls.set_values(lv)
 
         return lv, ls
 
 class FinefyLatticeModule(torch.nn.Module):
-    def __init__(self, nr_filters ):
+    def __init__(self, nr_filters,  bias=False ):
         super(FinefyLatticeModule, self).__init__()
         self.first_time=True
         self.nr_filters=nr_filters
         self.neighbourhood_size=1
+        self.bias=None
+        self.use_bias=bias
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
     def reset_parameters(self, filter_extent):
@@ -228,6 +241,11 @@ class FinefyLatticeModule(torch.nn.Module):
         bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
         with torch.no_grad():
             self.weight.uniform_(-bound, bound)
+
+        if self.bias is not None:
+            fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_out)
+            torch.nn.init.uniform_(self.bias, -bound, bound)
 
 
     def forward(self, lattice_coarse_values, lattice_coarse_structure, lattice_fine_structure):
@@ -240,11 +258,17 @@ class FinefyLatticeModule(torch.nn.Module):
             val_dim=lattice_coarse_structure.val_dim()
             self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
             # self.bias = torch.nn.Parameter(torch.empty( self.nr_filters).to("cuda") )
+            if self.use_bias:
+                self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
             with torch.no_grad():
                 self.reset_parameters(filter_extent)
 
         lv, ls_wrap= FinefyLattice.apply(lattice_coarse_values, lattice_coarse_structure, lattice_fine_structure, self.weight ) #this just does a convolution, we also need batch norm an non linearity
         ls = ls_wrap.lattice
+
+        
+        if self.use_bias:
+            lv+=self.bias
 
         ls.set_values(lv)
 
@@ -412,8 +436,8 @@ class GroupNormLatticeModule(torch.nn.Module):
         if nr_params%nr_groups!=0:
             nr_groups= int(nr_params/2)
         #if we have less than 64 we make groups of 4 channels each. Less than 4 channels per group will probably be bad
-        if nr_params<=64:
-            nr_groups=int(nr_params/4)
+        # if nr_params<=64:
+            # nr_groups=int(nr_params/4)
 
 
         self.gn = torch.nn.GroupNorm(nr_groups, nr_params).to("cuda") #having 32 groups is the best as explained in the GroupNormalization paper
@@ -464,7 +488,7 @@ class PointNetModule(torch.nn.Module):
                 for i in range(len(self.nr_output_channels_per_layer)):
                     nr_output_channels=self.nr_output_channels_per_layer[i]
                     is_last_layer=i==len(self.nr_output_channels_per_layer)-1 #the last layer is folowed by scatter max and not a batch norm therefore it needs a bias
-                    self.layers.append( torch.nn.Linear(nr_input_channels, nr_output_channels, bias=is_last_layer).to("cuda")  )
+                    self.layers.append( torch.nn.Linear(nr_input_channels, nr_output_channels, bias=True).to("cuda")  )
                     with torch.no_grad():
                         torch.nn.init.kaiming_normal_(self.layers[-1].weight, mode='fan_in', nonlinearity='relu')
                     self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
@@ -500,14 +524,15 @@ class PointNetModule(torch.nn.Module):
 
                 if (self.experiment=="attention_pool"):
                     distributed=self.layers[i] (distributed)
-                    distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+                    # distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
                     distributed=self.relu(distributed) 
                 else:
                     distributed=self.layers[i] (distributed)
-                    if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
+                    # if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
                         #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
-                        distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
-                    distributed=self.relu(distributed) 
+                        # distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+                    if( i < len(self.layers)-1): 
+                        distributed=self.relu(distributed) 
 
 
 
