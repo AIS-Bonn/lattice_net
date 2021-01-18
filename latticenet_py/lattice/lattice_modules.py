@@ -469,9 +469,9 @@ class PointNetModule(torch.nn.Module):
         self.nr_linear_layers=len(self.nr_output_channels_per_layer)
         self.layers=torch.nn.ModuleList([])
         self.norm_layers=torch.nn.ModuleList([])
-        self.relu=torch.nn.ReLU(inplace=True)
+        self.relu=torch.nn.ReLU(inplace=False)
         self.tanh=torch.nn.Tanh()
-        self.leaky=torch.nn.LeakyReLU(negative_slope=0.1, inplace=True)
+        self.leaky=torch.nn.LeakyReLU(negative_slope=0.1, inplace=False)
         self.experiment=experiment
     def forward(self, lattice_py, distributed, indices):
         if (self.first_time):
@@ -638,7 +638,7 @@ class GnRelu1x1(torch.nn.Module):
         super(GnRelu1x1, self).__init__()
         self.out_channels=out_channels
         self.norm= None
-        self.relu = torch.nn.ReLU(inplace=True)
+        self.relu = torch.nn.ReLU(inplace=False)
         self.linear=None
         self.use_bias=bias
     def forward(self, lv, ls):
@@ -665,7 +665,7 @@ class GnGelu1x1(torch.nn.Module):
         super(GnGelu1x1, self).__init__()
         self.out_channels=out_channels
         self.norm= None
-        self.relu = torch.nn.ReLU(inplace=True)
+        self.relu = torch.nn.ReLU(inplace=False)
         self.linear=None
         self.use_bias=bias
     def forward(self, lv, ls):
@@ -712,7 +712,7 @@ class GnReluDepthwiseConv(torch.nn.Module):
         self.nr_filters=nr_filters
         self.conv=DepthwiseConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias)
         self.norm= None
-        self.relu = torch.nn.ReLU(inplace=True)
+        self.relu = torch.nn.ReLU(inplace=False)
         self.with_dropout=with_dropout
         if with_dropout:
             self.drop=DropoutLattice(0.2)
@@ -740,7 +740,7 @@ class GnReluConv(torch.nn.Module):
         self.nr_filters=nr_filters
         self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias)
         self.norm= None
-        self.relu = torch.nn.ReLU(inplace=True)
+        self.relu = torch.nn.ReLU(inplace=False)
         self.with_dropout=with_dropout
         if with_dropout:
             self.drop=DropoutLattice(0.2)
@@ -795,7 +795,7 @@ class BnReluConv(torch.nn.Module):
         self.nr_filters=nr_filters
         self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias)
         self.bn= None
-        self.relu = torch.nn.ReLU(inplace=True)
+        self.relu = torch.nn.ReLU(inplace=False)
     def forward(self, lv, ls):
 
         ls.set_values(lv)
@@ -844,7 +844,7 @@ class GnReluCoarsen(torch.nn.Module):
         self.nr_filters=nr_filters
         self.coarse=CoarsenLatticeModule(nr_filters=nr_filters)
         self.norm= None
-        self.relu = torch.nn.ReLU(inplace=True)
+        self.relu = torch.nn.ReLU(inplace=False)
     def forward(self, lv, ls, concat_connection=None):
 
         ls.set_values(lv)
@@ -899,7 +899,7 @@ class GnReluFinefy(torch.nn.Module):
         self.nr_filters=nr_filters
         self.fine=FinefyLatticeModule(nr_filters=nr_filters)
         self.norm= None
-        self.relu = torch.nn.ReLU(inplace=True)
+        self.relu = torch.nn.ReLU(inplace=False)
     def forward(self, lv_coarse, ls_coarse, ls_fine):
 
         ls_coarse.set_values(lv_coarse)
