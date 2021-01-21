@@ -88,7 +88,7 @@ If training is performed with the viewer enabled, you should see something like 
 ## Citation
 
 ```
-@inproceedings{rosu2019latticenet,
+@inproceedings{rosu2020latticenet,
   title={LatticeNet: Fast point cloud segmentation using permutohedral lattices},
   author={Rosu, Radu Alexandru and Sch{\"u}tt, Peer and Quenzel, Jan and Behnke, Sven},
   booktitle="Proc. of Robotics: Science and Systems (RSS)",
