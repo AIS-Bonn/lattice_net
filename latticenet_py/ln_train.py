@@ -25,9 +25,9 @@ from latticenet_py.callbacks.state_callback import *
 from latticenet_py.callbacks.phase import *
 
 
-# config_file="ln_train_shapenet_example.cfg"
-# config_file="lnn_train_shapenet.cfg"
-config_file="lnn_train_semantic_kitti.cfg"
+config_file="ln_train_shapenet_example.cfg"
+#config_file="lnn_train_shapenet.cfg"
+#config_file="lnn_train_semantic_kitti.cfg"
 # config_file="lnn_train_scannet.cfg"
 
 torch.manual_seed(0)
@@ -125,6 +125,7 @@ def run():
     loss_fn=LovaszSoftmax(ignore_index=loader_train.label_mngr().get_idx_unlabeled())
     #class_weights_tensor=model.compute_class_weights(loader_train.label_mngr().class_frequencies(), loader_train.label_mngr().get_idx_unlabeled())
     secondary_fn=torch.nn.NLLLoss(ignore_index=loader_train.label_mngr().get_idx_unlabeled() )  #combination of nll and dice  https://arxiv.org/pdf/1809.10486.pdf
+    scheduler=None
 
     while True:
 
