@@ -52,12 +52,12 @@ class DistributeLattice(Function):
 
 
         lattice.begin_splat(reset_hashmap)
-        distributed, splatting_indices, splatting_weights = lattice.distribute(positions, values, reset_hashmap)
+        distributed_lattice, distributed, splatting_indices, splatting_weights = lattice.distribute(positions, values, reset_hashmap)
 
 
 
         ctx.save_for_backward(splatting_indices, splatting_weights ) 
-        ctx.lattice=lattice
+        # ctx.lattice=lattice
         ctx.pos_dim=lattice.pos_dim() 
         ctx.val_dim=lattice.val_dim() 
         ctx.nr_positions=positions.shape[0]
@@ -70,7 +70,7 @@ class DistributeLattice(Function):
         # print("FORWARD----------------------   splatting_indices has max ", splatting_indices.max())
 
 
-        return distributed, splatting_indices, splatting_weights
+        return  LatticeWrapper.wrap(distributed_lattice), distributed, splatting_indices, splatting_weights
 
 
     @staticmethod

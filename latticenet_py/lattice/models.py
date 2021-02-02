@@ -190,7 +190,7 @@ class LNN(torch.nn.Module):
     def forward(self, ls, positions, values):
 
         with torch.set_grad_enabled(False):
-            distributed, indices, weights=self.distribute(ls, positions, values)
+            ls, distributed, indices, weights=self.distribute(ls, positions, values)
 
         lv, ls=self.point_net(ls, distributed, indices)
 

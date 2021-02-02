@@ -341,7 +341,7 @@ std::shared_ptr<Lattice> Lattice::expand(torch::Tensor& positions_raw, const int
 }
 
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torch::Tensor& positions_raw, torch::Tensor& values, const bool reset_hashmap){
+std::tuple<std::shared_ptr<Lattice>, torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torch::Tensor& positions_raw, torch::Tensor& values, const bool reset_hashmap){
     check_positions_and_values(positions_raw, values);
     int nr_positions=positions_raw.size(0);
     int pos_dim=positions_raw.size(1);
@@ -364,13 +364,23 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torc
     Tensor splatting_weights_tensor = torch::empty({nr_positions*(pos_dim+1) }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) );
     splatting_indices_tensor.fill_(-1);
     splatting_weights_tensor.fill_(-1);
+
+
+    std::shared_ptr<Lattice> distributed_lattice=create(this); //create a lattice with no config but takes the config from this one
+    distributed_lattice->m_hash_table->m_keys_tensor=this->m_hash_table->m_keys_tensor.clone();
+    distributed_lattice->m_hash_table->m_entries_tensor=this->m_hash_table->m_entries_tensor.clone();
+    if ( this->m_hash_table->m_values_tensor.defined()){
+        distributed_lattice->m_hash_table->m_values_tensor=this->m_hash_table->m_values_tensor.clone();
+    }
+    distributed_lattice->m_name="distributed_lattice";
+    distributed_lattice->m_hash_table->update_impl();
    
     
     // m_hash_table->clear();
     if(reset_hashmap)   {
-        m_hash_table->clear(); 
+        distributed_lattice->m_hash_table->clear(); 
     }else {
-        m_hash_table->clear_only_values();
+        distributed_lattice->m_hash_table->clear_only_values();
     }
 
 
@@ -382,12 +392,12 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torc
     Tensor positions=positions_raw/m_sigmas_tensor;
 
     m_impl->distribute(positions.data_ptr<float>(), values.data_ptr<float>(), distributed_tensor.data_ptr<float>(), nr_positions, pos_dim, val_dim, 
-                            splatting_indices_tensor.data_ptr<int>(), splatting_weights_tensor.data_ptr<float>(), *(m_hash_table->m_impl) );
-    m_hash_table->m_nr_filled_is_dirty=true;
+                            splatting_indices_tensor.data_ptr<int>(), splatting_weights_tensor.data_ptr<float>(), *(distributed_lattice->m_hash_table->m_impl) );
+    distributed_lattice->m_hash_table->m_nr_filled_is_dirty=true;
 
-    VLOG(3) << "after distributing nr_verts is " << nr_lattice_vertices();
+    VLOG(3) << "after distributing nr_verts is " << distributed_lattice->nr_lattice_vertices();
 
-    auto ret = std::make_tuple (distributed_tensor, splatting_indices_tensor, splatting_weights_tensor ); 
+    auto ret = std::make_tuple (distributed_lattice, distributed_tensor, splatting_indices_tensor, splatting_weights_tensor ); 
     return ret;
   
 }

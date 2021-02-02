@@ -45,7 +45,9 @@ class DistributeLatticeModule(torch.nn.Module):
         super(DistributeLatticeModule, self).__init__()
         self.experiment=experiment
     def forward(self, lattice, positions, values, reset_hashmap = True):
-        distributed, splatting_indices, splatting_weights = DistributeLattice.apply(lattice, positions, values, reset_hashmap )
+        # distributed, splatting_indices, splatting_weights = DistributeLattice.apply(lattice, positions, values, reset_hashmap )
+        distributed_lattice_wrap, distributed, splatting_indices, splatting_weights = DistributeLattice.apply(lattice, positions, values, reset_hashmap )
+        distributed_lattice=distributed_lattice_wrap.lattice
 
 
 
@@ -83,7 +85,7 @@ class DistributeLatticeModule(torch.nn.Module):
         # distributed.masked_fill_(positions_that_splat_onto_vertex_zero_or_are_invalid, 0)
         distributed=distributed.masked_fill(positions_that_splat_onto_vertex_zero_or_are_invalid, 0)
 
-        return distributed, splatting_indices, splatting_weights
+        return distributed_lattice, distributed, splatting_indices, splatting_weights
 
 class ExpandLatticeModule(torch.nn.Module): #creates lattice vertiex not directly around the positions but also further away by applying random noise to the positions
     def __init__(self, point_multiplier, noise_stddev, expand_values ):
