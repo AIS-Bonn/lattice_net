@@ -27,6 +27,7 @@ public:
    
 
     void clear();
+    void clear_only_values();
     bool is_initialized();
     void update_impl();
 

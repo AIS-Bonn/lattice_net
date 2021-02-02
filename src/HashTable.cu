@@ -56,6 +56,13 @@ void HashTable::clear(){
     }
 }
 
+void HashTable::clear_only_values(){
+    if(is_initialized()){
+        m_values_tensor.fill_(0);
+        // m_nr_filled_is_dirty=true;
+    }
+}
+
 bool HashTable::is_initialized(){
     if(m_keys_tensor.defined() ){
         return true;

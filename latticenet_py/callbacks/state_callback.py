@@ -47,4 +47,9 @@ class StateCallback(Callback):
         phase.samples_processed_this_epoch=0
 
     def phase_ended(self, phase, **kwargs):
-        phase.loader.reset()
+        # phase.loader.reset()
+
+        if(type(phase.loader) == torch.utils.data.DataLoader): # pytorchs dataloder has no reset 
+            pass
+        else:
+            phase.loader.reset()

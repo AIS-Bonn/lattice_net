@@ -32,12 +32,12 @@ public:
     void set_sigmas(std::vector<  std::pair<float, int> > sigmas_list); // in the init_params code I need to pass an explicit std vector so in this case I would need this
     torch::Tensor bilateral_filter(torch::Tensor& positions_raw, torch::Tensor& values); //runs a bilateral filter on the positions and values and returns the output values
 
-    void begin_splat(); //clears the hashtable and new_values matris so we can use them as fresh
+    void begin_splat(const bool reset_hashmap=true); //clears the hashtable and new_values matris so we can use them as fresh
     // void begin_splat_modify_only_values(); //clears the hashtable and new_values matris so we can use them as fresh
     std::tuple<torch::Tensor, torch::Tensor> splat_standalone(torch::Tensor& positions_raw, torch::Tensor& values); 
     std::tuple<torch::Tensor, torch::Tensor> just_create_verts(torch::Tensor& positions_raw,  const bool return_indices_and_weights );  //creates splatting indices and splatting weights
     std::shared_ptr<Lattice> expand(torch::Tensor& positions_raw, const int point_multiplier, const float noise_stddev, const bool expand_values );
-    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> distribute(torch::Tensor& positions_raw, torch::Tensor& values); 
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> distribute(torch::Tensor& positions_raw, torch::Tensor& values, const bool reset_hashmap=true); 
     // torch::Tensor create_splatting_mask(const torch::Tensor& nr_points_per_simplex, const int nr_positions, const int max_nr_points);
     // void blur_standalone(torch::Tensor& positions_raw, torch::Tensor& values); 
     // std::shared_ptr<Lattice> blur_standalone(); 

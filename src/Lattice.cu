@@ -175,8 +175,13 @@ void Lattice::check_positions_and_values(const torch::Tensor& positions_raw, con
 
 
 
-void Lattice::begin_splat(){
-    m_hash_table->clear(); 
+void Lattice::begin_splat(const bool reset_hashmap ){
+    // m_hash_table->clear(); 
+    if(reset_hashmap)   {
+        m_hash_table->clear(); 
+    }else {
+        m_hash_table->clear_only_values();
+    }
     m_hash_table->m_nr_filled_is_dirty=true;
 }
 
@@ -336,7 +341,7 @@ std::shared_ptr<Lattice> Lattice::expand(torch::Tensor& positions_raw, const int
 }
 
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torch::Tensor& positions_raw, torch::Tensor& values){
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torch::Tensor& positions_raw, torch::Tensor& values, const bool reset_hashmap){
     check_positions_and_values(positions_raw, values);
     int nr_positions=positions_raw.size(0);
     int pos_dim=positions_raw.size(1);
@@ -361,7 +366,12 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Lattice::distribute(torc
     splatting_weights_tensor.fill_(-1);
    
     
-    m_hash_table->clear();
+    // m_hash_table->clear();
+    if(reset_hashmap)   {
+        m_hash_table->clear(); 
+    }else {
+        m_hash_table->clear_only_values();
+    }
 
 
     //to cuda
