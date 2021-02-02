@@ -30,8 +30,8 @@ Afterwards, you can build the docker image which contains all the LatticeNet dep
 ```sh
 $ git clone --recursive https://github.com/RaduAlexandru/lattice_net
 $ cd lattice_net/docker
-$ ./build.sh lattice_img #this will take some time because some packages need to be build from source
-$ ./run.sh lattice_img 
+$ bash ./build.sh lattice_img #this will take some time because some packages need to be build from source
+$ bash ./run.sh lattice_img 
 $ git clone --recursive https://github.com/RaduAlexandru/easy_pbr
 $ cd easy_pbr && make && cd ..
 $ git clone --recursive https://github.com/RaduAlexandru/data_loaders  
