@@ -1337,6 +1337,7 @@ void Lattice::set_values(const torch::Tensor& new_values){
     // m_values_tensor=new_values.contiguous();
     // update_impl();
     m_hash_table->set_values(new_values);
+    CHECK(new_values.size(0)==nr_lattice_vertices()) << "The nr of rows in the new values does not correspond to the nr_lattice_vertices. Nr of rows is " << new_values.size(0) << " and nr lattice vertices is " << nr_lattice_vertices();
 }
 void Lattice::set_positions( const torch::Tensor& positions_raw ){
     m_positions=positions_raw;
