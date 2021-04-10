@@ -405,6 +405,7 @@ class SliceLattice(Function):
         if(lattice_structure.val_dim() is not grad_sliced_values.shape[1]):
             sys.exit("for some reason the values stored in the lattice are not the same dimension as the gradient. What?")
         # lattice_py.set_val_dim(grad_sliced_values.shape[1])
+        grad_sliced_values=grad_sliced_values.contiguous()
         lattice_structure.slice_backwards_standalone_with_precomputation_no_homogeneous(positions, grad_sliced_values, splatting_indices, splatting_weights) 
         lattice_values=lattice_structure.values() #we get a pointer to the values so they don't dissapear when we realease the lettice
        

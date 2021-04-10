@@ -130,3 +130,6 @@ $ latticenet_py/lnn_train.py
 
 
 
+
+# License
+LatticeNet is provided under the terms of the MIT license (see LICENSE). We bundle various other libraries (see ./deps) which may have different licenses.
