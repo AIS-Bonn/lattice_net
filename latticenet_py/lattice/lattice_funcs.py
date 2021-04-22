@@ -144,7 +144,52 @@ class ExpandLattice(Function):
         # return None, None, None, None, None, None, None
 
 
+class Im2RowLattice(Function):
+    @staticmethod
+    def forward(ctx, lattice_values, lattice, filter_extent, dilation, nr_filters):
+       
+        lattice.set_values(lattice_values)
+        # if(lattice_neighbours_structure is not None):
+            # lattice_neighbours_structure.set_values(lattice_neighbours_values)
 
+        # convolved_lattice=lattice.convolve_im2row_standalone(filter_bank, dilation, lattice, False)
+        lattice_rowified=lattice.im2row(lattice,filter_extent,dilation,False)
+        
+
+        # values=convolved_lattice.values()
+
+
+        ctx.save_for_backward(lattice_rowified) 
+        ctx.lattice=lattice
+        # ctx.lattice_neighbours_structure=lattice_neighbours_structure
+        ctx.filter_extent=filter_extent
+        ctx.dilation=dilation
+        ctx.nr_filters=nr_filters
+        ctx.val_dim= lattice.val_dim()
+
+        return lattice_rowified
+
+    @staticmethod
+    def backward(ctx, grad_lattice_rowified):
+        
+
+
+        lattice=ctx.lattice
+        # lattice_neighbours_structure=ctx.lattice_neighbours_structure
+        filter_extent=ctx.filter_extent
+        dilation=ctx.dilation
+        val_dim=ctx.val_dim
+        nr_filters=ctx.nr_filters
+        lattice_rowified =ctx.saved_tensors
+
+
+        grad_values=lattice.row2im(grad_lattice_rowified, dilation, filter_extent, nr_filters, lattice)
+
+
+        ctx.lattice=0 #release this object so it doesnt leak
+        # ctx.lattice_neighbours_structure=0
+
+        return grad_values, None, None, None, None
 
 
 

@@ -163,6 +163,64 @@ class ConvLatticeModule(torch.nn.Module):
         return lv, ls
 
 
+class ConvLatticeIm2RowModule(torch.nn.Module):
+    def __init__(self, nr_filters, neighbourhood_size, dilation=1, bias=True ):
+    # def __init__(self, nr_filters, neighbourhood_size, dilation=1):
+        super(ConvLatticeIm2RowModule, self).__init__()
+        self.first_time=True
+        self.weight=None
+        self.bias=None
+        self.neighbourhood_size=neighbourhood_size
+        self.nr_filters=nr_filters
+        self.dilation=dilation
+        self.use_bias=bias
+
+    #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
+    def reset_parameters(self, filter_extent):
+        # torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu') #pytorch uses default leaky relu but we use relu as here https://github.com/szagoruyko/binary-wide-resnet/blob/master/wrn_mcdonnell.py and as in here https://github.com/pytorch/vision/blob/19315e313511fead3597e23075552255d07fcb2a/torchvision/models/resnet.py#L156
+
+        fan = torch.nn.init._calculate_correct_fan(self.weight, "fan_out")
+        gain = torch.nn.init.calculate_gain("relu", 1)
+        std = gain / math.sqrt(fan)
+        bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+        with torch.no_grad():
+            self.weight.uniform_(-bound, bound)
+
+        # print("reset params, self use_bias is", self.use_bias)
+        if self.bias is not None:
+            fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_out)
+            torch.nn.init.uniform_(self.bias, -bound, bound)
+
+
+    def forward(self, lattice_values, lattice_structure):
+
+        lattice_structure.set_values(lattice_values)
+        filter_extent=lattice_structure.get_filter_extent(self.neighbourhood_size)
+        dilation=1
+
+        if(self.first_time):
+            self.first_time=False
+            val_dim=lattice_structure.val_dim()
+            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
+            if self.use_bias:
+                self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
+            with torch.no_grad():
+                self.reset_parameters(filter_extent)
+
+        # lv, ls_wrap=ConvIm2RowLattice.apply(lattice_values, lattice_structure, self.weight, self.dilation )
+        # ls=ls_wrap.lattice
+
+        lattice_rowified=Im2RowLattice.apply(lattice_values, lattice_structure, filter_extent, dilation, self.nr_filters)
+        lv= lattice_rowified.mm(self.weight)
+
+        if self.use_bias:
+            lv+=self.bias
+        lattice_structure.set_values(lv)
+        
+        return lv, lattice_structure
+
+
 
 
 class CoarsenLatticeModule(torch.nn.Module):
@@ -741,7 +799,8 @@ class GnReluConv(torch.nn.Module):
     def __init__(self, nr_filters, dilation, bias, with_dropout):
         super(GnReluConv, self).__init__()
         self.nr_filters=nr_filters
-        self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias)
+        # self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias)
+        self.conv=ConvLatticeIm2RowModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias)
         self.norm= None
         self.relu = torch.nn.ReLU(inplace=False)
         self.with_dropout=with_dropout

@@ -1858,7 +1858,7 @@ row2im(int capacity, float* im2row_in, int filter_extent, int dilation, HashTabl
 
 
 
-    int row_size=filter_extent*val_full_dim; // each row contains a patch around the current lattice vertex that contains the values of all the neighbours in the filter extent (and the center vertex)
+    int row_size=filter_extent*val_dim; // each row contains a patch around the current lattice vertex that contains the values of all the neighbours in the filter extent (and the center vertex)
 
 
     // find my key (from the hash_table_query) and the keys of my neighbors (from the hash_table_neighbours). The hash tables can actually be the same
