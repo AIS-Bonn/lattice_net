@@ -501,7 +501,7 @@ class GroupNormLatticeModule(torch.nn.Module):
 
 
         self.gn = torch.nn.GroupNorm(nr_groups, nr_params).to("cuda") #having 32 groups is the best as explained in the GroupNormalization paper
-    def forward(self,lattice_values, lattice_py):
+    def forward(self,lattice_values, lattice_py, do_set_values=True):
 
         if(lattice_values.dim() is not 2):
             sys.exit("lattice should be 2 dimensional, nr_vertices x val_dim")
@@ -514,7 +514,8 @@ class GroupNormLatticeModule(torch.nn.Module):
         lattice_values=lattice_values.transpose(1,2)
         lattice_values=lattice_values.squeeze(0)
 
-        lattice_py.set_values(lattice_values)
+        if do_set_values: #sometimes we don't want to set the values because it doesnt make sense, like for example when we use this in the pointnet layer 
+            lattice_py.set_values(lattice_values)
 
         return lattice_values, lattice_py
 
@@ -528,7 +529,7 @@ class PointNetModule(torch.nn.Module):
         self.nr_outputs_last_layer=nr_outputs_last_layer
         self.nr_linear_layers=len(self.nr_output_channels_per_layer)
         self.layers=torch.nn.ModuleList([])
-        # self.norm_layers=torch.nn.ModuleList([])
+        self.norm_layers=torch.nn.ModuleList([])
         self.relu=torch.nn.ReLU(inplace=False)
         self.tanh=torch.nn.Tanh()
         self.leaky=torch.nn.LeakyReLU(negative_slope=0.1, inplace=False)
@@ -548,10 +549,10 @@ class PointNetModule(torch.nn.Module):
                 for i in range(len(self.nr_output_channels_per_layer)):
                     nr_output_channels=self.nr_output_channels_per_layer[i]
                     is_last_layer=i==len(self.nr_output_channels_per_layer)-1 #the last layer is folowed by scatter max and not a batch norm therefore it needs a bias
-                    self.layers.append( torch.nn.Linear(nr_input_channels, nr_output_channels, bias=True).to("cuda")  )
+                    self.layers.append( torch.nn.Linear(nr_input_channels, nr_output_channels, bias=is_last_layer).to("cuda")  )
                     with torch.no_grad():
                         torch.nn.init.kaiming_normal_(self.layers[-1].weight, mode='fan_in', nonlinearity='relu')
-                    # self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
+                    self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
                     nr_input_channels=nr_output_channels
                     nr_layers=nr_layers+1
 
@@ -589,9 +590,9 @@ class PointNetModule(torch.nn.Module):
                         distributed=self.relu(distributed) 
                 else:
                     distributed=self.layers[i] (distributed)
-                    # if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
+                    if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
                         #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
-                        # distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
+                        distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py, do_set_values=False) 
                     if( i < len(self.layers)-1): 
                         distributed=self.relu(distributed) 
 

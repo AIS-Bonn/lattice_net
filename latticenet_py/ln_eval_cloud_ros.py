@@ -12,7 +12,7 @@ from dataloaders import *
 from latticenet  import TrainParams
 from latticenet  import ModelParams
 from latticenet  import EvalParams
-from lattice.lattice_py import LatticePy
+# from lattice.lattice_py import LatticePy
 from lattice.models import *
 
 from callbacks.callback import *
@@ -57,8 +57,9 @@ def run():
     first_time=True
 
     #torch stuff 
-    lattice=LatticePy()
-    lattice.create(config_path, "splated_lattice")
+    # lattice=LatticePy()
+    # lattice.create(config_path, "splated_lattice")
+    lattice=Lattice.create(config_path, "lattice")
 
     cb_list = []
     # if(eval_params.with_viewer()):
@@ -97,7 +98,8 @@ def run():
             pbar = tqdm(total=100000)
             # while ( phase.samples_processed_this_epoch < phase.loader.nr_samples()):
             while loader.is_loader_thread_alive():
-                
+
+                # print("phase.loader.has_data()", phase.loader.has_data())
                 if(phase.loader.has_data()): 
                     cloud=phase.loader.get_cloud()
                     cloud.m_label_mngr=label_mngr
