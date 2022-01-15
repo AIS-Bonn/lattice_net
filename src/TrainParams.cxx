@@ -37,6 +37,7 @@ void TrainParams::init_params(const std::string config_file){
     m_dataset_name=(std::string)train_config["dataset_name"];
     m_with_viewer = train_config["with_viewer"];
     m_with_visdom = train_config["with_visdom"];
+    m_with_tensorboard = train_config["with_tensorboard"];
     m_lr = train_config["lr"];
     m_weight_decay = train_config["weight_decay"];
     m_save_checkpoint=train_config["save_checkpoint"];
@@ -56,6 +57,9 @@ bool TrainParams::with_viewer(){
 }
 bool TrainParams::with_visdom(){
     return m_with_visdom;
+}
+bool TrainParams::with_tensorboard(){
+    return m_with_tensorboard;
 }
 float TrainParams::lr(){
     return m_lr;

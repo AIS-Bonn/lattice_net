@@ -116,6 +116,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def("dataset_name",  &TrainParams::dataset_name )
     .def("with_viewer",  &TrainParams::with_viewer )
     .def("with_visdom",  &TrainParams::with_visdom )
+    .def("with_tensorboard",  &TrainParams::with_tensorboard )
     .def("lr",  &TrainParams::lr )
     .def("weight_decay",  &TrainParams::weight_decay )
     .def("save_checkpoint",  &TrainParams::save_checkpoint )

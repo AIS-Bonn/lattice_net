@@ -15,6 +15,7 @@ public:
 
     bool with_viewer();
     bool with_visdom();
+    bool with_tensorboard();
     std::string dataset_name();
     float lr();
     float weight_decay();
@@ -29,6 +30,7 @@ private:
     std::string m_dataset_name;
     bool m_with_viewer; //wether the training script will show in a viewer the gt_cloud and prediciton cloud
     bool m_with_visdom;
+    bool m_with_tensorboard;
     float m_lr; 
     float m_weight_decay;
     bool m_save_checkpoint;
