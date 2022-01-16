@@ -147,6 +147,8 @@ class ExpandLattice(Function):
 class Im2RowLattice(Function):
     @staticmethod
     def forward(ctx, lattice_values, lattice, filter_extent, dilation, nr_filters):
+
+        # print("Im2RowLattice forward with lattice values fo size ", lattice_values.shape)
        
         lattice.set_values(lattice_values)
         # if(lattice_neighbours_structure is not None):
@@ -166,6 +168,8 @@ class Im2RowLattice(Function):
         ctx.dilation=dilation
         ctx.nr_filters=nr_filters
         ctx.val_dim= lattice.val_dim()
+        # print("forward val dim is ", ctx.val_dim)
+        # print("forward nr_filters is ", nr_filters)
 
         return lattice_rowified
 
@@ -182,8 +186,18 @@ class Im2RowLattice(Function):
         nr_filters=ctx.nr_filters
         lattice_rowified =ctx.saved_tensors
 
+        if lattice.val_dim()!=val_dim:
+            print("something went wrong. Lattice val dim is ", lattice.val_dim(), " but val dim is ", val_dim)
+            exit()
+
+        # print("BACKWARD latticeval dim is ", lattice.val_dim())
+        # print("BACKWARD val dim is ", val_dim )
+        # print("BACKWARD grad_lattice_rowified is ", grad_lattice_rowified.shape )
+        # print("BACKWARD filter_extent is ", filter_extent )
+
 
         grad_values=lattice.row2im(grad_lattice_rowified, dilation, filter_extent, nr_filters, lattice)
+        # print("BACKWARD grad_values is ", grad_values.shape )
 
 
         ctx.lattice=0 #release this object so it doesnt leak

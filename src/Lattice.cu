@@ -605,13 +605,14 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
 torch::Tensor Lattice::row2im(const torch::Tensor& lattice_rowified,  const int dilation, const int filter_extent, const int nr_filters, std::shared_ptr<Lattice> lattice_neighbours){
 
     CHECK(lattice_rowified.is_contiguous()) << "lattice rowified is not contiguous. Please call .contiguous() on it";
+    CHECK(lattice_rowified.size(1)/filer_extent == val_dim() ) << "Each row of the lattice rowified shold be of size val_dim*filter_extent. But the row size is " << lattice_rowified.size(1) << " and th val dim is " << val_dim();
 
     if (!lattice_neighbours){
         lattice_neighbours=shared_from_this();
     }
 
     int nr_vertices=nr_lattice_vertices();
-    m_hash_table->m_values_tensor=torch::zeros({nr_vertices, nr_filters}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) ); 
+    m_hash_table->m_values_tensor=torch::zeros({nr_vertices, val_dim() }, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0) ); 
     m_hash_table->update_impl();
 
     CHECK(nr_lattice_vertices()!=0) <<"Something went wrong because have zero lattice vertices";

@@ -14,6 +14,11 @@ import torch_scatter
 from latticenet_py.lattice.lattice_funcs import *
 
 
+# from utils.utils import *
+import utils.utils as utils
+from utils.utils import LinearWN
+
+
 class DropoutLattice(torch.nn.Module):
     def __init__(self, prob):
         super(DropoutLattice, self).__init__()
@@ -41,9 +46,8 @@ class SplatLatticeModule(torch.nn.Module):
         return lv, ls_wrap.lattice, indices, weights
 
 class DistributeLatticeModule(torch.nn.Module):
-    def __init__(self, experiment):
+    def __init__(self):
         super(DistributeLatticeModule, self).__init__()
-        self.experiment=experiment
     def forward(self, lattice, positions, values, reset_hashmap = True):
         # distributed, splatting_indices, splatting_weights = DistributeLattice.apply(lattice, positions, values, reset_hashmap )
         distributed_lattice_wrap, distributed, splatting_indices, splatting_weights = DistributeLattice.apply(lattice, positions, values, reset_hashmap )
@@ -53,7 +57,7 @@ class DistributeLatticeModule(torch.nn.Module):
 
 
         #subsctract mean from the positions so we have something like a local laplacian as a feature
-        experiments_that_imply_no_mean_substraction=["pointnet_no_local_mean", "pointnet_no_elevate_no_local_mean", "splat"]
+        # experiments_that_imply_no_mean_substraction=["pointnet_no_local_mean", "pointnet_no_elevate_no_local_mean", "splat"]
         # indices=lattice_py.splatting_indices()
         pos_dim=positions.shape[1]
         distributed_positions=distributed[:,:pos_dim] #get the first 3 columns, the ones corresponding only to the xyz positions
@@ -63,18 +67,18 @@ class DistributeLatticeModule(torch.nn.Module):
         #some indices may be -1 because they were not inserted into the hashmap, this will cause an error for scatter_max so we just set them to 0
         indices_long[indices_long<0]=0
 
-        if self.experiment in experiments_that_imply_no_mean_substraction:
+        # if self.experiment in experiments_that_imply_no_mean_substraction:
             # print("not performing mean substraction as the experiment is ", experiment)
-            pass
-        else:
-            mean_positions = torch_scatter.scatter_mean(distributed_positions, indices_long, dim=0 )
-            # mean_positions[0,:]=0 #the first lattice vertex corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
-            index = torch.tensor([0]).to("cuda")
-            mean_positions=torch.index_fill(mean_positions, dim=0, index=index, value=0) 
-            #by setting the first row of mean_positions to 0 it means that all the point that splat onto vertex zero will have a wrong mean. We will set those distributed_mean_substracted to also zero later
-            #the distributed means now has shape nr_positions x pos_dim but we want to substract each distributed position (shape  (nr_positions x m_pos_dim+1) x pos_dim   ) with its corresponding mean. We can do a index_select with splatting indices to get the means
-            distributed_mean_positions=torch.index_select(mean_positions, 0, indices_long)
-            distributed[:,:pos_dim]=distributed_positions-distributed_mean_positions
+            # pass
+        # else:
+        mean_positions = torch_scatter.scatter_mean(distributed_positions, indices_long, dim=0 )
+        # mean_positions[0,:]=0 #the first lattice vertex corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
+        index = torch.tensor([0]).to("cuda")
+        mean_positions=torch.index_fill(mean_positions, dim=0, index=index, value=0) 
+        #by setting the first row of mean_positions to 0 it means that all the point that splat onto vertex zero will have a wrong mean. We will set those distributed_mean_substracted to also zero later
+        #the distributed means now has shape nr_positions x pos_dim but we want to substract each distributed position (shape  (nr_positions x m_pos_dim+1) x pos_dim   ) with its corresponding mean. We can do a index_select with splatting indices to get the means
+        distributed_mean_positions=torch.index_select(mean_positions, 0, indices_long)
+        distributed[:,:pos_dim]=distributed_positions-distributed_mean_positions
 
         #we have to set the positions that ended up in an invalid vertes or the zero one because it's also considered invalid, to zero
         positions_that_splat_onto_vertex_zero_or_are_invalid=indices_long==0
@@ -176,21 +180,22 @@ class ConvLatticeIm2RowModule(torch.nn.Module):
         self.use_bias=bias
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
-    def reset_parameters(self, filter_extent):
+    def reset_parameters(self):
         # torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu') #pytorch uses default leaky relu but we use relu as here https://github.com/szagoruyko/binary-wide-resnet/blob/master/wrn_mcdonnell.py and as in here https://github.com/pytorch/vision/blob/19315e313511fead3597e23075552255d07fcb2a/torchvision/models/resnet.py#L156
 
-        fan = torch.nn.init._calculate_correct_fan(self.weight, "fan_out")
-        gain = torch.nn.init.calculate_gain("relu", 1)
-        std = gain / math.sqrt(fan)
-        bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
-        with torch.no_grad():
-            self.weight.uniform_(-bound, bound)
+        # fan = torch.nn.init._calculate_correct_fan(self.weight, "fan_out")
+        # gain = torch.nn.init.calculate_gain("relu", 1)
+        # std = gain / math.sqrt(fan)
+        # bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+        # with torch.no_grad():
+        #     self.weight.uniform_(-bound, bound)
 
-        # print("reset params, self use_bias is", self.use_bias)
-        if self.bias is not None:
-            fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
-            bound = 1 / math.sqrt(fan_out)
-            torch.nn.init.uniform_(self.bias, -bound, bound)
+        # # print("reset params, self use_bias is", self.use_bias)
+        # if self.bias is not None:
+        #     fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
+        #     bound = 1 / math.sqrt(fan_out)
+        #     torch.nn.init.uniform_(self.bias, -bound, bound)
+        utils.apply_weight_init_fn(self, utils.swish_init)
 
 
     def forward(self, lattice_values, lattice_structure):
@@ -202,11 +207,13 @@ class ConvLatticeIm2RowModule(torch.nn.Module):
         if(self.first_time):
             self.first_time=False
             val_dim=lattice_structure.val_dim()
+            self.in_channels=val_dim
+            self.filter_extent=filter_extent
             self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
             if self.use_bias:
                 self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
             with torch.no_grad():
-                self.reset_parameters(filter_extent)
+                self.reset_parameters()
 
         # lv, ls_wrap=ConvIm2RowLattice.apply(lattice_values, lattice_structure, self.weight, self.dilation )
         # ls=ls_wrap.lattice
@@ -214,11 +221,13 @@ class ConvLatticeIm2RowModule(torch.nn.Module):
         lattice_rowified=Im2RowLattice.apply(lattice_values, lattice_structure, filter_extent, dilation, self.nr_filters)
         lv= lattice_rowified.mm(self.weight)
 
+        lattice_structure_new=lattice_structure.clone_lattice() #we create a new lattice because after doing convolution on this lattice, the val dim may change
+
         if self.use_bias:
             lv+=self.bias
-        lattice_structure.set_values(lv)
+        lattice_structure_new.set_values(lv)
         
-        return lv, lattice_structure
+        return lv, lattice_structure_new
 
 
 
@@ -522,79 +531,54 @@ class GroupNormLatticeModule(torch.nn.Module):
 
 
 class PointNetModule(torch.nn.Module):
-    def __init__(self, nr_output_channels_per_layer, nr_outputs_last_layer, experiment):
+    def __init__(self, nr_output_channels_per_layer, nr_outputs_last_layer):
         super(PointNetModule, self).__init__()
         self.first_time=True
         self.nr_output_channels_per_layer=nr_output_channels_per_layer
         self.nr_outputs_last_layer=nr_outputs_last_layer
         self.nr_linear_layers=len(self.nr_output_channels_per_layer)
         self.layers=torch.nn.ModuleList([])
-        self.norm_layers=torch.nn.ModuleList([])
-        self.relu=torch.nn.ReLU(inplace=False)
-        self.tanh=torch.nn.Tanh()
-        self.leaky=torch.nn.LeakyReLU(negative_slope=0.1, inplace=False)
-        self.experiment=experiment
-    def forward(self, lattice_py, distributed, indices):
+        self.swish=torch.nn.SiLU()
+
+    #called the first time we do a forwad pass to initialize all the modules
+    def init(self, distributed):
         if (self.first_time):
             with torch.no_grad():
                 self.first_time=False
 
                 #get the nr of channels of the distributed tensor
                 nr_input_channels=distributed.shape[1] - 1
-                if (self.experiment=="attention_pool"):
-                    nr_input_channels=distributed.shape[1] 
-                # initial_nr_channels=distributed.shape[1]
 
                 nr_layers=0
                 for i in range(len(self.nr_output_channels_per_layer)):
                     nr_output_channels=self.nr_output_channels_per_layer[i]
-                    is_last_layer=i==len(self.nr_output_channels_per_layer)-1 #the last layer is folowed by scatter max and not a batch norm therefore it needs a bias
-                    self.layers.append( torch.nn.Linear(nr_input_channels, nr_output_channels, bias=is_last_layer).to("cuda")  )
-                    with torch.no_grad():
-                        torch.nn.init.kaiming_normal_(self.layers[-1].weight, mode='fan_in', nonlinearity='relu')
-                    self.norm_layers.append( GroupNormLatticeModule(nr_params=nr_output_channels, affine=True)  )  #we disable the affine because it will be slow for semantic kitti
+                    self.layers.append( LinearWN(nr_input_channels, nr_output_channels, bias=True).to("cuda")  )
                     nr_input_channels=nr_output_channels
                     nr_layers=nr_layers+1
 
-                if (self.experiment=="attention_pool"):
-                    self.pre_conv=torch.nn.Linear(nr_input_channels, nr_input_channels, bias=False).to("cuda") #the last distributed is the result of relu, so we want to start this paralel branch with a conv now
-                    self.gamma  = torch.nn.Parameter( torch.ones( nr_input_channels ).to("cuda") ) 
-                    with torch.no_grad():
-                        torch.nn.init.kaiming_normal_(self.pre_conv.weight, mode='fan_in', nonlinearity='relu')
-                    self.att_activ=GnRelu1x1(nr_input_channels, False)
-                    self.att_scores=GnRelu1x1(nr_input_channels, True)
+                utils.apply_weight_init_fn(self, utils.swish_init) ##we put it here because the conv lattice wil have it;s weights initialized alzily when you do the frist forward pass
+
+                # self.last_conv=ConvLatticeModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=False) #disable the bias becuse it is followed by a gn
+                print("poitnnet last conv has output channels output ", self.nr_outputs_last_layer)
+                self.last_conv=ConvLatticeIm2RowModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=True) #disable the bias becuse it is followed by a gn
 
 
-                self.last_conv=ConvLatticeModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=False) #disable the bias becuse it is followed by a gn
 
+    def forward(self, lattice_py, distributed, indices):
+        # init()
+        if (self.first_time):
+            self.init(distributed)
+            
 
 
         barycentric_weights=distributed[:,-1]
-        if ( self.experiment=="attention_pool"):
-            distributed=distributed #when we use attention pool we use the distributed tensor that contains the barycentric weights
-        else:
-            distributed=distributed[:, :distributed.shape[1]-1] #IGNORE the barycentric weights for the moment and lift the coordinates of only the xyz and values
+        distributed=distributed[:, :distributed.shape[1]-1] #IGNORE the barycentric weights for the moment and lift the coordinates of only the xyz and values
 
         # #run the distributed through all the layers
-        experiment_that_imply_no_elevation=["pointnet_no_elevate", "pointnet_no_elevate_no_local_mean", "splat"]
-        if self.experiment in experiment_that_imply_no_elevation:
-            # print("not performing elevation by pointnet as the experiment is", self.experiment)
-            pass
-        else:
-            for i in range(len(self.layers)): 
-
-                if (self.experiment=="attention_pool"):
-                    distributed=self.layers[i] (distributed)
-                    # distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py) 
-                    if( i < len(self.layers)-1): 
-                        distributed=self.relu(distributed) 
-                else:
-                    distributed=self.layers[i] (distributed)
-                    if( i < len(self.layers)-1): #last tanh before the maxing need not be applied because it actually hurts the performance, also it's not used in the original pointnet https://github.com/fxia22/pointnet.pytorch/blob/master/pointnet/model.py
-                        #last bn need not be applied because we will max over the lattices either way and then to a bn afterwards
-                        distributed, lattice_py=self.norm_layers[i] (distributed, lattice_py, do_set_values=False) 
-                    if( i < len(self.layers)-1): 
-                        distributed=self.relu(distributed) 
+        for i in range(len(self.layers)): 
+            distributed=self.layers[i] (distributed)
+            # if( i < len(self.layers)-1): 
+            distributed=self.swish(distributed) 
 
 
 
@@ -605,54 +589,27 @@ class PointNetModule(torch.nn.Module):
 
 
 
-        if self.experiment=="splat":
-            distributed_reduced = torch_scatter.scatter_mean(distributed, indices_long, dim=0)
-        if self.experiment=="attention_pool":
-            #attention pooling ##################################################
-            #concat for each vertex the max over the simplex
-            max_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
-            max_per_vertex=torch.index_select(max_reduced, 0, indices_long)
-            distributed_with_max=distributed+self.gamma*max_per_vertex
+       
+        distributed_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
 
-            pre_conv=self.pre_conv(distributed_with_max) 
-            att_activ, lattice_py=self.att_activ(pre_conv, lattice_py)
-            att_scores, lattice_py=self.att_scores(att_activ, lattice_py)
-            att_scores=torch.exp(att_scores)
-            att_scores_sum_reduced = torch_scatter.scatter_add(att_scores, indices_long, dim=0)
-            att_scores_sum=torch.index_select(att_scores_sum_reduced, 0, indices_long)
-            att_scores=att_scores/att_scores_sum
-            #softmax them somehow
-            distributed=distributed*att_scores
-            distributed_reduced = torch_scatter.scatter_add(distributed, indices_long, dim=0)
+        #get also the nr of points in the lattice so the max pooled features can be different if there is 1 point then if there are 100
+        ones=torch.cuda.FloatTensor( indices_long.shape[0] ).fill_(1.0)
+        nr_points_per_simplex = torch_scatter.scatter_add(ones, indices_long)
+        nr_points_per_simplex=nr_points_per_simplex.unsqueeze(1)
+        #attempt 3 just by concatenating the barycentric coords
+        # argmax_flatened=argmax.flatten()
+        # argmax_positive=argmax_flatened.clone()
+        # argmax_positive[argmax_flatened<0]=0
+        barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
+        # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax_positive ) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
+        barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
+        distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced),1)
+        # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced, nr_points_per_simplex),1)
+        # distributed_reduced=torch.cat((distributed_reduced, nr_points_per_simplex),1)
 
-            #get also the nr of points in the lattice so the max pooled features can be different if there is 1 point then if there are 100
-            ones=torch.cuda.FloatTensor( indices_long.shape[0] ).fill_(1.0)
-            nr_points_per_simplex = torch_scatter.scatter_add(ones, indices_long)
-            nr_points_per_simplex=nr_points_per_simplex.unsqueeze(1)
-            minimum_points_per_simplex=4
-            simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
-            distributed_reduced=distributed_reduced.masked_fill(simplexes_with_few_points, 0)
-        else:
-            distributed_reduced, argmax = torch_scatter.scatter_max(distributed, indices_long, dim=0)
-
-            #get also the nr of points in the lattice so the max pooled features can be different if there is 1 point then if there are 100
-            ones=torch.cuda.FloatTensor( indices_long.shape[0] ).fill_(1.0)
-            nr_points_per_simplex = torch_scatter.scatter_add(ones, indices_long)
-            nr_points_per_simplex=nr_points_per_simplex.unsqueeze(1)
-            #attempt 3 just by concatenating the barycentric coords
-            # argmax_flatened=argmax.flatten()
-            # argmax_positive=argmax_flatened.clone()
-            # argmax_positive[argmax_flatened<0]=0
-            barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax.flatten()) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
-            # barycentric_reduced=torch.index_select(barycentric_weights, 0, argmax_positive ) #we select for each vertex the 64 barycentric weights that got selected by the scatter max
-            barycentric_reduced=barycentric_reduced.view(argmax.shape[0], argmax.shape[1])
-            distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced),1)
-            # distributed_reduced=torch.cat((distributed_reduced,barycentric_reduced, nr_points_per_simplex),1)
-            # distributed_reduced=torch.cat((distributed_reduced, nr_points_per_simplex),1)
-
-            minimum_points_per_simplex=4
-            simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
-            distributed_reduced=distributed_reduced.masked_fill(simplexes_with_few_points, 0)
+        minimum_points_per_simplex=4
+        simplexes_with_few_points=nr_points_per_simplex<minimum_points_per_simplex
+        distributed_reduced=distributed_reduced.masked_fill(simplexes_with_few_points, 0)
 
 
         # distributed_reduced[0,:]=0 #the first layers corresponds to the invalid points, the ones that had an index of -1. We set it to 0 so it doesnt affect the prediction or the batchnorm
@@ -666,9 +623,14 @@ class PointNetModule(torch.nn.Module):
 
 
         # print("calling last_conv") 
+        # print("distributed_reduced before last conv is ------------------------------------", distributed_reduced.shape)
         distributed_reduced, lattice_py=self.last_conv(distributed_reduced, lattice_py)
+
+        # print("finished last conv of pointnet --------------------------------------")
+
         # print("called last conv")
 
+        distributed_reduced=self.swish(distributed_reduced)
 
         lattice_py.set_values(distributed_reduced)
         # lattice_py.set_val_dim(distributed_reduced.shape[1])

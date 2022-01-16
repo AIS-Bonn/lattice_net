@@ -37,7 +37,7 @@ void ModelParams::init_params(const std::string config_file){
 
     m_positions_mode=(std::string)train_config["positions_mode"];
     m_values_mode=(std::string)train_config["values_mode"];
-    m_pointnet_layers=train_config["pointnet_layers"];
+    m_pointnet_channels_per_layer=train_config["pointnet_channels_per_layer"];
     m_pointnet_start_nr_channels=train_config["pointnet_start_nr_channels"];
     m_nr_downsamples=train_config["nr_downsamples"];
     m_nr_blocks_down_stage=train_config["nr_blocks_down_stage"];
@@ -47,7 +47,7 @@ void ModelParams::init_params(const std::string config_file){
     m_nr_levels_up_with_normal_resnet=train_config["nr_levels_up_with_normal_resnet"];
     m_compression_factor=train_config["compression_factor"];
     m_dropout_last_layer=train_config["dropout_last_layer"];
-    m_experiment=(std::string)train_config["experiment"];
+    // m_experiment=(std::string)train_config["experiment"];
 
 }
 
@@ -57,8 +57,8 @@ std::string ModelParams::positions_mode(){
 std::string ModelParams::values_mode(){
     return m_values_mode;
 }
-Eigen::VectorXi ModelParams::pointnet_layers(){
-    return m_pointnet_layers;
+Eigen::VectorXi ModelParams::pointnet_channels_per_layer(){
+    return m_pointnet_channels_per_layer;
 }
 int ModelParams::pointnet_start_nr_channels(){
     return m_pointnet_start_nr_channels;
@@ -87,9 +87,9 @@ float ModelParams::compression_factor(){
 float ModelParams::dropout_last_layer(){
     return m_dropout_last_layer;
 }
-std::string ModelParams::experiment(){
-    return m_experiment;
-}
+// std::string ModelParams::experiment(){
+//     return m_experiment;
+// }
 
 
 

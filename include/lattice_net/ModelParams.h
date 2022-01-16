@@ -18,7 +18,7 @@ public:
 
     std::string positions_mode(); //the values we feed into the lattice can be either: xyz, xyz+rgb
     std::string values_mode(); //the values we feed into the lattice can be either: none, intensity
-    Eigen::VectorXi pointnet_layers();
+    Eigen::VectorXi pointnet_channels_per_layer();
     int pointnet_start_nr_channels(); //after pointnet architecture we add one more fully connected layer to elevate the lattice vertices up to this nr_channels
     int nr_downsamples(); //the network uses this many corsening of the lattice graph
     std::vector<int> nr_blocks_down_stage(); //each corsening stage inclues some amount of resnetblocks or bottleneck blocks. This says how many blocks for each stage we have
@@ -28,7 +28,7 @@ public:
     int nr_levels_up_with_normal_resnet(); //starting from the bottom of the network (closer to the output) we count how many of the upsampling stages should include ResnetBlocks instead of BottleneckBlocks (the first few stages have few channels so we can afford to use ResnetBlock instead of Bottleneck block)
     float compression_factor(); //each corsening of the graph increases the nr of channels by prev_nr_channels*2*compression_factor. So if the compression factor is 1.0 we will double the nr of channels
     float dropout_last_layer(); //Probability of dropout added to the last linear layer, the one that maps to the nr_classes and is just before the softmax 
-    std::string experiment();
+    // std::string experiment();
 
 
 
@@ -39,7 +39,7 @@ private:
 
     std::string m_positions_mode;
     std::string m_values_mode;
-    Eigen::VectorXi m_pointnet_layers;
+    Eigen::VectorXi m_pointnet_channels_per_layer;
     int m_pointnet_start_nr_channels;
     int m_nr_downsamples; 
     std::vector<int> m_nr_blocks_down_stage; 
@@ -50,6 +50,6 @@ private:
     float m_compression_factor; 
     float m_dropout_last_layer;
 
-    std::string m_experiment;
+    // std::string m_experiment;
 
 };

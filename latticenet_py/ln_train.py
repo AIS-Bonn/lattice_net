@@ -21,12 +21,13 @@ from latticenet_py.lattice.models import *
 from latticenet_py.callbacks.callback import *
 from latticenet_py.callbacks.viewer_callback import *
 from latticenet_py.callbacks.visdom_callback import *
+from latticenet_py.callbacks.tensorboard_callback import *
 from latticenet_py.callbacks.state_callback import *
 from latticenet_py.callbacks.phase import *
 
 
-config_file="ln_train_shapenet_example.cfg"
-# config_file="lnn_train_shapenet.cfg"
+# config_file="ln_train_shapenet_example.cfg"
+config_file="lnn_train_shapenet.cfg"
 # config_file="lnn_train_semantic_kitti.cfg"
 # config_file="lnn_train_scannet.cfg"
 
@@ -87,7 +88,7 @@ def run():
 
     first_time=True
 
-    experiment_name="s_1"
+    experiment_name="s_2siwshinit_firt_conv"
 
     #torch stuff 
     lattice=Lattice.create(config_path, "lattice")
@@ -95,6 +96,8 @@ def run():
     cb_list = []
     if(train_params.with_visdom()):
         cb_list.append(VisdomCallback(experiment_name))
+    if(train_params.with_tensorboard()):
+        cb_list.append(TensorboardCallback(experiment_name))
     if(train_params.with_viewer()):
         cb_list.append(ViewerCallback())
     cb_list.append(StateCallback())

@@ -138,7 +138,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def_static("create", &ModelParams::create<const std::string> ) //for templated methods like this one we need to explicitly instantiate one of the arguments
     .def("positions_mode",  &ModelParams::positions_mode )
     .def("values_mode",  &ModelParams::values_mode )
-    .def("pointnet_layers",  &ModelParams::pointnet_layers )
+    .def("pointnet_channels_per_layer",  &ModelParams::pointnet_channels_per_layer )
     .def("pointnet_start_nr_channels",  &ModelParams::pointnet_start_nr_channels )
     .def("nr_downsamples",  &ModelParams::nr_downsamples )
     .def("nr_blocks_down_stage",  &ModelParams::nr_blocks_down_stage )
@@ -148,7 +148,7 @@ PYBIND11_MODULE(latticenet, m) {
     .def("nr_levels_up_with_normal_resnet",  &ModelParams::nr_levels_up_with_normal_resnet )
     .def("compression_factor",  &ModelParams::compression_factor )
     .def("dropout_last_layer",  &ModelParams::dropout_last_layer )
-    .def("experiment",  &ModelParams::experiment )
+    // .def("experiment",  &ModelParams::experiment )
     ;
 
 

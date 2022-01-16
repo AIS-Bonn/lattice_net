@@ -82,24 +82,24 @@ class LNN(torch.nn.Module):
         self.nr_levels_up_with_normal_resnet=model_params.nr_levels_up_with_normal_resnet()
         compression_factor=model_params.compression_factor()
         dropout_last_layer=model_params.dropout_last_layer()
-        experiment=model_params.experiment()
+        # experiment=model_params.experiment()
         #check that the experiment has a valid string
-        valid_experiment=["none", "slice_no_deform", "pointnet_no_elevate", "pointnet_no_local_mean", "pointnet_no_elevate_no_local_mean", "splat", "attention_pool"]
-        if experiment not in valid_experiment:
-            err = "Experiment " + experiment + " is not valid"
-            sys.exit(err)
+        # valid_experiment=["none", "slice_no_deform", "pointnet_no_elevate", "pointnet_no_local_mean", "pointnet_no_elevate_no_local_mean", "splat", "attention_pool"]
+        # if experiment not in valid_experiment:
+            # err = "Experiment " + experiment + " is not valid"
+            # sys.exit(err)
 
 
 
 
 
-        self.distribute=DistributeLatticeModule(experiment) 
-        self.pointnet_layers=model_params.pointnet_layers()
+        self.distribute=DistributeLatticeModule() 
+        self.pointnet_channels_per_layer=model_params.pointnet_channels_per_layer()
         self.start_nr_filters=model_params.pointnet_start_nr_channels()
-        print("pointnet layers is ", self.pointnet_layers)
-        self.point_net=PointNetModule( self.pointnet_layers, self.start_nr_filters, experiment)  
+        print("pointnt_channels_per_layer is ", self.pointnet_channels_per_layer)
+        self.point_net=PointNetModule( self.pointnet_channels_per_layer, self.start_nr_filters)  
 
-
+        experiment="none"
 
 
         #####################
