@@ -127,7 +127,7 @@ class LNN(torch.nn.Module):
             skip_connection_channel_counts.append(cur_channels_count)
             nr_channels_after_coarsening=int(cur_channels_count*2*compression_factor)
             print("adding bnReluCorsen which outputs nr of channels ", nr_channels_after_coarsening )
-            self.coarsens_list.append( GnReluCoarsen(nr_channels_after_coarsening)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
+            self.coarsens_list.append( GnReluCoarsen(cur_channels_count, nr_channels_after_coarsening)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             cur_channels_count=nr_channels_after_coarsening
             corsenings_channel_counts.append(cur_channels_count)
 
@@ -156,7 +156,7 @@ class LNN(torch.nn.Module):
 
             #do it with finefy
             print("adding bnReluFinefy which outputs nr of channels ", nr_chanels_finefy )
-            self.finefy_list.append( GnReluFinefy(nr_chanels_finefy ))
+            self.finefy_list.append( GnReluFinefy(cur_channels_count, nr_chanels_finefy ))
 
             #after finefy we do a concat with the skip connection so the number of channels doubles
             if self.do_concat_for_vertical_connection:

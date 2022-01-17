@@ -191,7 +191,8 @@ class ConvLatticeIm2RowModule(torch.nn.Module):
         self.weight = torch.nn.Parameter( torch.empty( self.filter_extent * self.in_channels, self.out_channels ).to("cuda") ) #works for ConvIm2RowLattice
         if self.use_bias:
             self.bias = torch.nn.Parameter( torch.empty( self.out_channels ).to("cuda") )
-        self.reset_parameters()
+        with torch.no_grad():
+            self.reset_parameters()
 
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
@@ -253,16 +254,27 @@ ConvLatticeIm2RowWNModule = utils.weight_norm_wrapper(ConvLatticeIm2RowModule, g
 
 
 class CoarsenLatticeModule(torch.nn.Module):
-    def __init__(self, nr_filters, bias=False ):
+    def __init__(self, in_channels, out_channels, bias=False ):
         super(CoarsenLatticeModule, self).__init__()
         self.first_time=True
-        self.nr_filters=nr_filters
+        # self.nr_filters=nr_filters
+        self.in_channels=in_channels
+        self.out_channels=out_channels
         self.neighbourhood_size=1
         self.bias=None
         self.use_bias=bias
+        self.filter_extent=Lattice.get_expected_filter_extent(self.neighbourhood_size)
+
+
+        #create parameters
+        self.weight = torch.nn.Parameter( torch.empty( self.filter_extent * self.in_channels, self.out_channels ).to("cuda") ) #works for ConvIm2RowLattice
+        if self.use_bias:
+            self.bias = torch.nn.Parameter( torch.empty( self.out_channels ).to("cuda") )
+        with torch.no_grad():
+            self.reset_parameters()
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
-    def reset_parameters(self, filter_extent):
+    def reset_parameters(self):
         # torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu')
 
         fan = torch.nn.init._calculate_correct_fan(self.weight, "fan_out")
@@ -286,15 +298,17 @@ class CoarsenLatticeModule(torch.nn.Module):
     def forward(self, lattice_fine_values, lattice_fine_structure, coarsened_lattice=None):
         lattice_fine_structure.set_values(lattice_fine_values)
 
-        if(self.first_time):
-            self.first_time=False
-            filter_extent=lattice_fine_structure.get_filter_extent(self.neighbourhood_size) 
-            val_dim=lattice_fine_structure.val_dim()
-            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
-            if self.use_bias:
-                self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
-            with torch.no_grad():
-                self.reset_parameters(filter_extent)
+        assert self.in_channels==lattice_fine_structure.val_dim(), f"In channels doesn't match the val_dim of the lattice. In channels is {self.in_channels}, while val dim is {lattice_fine_structure.val_dim()}"
+
+        # if(self.first_time):
+        #     self.first_time=False
+        #     filter_extent=lattice_fine_structure.get_filter_extent(self.neighbourhood_size) 
+        #     val_dim=lattice_fine_structure.val_dim()
+        #     self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
+        #     if self.use_bias:
+        #         self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
+        #     with torch.no_grad():
+        #         self.reset_parameters(filter_extent)
 
         lv, ls_wrap= CoarsenLattice.apply(lattice_fine_values, lattice_fine_structure, self.weight, coarsened_lattice ) #this just does a convolution, we also need batch norm an non linearity
         ls=ls_wrap.lattice
@@ -306,16 +320,27 @@ class CoarsenLatticeModule(torch.nn.Module):
         return lv, ls
 
 class FinefyLatticeModule(torch.nn.Module):
-    def __init__(self, nr_filters,  bias=False ):
+    def __init__(self, in_channels, out_channels,  bias=False ):
         super(FinefyLatticeModule, self).__init__()
         self.first_time=True
-        self.nr_filters=nr_filters
+        # self.nr_filters=nr_filters
+        self.in_channels=in_channels
+        self.out_channels=out_channels
         self.neighbourhood_size=1
         self.bias=None
         self.use_bias=bias
+        self.filter_extent=Lattice.get_expected_filter_extent(self.neighbourhood_size)
+
+        #create parameters
+        self.weight = torch.nn.Parameter( torch.empty( self.filter_extent * self.in_channels, self.out_channels ).to("cuda") ) #works for ConvIm2RowLattice
+        # self.bias = torch.nn.Parameter(torch.empty( self.nr_filters).to("cuda") )
+        if self.use_bias:
+            self.bias = torch.nn.Parameter( torch.empty( self.out_channels ).to("cuda") )
+        with torch.no_grad():
+            self.reset_parameters()
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
-    def reset_parameters(self, filter_extent):
+    def reset_parameters(self):
         # torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu')
 
         fan = torch.nn.init._calculate_correct_fan(self.weight, "fan_out")
@@ -341,16 +366,18 @@ class FinefyLatticeModule(torch.nn.Module):
         lattice_coarse_structure.set_values(lattice_coarse_values)
         # lattice_fine_structure.set_val_dim(lattice_coarse_structure.val_dim())
 
-        if(self.first_time):
-            self.first_time=False
-            filter_extent=lattice_fine_structure.get_filter_extent(self.neighbourhood_size) 
-            val_dim=lattice_coarse_structure.val_dim()
-            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
-            # self.bias = torch.nn.Parameter(torch.empty( self.nr_filters).to("cuda") )
-            if self.use_bias:
-                self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
-            with torch.no_grad():
-                self.reset_parameters(filter_extent)
+        assert self.in_channels==lattice_coarse_structure.val_dim(), f"In channels doesn't match the val_dim of the lattice. In channels is {self.in_channels}, while val dim is {lattice_coarse_structure.val_dim()}"
+
+        # if(self.first_time):
+        #     self.first_time=False
+        #     filter_extent=lattice_fine_structure.get_filter_extent(self.neighbourhood_size) 
+        #     val_dim=lattice_coarse_structure.val_dim()
+        #     self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
+        #     # self.bias = torch.nn.Parameter(torch.empty( self.nr_filters).to("cuda") )
+        #     if self.use_bias:
+        #         self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
+        #     with torch.no_grad():
+        #         self.reset_parameters(filter_extent)
 
         lv, ls_wrap= FinefyLattice.apply(lattice_coarse_values, lattice_coarse_structure, lattice_fine_structure, self.weight ) #this just does a convolution, we also need batch norm an non linearity
         ls = ls_wrap.lattice
@@ -910,19 +937,21 @@ class GnCoarsen(torch.nn.Module):
         return lv_1, ls_1
 
 class GnReluCoarsen(torch.nn.Module):
-    def __init__(self, nr_filters):
+    def __init__(self, in_channels, out_channels):
         super(GnReluCoarsen, self).__init__()
-        self.nr_filters=nr_filters
-        self.coarse=CoarsenLatticeModule(nr_filters=nr_filters)
-        self.norm= None
+        # self.nr_filters=nr_filters
+        self.in_channels=in_channels
+        self.out_channels=out_channels
+        self.coarse=CoarsenLatticeModule(in_channels=in_channels, out_channels=out_channels)
+        self.norm= GroupNormLatticeModule(in_channels)
         self.relu = torch.nn.ReLU(inplace=False)
     def forward(self, lv, ls, concat_connection=None):
 
         ls.set_values(lv)
 
         #similar to densenet and resnet: bn, relu, conv
-        if self.norm is None:
-            self.norm = GroupNormLatticeModule(lv.shape[1])
+        # if self.norm is None:
+            # self.norm = GroupNormLatticeModule(lv.shape[1])
         lv, ls=self.norm(lv,ls)
         lv=self.relu(lv)
         ls.set_values(lv)
@@ -965,19 +994,21 @@ class GnGeluCoarsen(torch.nn.Module):
 
 
 class GnReluFinefy(torch.nn.Module):
-    def __init__(self, nr_filters):
+    def __init__(self, in_channels, out_channels):
         super(GnReluFinefy, self).__init__()
-        self.nr_filters=nr_filters
-        self.fine=FinefyLatticeModule(nr_filters=nr_filters)
-        self.norm= None
+        # self.nr_filters=nr_filters
+        self.in_channels=in_channels
+        self.out_channels=out_channels
+        self.fine=FinefyLatticeModule(in_channels=in_channels, out_channels=out_channels)
+        self.norm= GroupNormLatticeModule(in_channels)
         self.relu = torch.nn.ReLU(inplace=False)
     def forward(self, lv_coarse, ls_coarse, ls_fine):
 
         ls_coarse.set_values(lv_coarse)
 
         #similar to densenet and resnet: bn, relu, conv
-        if self.norm is None:
-            self.norm = GroupNormLatticeModule(lv_coarse.shape[1])
+        # if self.norm is None:
+            # self.norm = GroupNormLatticeModule(lv_coarse.shape[1])
         lv_coarse, ls_coarse=self.norm(lv_coarse,ls_coarse)
         lv_coarse=self.relu(lv_coarse)
         ls_coarse.set_values(lv_coarse)
