@@ -78,6 +78,7 @@ PYBIND11_MODULE(latticenet, m) {
     // .def("to_tensors", &Lattice::to_tensors )
     // .def("from_tensors", &Lattice::from_tensors )
     .def("get_filter_extent", &Lattice::get_filter_extent )
+    .def_static("get_expected_filter_extent", &Lattice::get_expected_filter_extent )
     .def("val_dim", &Lattice::val_dim )
     // .def("val_full_dim", &Lattice::val_full_dim )
     .def("pos_dim", &Lattice::pos_dim )

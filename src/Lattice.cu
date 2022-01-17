@@ -41,12 +41,15 @@ using torch::Tensor;
 using namespace radu::utils;
 
 
+int Lattice::m_expected_position_dimensions = -1;
+
 
 
 //CPU code that calls the kernels
 Lattice::Lattice(const std::string config_file):
     m_impl( new LatticeGPU() ),
     m_lvl(1)
+    // m_expected_position_dimensions(0)
     {
 
     init_params(config_file);
@@ -77,6 +80,7 @@ Lattice::Lattice(Lattice* other):
         // m_hash_table_capacity=other->m_hash_table_capacity;
         m_sigmas=other->m_sigmas;
         m_sigmas_tensor=other->m_sigmas_tensor.clone(); //deep copy
+        m_expected_position_dimensions=other->m_expected_position_dimensions;
         // m_splatting_indices_tensor=other->m_splatting_indices_tensor; //shallow copy
         // m_splatting_weights_tensor=other->m_splatting_weights_tensor; //shallow copy
         // m_lattice_rowified=other->m_lattice_rowified; //shallow copy
@@ -136,6 +140,7 @@ void Lattice::set_sigmas(std::initializer_list<  std::pair<float, int> > sigmas_
             m_sigmas.push_back(sigma);
         }
     }
+    m_expected_position_dimensions=m_sigmas.size();
 
     m_sigmas_tensor=vec2tensor(m_sigmas);
 }
@@ -149,6 +154,7 @@ void Lattice::set_sigmas(std::vector<  std::pair<float, int> > sigmas_list){
             m_sigmas.push_back(sigma);
         }
     }
+    m_expected_position_dimensions=m_sigmas.size();
 
     m_sigmas_tensor=vec2tensor(m_sigmas);
 }
@@ -159,6 +165,7 @@ void Lattice::check_positions(const torch::Tensor& positions_raw){
     int pos_dim=positions_raw.size(1);
     CHECK(m_sigmas.size()==pos_dim) <<"One must set sigmas for each dimension of the positions. Use set_sigmas. m_sigmas is " << m_sigmas.size() << " m_pos dim is " <<pos_dim;
     CHECK(positions_raw.is_contiguous()) << "Positions raw is not contiguous. Please call .contiguous() on it";
+    CHECK(pos_dim==m_expected_position_dimensions) << "The pos dim should be the same as the expected positions dimensions given by the sigmas. Pos dim is " << pos_dim << " m_expected_position_dimensions " << m_expected_position_dimensions;
 
 }
 void Lattice::check_values(const torch::Tensor& values){
@@ -605,7 +612,7 @@ torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const
 torch::Tensor Lattice::row2im(const torch::Tensor& lattice_rowified,  const int dilation, const int filter_extent, const int nr_filters, std::shared_ptr<Lattice> lattice_neighbours){
 
     CHECK(lattice_rowified.is_contiguous()) << "lattice rowified is not contiguous. Please call .contiguous() on it";
-    CHECK(lattice_rowified.size(1)/filer_extent == val_dim() ) << "Each row of the lattice rowified shold be of size val_dim*filter_extent. But the row size is " << lattice_rowified.size(1) << " and th val dim is " << val_dim();
+    CHECK(lattice_rowified.size(1)/filter_extent == val_dim() ) << "Each row of the lattice rowified shold be of size val_dim*filter_extent. But the row size is " << lattice_rowified.size(1) << " and th val dim is " << val_dim();
 
     if (!lattice_neighbours){
         lattice_neighbours=shared_from_this();
@@ -1314,6 +1321,12 @@ int Lattice::get_filter_extent(const int neighborhood_size) {
     CHECK(this->pos_dim()!=-1) << "m pos dim is not set. It is -1";
 
     return 2*(this->pos_dim()+1) + 1; //because we have 2 neighbour for each axis and we have pos_dim+1 axes. Also a +1 for the center vertex
+}
+int Lattice::get_expected_filter_extent(const int neighborhood_size){
+    CHECK(neighborhood_size==1) << "At the moment we only have implemented a filter with a neighbourhood size of 1. I haven't yet written the more general formula for more neighbourshood size";
+
+    return 2*(m_expected_position_dimensions+1) + 1; //because we have 2 neighbour for each axis and we have pos_dim+1 axes. Also a +1 for the center vertex
+
 }
 torch::Tensor Lattice::sigmas_tensor(){
     return m_sigmas_tensor;

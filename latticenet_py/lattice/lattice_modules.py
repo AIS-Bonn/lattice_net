@@ -19,6 +19,10 @@ import utils.utils as utils
 from utils.utils import LinearWN
 
 
+
+
+
+
 class DropoutLattice(torch.nn.Module):
     def __init__(self, prob):
         super(DropoutLattice, self).__init__()
@@ -179,6 +183,9 @@ class ConvLatticeIm2RowModule(torch.nn.Module):
         self.dilation=dilation
         self.use_bias=bias
 
+        filter_extent=Lattice.get_expected_filter_extent(1)
+        # self.weight = torch.nn.Parameter( torch.empty( filter_extent * 10, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
+
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
     def reset_parameters(self):
         # torch.nn.init.kaiming_uniform_(self.weight, mode='fan_out', nonlinearity='relu') #pytorch uses default leaky relu but we use relu as here https://github.com/szagoruyko/binary-wide-resnet/blob/master/wrn_mcdonnell.py and as in here https://github.com/pytorch/vision/blob/19315e313511fead3597e23075552255d07fcb2a/torchvision/models/resnet.py#L156
@@ -230,6 +237,8 @@ class ConvLatticeIm2RowModule(torch.nn.Module):
         return lv, lattice_structure_new
 
 
+ConvLatticeIm2RowWNModule = utils.weight_norm_wrapper(ConvLatticeIm2RowModule, g_dim=0, v_dim=None)
+# ConvLatticeIm2RowWNModule = torch.nn.utils.weight_norm(ConvLatticeIm2RowModule)
 
 
 class CoarsenLatticeModule(torch.nn.Module):
@@ -561,6 +570,7 @@ class PointNetModule(torch.nn.Module):
                 # self.last_conv=ConvLatticeModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=False) #disable the bias becuse it is followed by a gn
                 print("poitnnet last conv has output channels output ", self.nr_outputs_last_layer)
                 self.last_conv=ConvLatticeIm2RowModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=True) #disable the bias becuse it is followed by a gn
+                # self.last_conv=ConvLatticeIm2RowWNModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=True) #disable the bias becuse it is followed by a gn
 
 
 
