@@ -378,7 +378,14 @@ class Upsample(th.nn.Module):
         return thf.interpolate(x, *self.args, **self.kwargs)
 
 
-def glorot(m, alpha=0.2):
+def leaky_relu_init(m, alpha=0.2):
+
+    #mport here in rder to avoid circular dependency
+    from latticenet_py.lattice.lattice_modules import ConvLatticeIm2RowModule
+    from latticenet_py.lattice.lattice_modules import CoarsenLatticeModule 
+    from latticenet_py.lattice.lattice_modules import FinefyLatticeModule 
+
+
     gain = np.sqrt(2.0 / (1.0 + alpha ** 2))
 
     if isinstance(m, th.nn.Conv1d):
@@ -416,6 +423,33 @@ def glorot(m, alpha=0.2):
         n2 = m.out_features
 
         std = gain * np.sqrt(2.0 / (n1 + n2))
+    #LATTICE THINGS
+    elif isinstance(m, ConvLatticeIm2RowModule):
+        print("init ConvLatticeIm2RowModule")
+        # print("conv lattice weight is ", m.weight.shape)
+        n1 = m.in_channels
+        n2 = m.out_channels
+        filter_extent=m.filter_extent
+        # print("filter_extent", filter_extent)
+        # print("n1", n1)
+        std = gain * np.sqrt(2.0 / ((n1 + n2) * filter_extent))
+        # return
+    elif isinstance(m, CoarsenLatticeModule):
+        print("init CoarsenLatticeModule")
+        n1 = m.in_channels
+        n2 = m.out_channels
+        filter_extent=m.filter_extent
+        filter_extent=filter_extent//8
+        std = gain * np.sqrt(2.0 / ((n1 + n2) * filter_extent))
+    elif isinstance(m, FinefyLatticeModule):
+        print("init FinefyLatticeModule")
+        n1 = m.in_channels
+        n2 = m.out_channels
+        filter_extent=m.filter_extent
+        filter_extent=filter_extent//8
+        #since coarsen usually hits empty space, the effective extent of it is actually smaller
+        std = gain * np.sqrt(2.0 / ((n1 + n2) * filter_extent))
+        # std = gain / np.sqrt( ((n1 ) * filter_extent) *1.0 )
     else:
         return
 
@@ -435,6 +469,8 @@ def glorot(m, alpha=0.2):
 
     if is_wnw:
         m.unfuse()
+
+    # m.weights_initialized=True
 
 
 
@@ -579,7 +615,7 @@ def swish_init(m, is_linear, scale=1):
     if is_wnw:
         m.unfuse()
 
-    m.weights_initialized=True
+    # m.weights_initialized=True
 
 #init the positional encoding layers, should be done after the swish_init
 def pe_layers_init(m):
@@ -610,8 +646,9 @@ def apply_weight_init_fn(m, fn, is_linear=False, scale=1):
         should_initialize_weight=False
 
     if should_initialize_weight:
-        fn(m, is_linear, scale)
-        m.weights_initialized=True
+        # fn(m, is_linear, scale)
+        fn(m,scale)
+        # m.weights_initialized=True
         for module in m.children():
             apply_weight_init_fn(module, fn, is_linear, scale)
 

@@ -88,7 +88,7 @@ def run():
 
     first_time=True
 
-    experiment_name="s_6resnetblock2"
+    experiment_name="s_10tryingback"
 
     #torch stuff 
     lattice=Lattice.create(config_path, "lattice")
