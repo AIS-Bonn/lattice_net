@@ -88,7 +88,7 @@ def run():
 
     first_time=True
 
-    experiment_name="s_2siwshinit_firt_conv"
+    experiment_name="s_3all_convSwish_no_init"
 
     #torch stuff 
     lattice=Lattice.create(config_path, "lattice")

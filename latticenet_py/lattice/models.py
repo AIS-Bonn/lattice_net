@@ -120,14 +120,16 @@ class LNN(torch.nn.Module):
                     print("adding down_resnet_block with nr of filters", cur_channels_count )
                     should_use_dropout=False
                     print("adding down_resnet_block with dropout", should_use_dropout )
-                    self.resnet_blocks_per_down_lvl_list[i].append( ResnetBlock(cur_channels_count, cur_channels_count,  [1,1], [True,True], should_use_dropout) )
+                    self.resnet_blocks_per_down_lvl_list[i].append( TwoConv(cur_channels_count, cur_channels_count,  [1,1], [True,True], should_use_dropout) )
                 else:
                     print("adding down_bottleneck_block with nr of filters", cur_channels_count )
-                    self.resnet_blocks_per_down_lvl_list[i].append( BottleneckBlock(cur_channels_count, cur_channels_count, [False,False,False]) )
+                    # self.resnet_blocks_per_down_lvl_list[i].append( BottleneckBlock(cur_channels_count, cur_channels_count, [False,False,False]) )
+                    self.resnet_blocks_per_down_lvl_list[i].append( TwoConv(cur_channels_count, cur_channels_count,  [1,1], [True,True], False)  )
             skip_connection_channel_counts.append(cur_channels_count)
             nr_channels_after_coarsening=int(cur_channels_count*2*compression_factor)
             print("adding bnReluCorsen which outputs nr of channels ", nr_channels_after_coarsening )
-            self.coarsens_list.append( GnReluCoarsen(cur_channels_count, nr_channels_after_coarsening)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
+            # self.coarsens_list.append( GnReluCoarsen(cur_channels_count, nr_channels_after_coarsening)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
+            self.coarsens_list.append( CoarsenSwish(cur_channels_count, nr_channels_after_coarsening)) #is still the best one because it can easily learn the versions of Avg and Blur. and the Max version is the worse for some reason
             cur_channels_count=nr_channels_after_coarsening
             corsenings_channel_counts.append(cur_channels_count)
 
@@ -137,7 +139,8 @@ class LNN(torch.nn.Module):
         self.resnet_blocks_bottleneck=torch.nn.ModuleList([])
         for j in range(self.nr_blocks_bottleneck):
                 print("adding bottleneck_resnet_block with nr of filters", cur_channels_count )
-                self.resnet_blocks_bottleneck.append( BottleneckBlock(cur_channels_count, cur_channels_count, [False,False,False]) )
+                # self.resnet_blocks_bottleneck.append( BottleneckBlock(cur_channels_count, cur_channels_count, [False,False,False]) )
+                self.resnet_blocks_bottleneck.append( TwoConv(cur_channels_count, cur_channels_count,  [1,1], [True,True], False)  )
 
         self.do_concat_for_vertical_connection=True
         #######################
@@ -156,7 +159,8 @@ class LNN(torch.nn.Module):
 
             #do it with finefy
             print("adding bnReluFinefy which outputs nr of channels ", nr_chanels_finefy )
-            self.finefy_list.append( GnReluFinefy(cur_channels_count, nr_chanels_finefy ))
+            # self.finefy_list.append( GnReluFinefy(cur_channels_count, nr_chanels_finefy ))
+            self.finefy_list.append( FinefySwish(cur_channels_count, nr_chanels_finefy ))
 
             #after finefy we do a concat with the skip connection so the number of channels doubles
             if self.do_concat_for_vertical_connection:
@@ -169,10 +173,11 @@ class LNN(torch.nn.Module):
                 is_last_conv=j==self.nr_blocks_up_stage[i]-1 and i==self.nr_downsamples-1 #the last conv of the last upsample is followed by a slice and not a bn, therefore we need a bias
                 if i>=self.nr_downsamples-self.nr_levels_up_with_normal_resnet:
                     print("adding up_resnet_block with nr of filters", cur_channels_count ) 
-                    self.resnet_blocks_per_up_lvl_list[i].append( ResnetBlock(cur_channels_count, cur_channels_count,  [1,1], [False,is_last_conv], False) )
+                    self.resnet_blocks_per_up_lvl_list[i].append( TwoConv(cur_channels_count, cur_channels_count,  [1,1], [True,True], False) )
                 else:
                     print("adding up_bottleneck_block with nr of filters", cur_channels_count ) 
-                    self.resnet_blocks_per_up_lvl_list[i].append( BottleneckBlock(cur_channels_count, cur_channels_count, [False,False,is_last_conv] ) )
+                    # self.resnet_blocks_per_up_lvl_list[i].append( BottleneckBlock(cur_channels_count, cur_channels_count, [False,False,is_last_conv] ) )
+                    self.resnet_blocks_per_up_lvl_list[i].append( TwoConv(cur_channels_count, cur_channels_count,  [1,1], [True,True], False) )
 
         self.slice_fast_cuda=SliceFastCUDALatticeModule(in_channels=cur_channels_count, nr_classes=nr_classes, dropout_prob=dropout_last_layer, experiment=experiment)
         # self.slice=SliceLatticeModule()
