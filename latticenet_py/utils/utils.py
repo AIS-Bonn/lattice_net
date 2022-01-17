@@ -442,6 +442,8 @@ def swish_init(m, is_linear, scale=1):
 
     #mport here in rder to avoid circular dependency
     from latticenet_py.lattice.lattice_modules import ConvLatticeIm2RowModule
+    from latticenet_py.lattice.lattice_modules import CoarsenLatticeModule 
+    from latticenet_py.lattice.lattice_modules import FinefyLatticeModule 
 
 
     # is_wnw = is_weight_norm_wrapped(m)
@@ -527,11 +529,7 @@ def swish_init(m, is_linear, scale=1):
         # std = gain / np.sqrt( (n2 ))
     #LATTICE THINGS
     elif isinstance(m, ConvLatticeIm2RowModule):
-        # n1 = m.in_features
-        # n2 = m.out_features
-        # std = gain / np.sqrt( (n1 ))
-        # print("init convlattice")
-
+        print("init ConvLatticeIm2RowModule")
         # print("conv lattice weight is ", m.weight.shape)
         n1 = m.in_channels
         n2 = m.out_channels
@@ -540,6 +538,20 @@ def swish_init(m, is_linear, scale=1):
         # print("n1", n1)
         std = gain / np.sqrt( ((n1 ) * filter_extent))
         # return
+    elif isinstance(m, CoarsenLatticeModule):
+        print("init CoarsenLatticeModule")
+        n1 = m.in_channels
+        n2 = m.out_channels
+        filter_extent=m.filter_extent
+        std = gain / np.sqrt( ((n1 ) * filter_extent) *1.0 )
+    elif isinstance(m, FinefyLatticeModule):
+        print("init FinefyLatticeModule")
+        n1 = m.in_channels
+        n2 = m.out_channels
+        filter_extent=m.filter_extent
+        #since coarsen usually hits empty space, the effective extent of it is actually smaller
+        std = gain / np.sqrt( ((n1 ) * filter_extent) *0.5 )
+        # std = gain / np.sqrt( ((n1 ) * filter_extent) *1.0 )
     else:
         return
 

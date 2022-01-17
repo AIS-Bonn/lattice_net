@@ -88,7 +88,7 @@ def run():
 
     first_time=True
 
-    experiment_name="s_3all_convSwish_no_init"
+    experiment_name="s_6resnetblock2"
 
     #torch stuff 
     lattice=Lattice.create(config_path, "lattice")
@@ -181,6 +181,10 @@ def run():
                         optimizer.zero_grad()
                         cb.before_backward_pass()
                         loss.backward()
+
+                        # model.summary()
+                        # exit()
+
                         cb.after_backward_pass()
                         optimizer.step()
 

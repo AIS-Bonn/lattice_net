@@ -405,9 +405,9 @@ class GatherLatticeModule(torch.nn.Module):
 
 
 
-ConvLatticeIm2RowWNModule = utils.weight_norm_wrapper(ConvLatticeIm2RowModule, g_dim=0, v_dim=None)
-CoarsenLatticeWNModule = utils.weight_norm_wrapper(CoarsenLatticeModule, g_dim=0, v_dim=None)
-FinefyLatticeWNModule = utils.weight_norm_wrapper(FinefyLatticeModule, g_dim=0, v_dim=None)
+ConvLatticeIm2RowWNModule = utils.weight_norm_wrapper(ConvLatticeIm2RowModule, g_dim=1, v_dim=None)
+CoarsenLatticeWNModule = utils.weight_norm_wrapper(CoarsenLatticeModule, g_dim=1, v_dim=None)
+FinefyLatticeWNModule = utils.weight_norm_wrapper(FinefyLatticeModule, g_dim=1, v_dim=None)
 # ConvLatticeIm2RowWNModule = torch.nn.utils.weight_norm(ConvLatticeIm2RowModule)
 
 
@@ -444,13 +444,15 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
                 sys.exit("We used to many linear layers an now the values are lower than the bottlenck size. Which means that the bottleneck would actually do an expansion...")
             print("adding stepdown with output of ", nr_channels_out)
             # self.stepdown.append( GnRelu1x1(cur_nr_channels, nr_channels_out , False)  )
-            self.stepdown.append( Conv1x1Swish(cur_nr_channels, nr_channels_out , False)  )
+            self.stepdown.append( Conv1x1Act(cur_nr_channels, nr_channels_out , False)  )
             cur_nr_channels=nr_channels_out
                 # self.stepdown.append( Gn1x1Gelu(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
         # if self.bottleneck is None:
         print("adding bottleneck with output of ", self.bottleneck_size)
         # self.bottleneck=GnRelu1x1(cur_nr_channels, self.bottleneck_size, False)            
-        self.bottleneck=Conv1x1Swish(cur_nr_channels, self.bottleneck_size, False)            
+        self.bottleneck=Conv1x1Act(cur_nr_channels, self.bottleneck_size, False)            
+
+        utils.apply_weight_init_fn(self, utils.swish_init)  
 
     def forward(self, lv, ls, positions, splatting_indices, splatting_weights):
 
@@ -720,11 +722,12 @@ class PointNetModule(torch.nn.Module):
         return distributed_reduced, lattice_py
 
 
-class Conv1x1Swish(torch.nn.Module):
+class Conv1x1Act(torch.nn.Module):
     def __init__(self, in_channels, out_channels, bias):
-        super(Conv1x1Swish, self).__init__()
+        super(Conv1x1Act, self).__init__()
         # self.out_channels=out_channels
-        self.swish = torch.nn.SiLU()
+        self.act = torch.nn.SiLU()
+        # self.act = torch.nn.Leaky_ReLU(0.2)
         self.linear=  LinearWN(in_channels, out_channels, bias=bias).to("cuda") 
 
     def forward(self, lv, ls):
@@ -741,7 +744,8 @@ class Conv1x1Swish(torch.nn.Module):
 
         ls.set_values(lv)
         lv = self.linear(lv)
-        lv=self.swish(lv)
+        # lv=self.swish(lv)
+        lv=self.act(lv)
         ls.set_values(lv)
         return lv, ls
 
@@ -865,12 +869,13 @@ class GnReluDepthwiseConv(torch.nn.Module):
         return lv_1, ls_1
 
 
-class ConvSwish(torch.nn.Module):
+class ConvAct(torch.nn.Module):
     def __init__(self, in_channels, out_channels, dilation, bias, with_dropout):
-        super(ConvSwish, self).__init__()
+        super(ConvAct, self).__init__()
         # self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias)
         self.conv=ConvLatticeIm2RowWNModule(in_channels=in_channels, out_channels=out_channels, neighbourhood_size=1, dilation=dilation, bias=bias)
-        self.swish = torch.nn.SiLU()
+        self.act = torch.nn.SiLU()
+        # self.act = torch.nn.Leaky_ReLU(0.2)
         self.with_dropout=with_dropout
         if with_dropout:
             self.drop=DropoutLattice(0.2)
@@ -885,7 +890,8 @@ class ConvSwish(torch.nn.Module):
             lv = self.drop(lv)
         ls.set_values(lv)
         lv_1, ls_1 = self.conv(lv, ls)
-        lv_1=self.swish(lv_1)
+        # lv_1=self.swish(lv_1)
+        lv_1=self.act(lv_1)
         ls_1.set_values(lv_1)
 
         return lv_1, ls_1
@@ -966,14 +972,18 @@ class BnReluConv(torch.nn.Module):
         return lv_1, ls_1
 
 
-class CoarsenSwish(torch.nn.Module):
+class CoarsenAct(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
-        super(CoarsenSwish, self).__init__()
+        super(CoarsenAct, self).__init__()
         # self.nr_filters=nr_filters
         self.in_channels=in_channels
         self.out_channels=out_channels
         self.coarse=CoarsenLatticeWNModule(in_channels=in_channels, out_channels=out_channels)
-        self.swish = torch.nn.SiLU()
+        self.act = torch.nn.SiLU()
+        # self.act = torch.nn.Leaky_ReLU(0.2)
+
+        utils.apply_weight_init_fn(self, utils.swish_init) 
+
     def forward(self, lv, ls, concat_connection=None):
 
         ls.set_values(lv)
@@ -983,7 +993,8 @@ class CoarsenSwish(torch.nn.Module):
             # self.norm = GroupNormLatticeModule(lv.shape[1])
         ls.set_values(lv)
         lv_1, ls_1 = self.coarse(lv, ls)
-        lv_1=self.swish(lv_1)
+        # lv_1=self.swish(lv_1)
+        lv_1=self.act(lv_1)
         ls_1.set_values(lv_1)
 
         if concat_connection is not None:
@@ -1074,14 +1085,19 @@ class GnGeluCoarsen(torch.nn.Module):
         return lv_1, ls_1
 
 
-class FinefySwish(torch.nn.Module):
+class FinefyAct(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
-        super(FinefySwish, self).__init__()
+        super(FinefyAct, self).__init__()
         # self.nr_filters=nr_filters
         self.in_channels=in_channels
         self.out_channels=out_channels
         self.fine=FinefyLatticeWNModule(in_channels=in_channels, out_channels=out_channels)
-        self.swish = torch.nn.SiLU()
+        self.act = torch.nn.SiLU()
+        # self.act = torch.nn.Leaky_ReLU(0.2)
+        
+
+        utils.apply_weight_init_fn(self, utils.swish_init) 
+
     def forward(self, lv_coarse, ls_coarse, ls_fine):
 
         ls_coarse.set_values(lv_coarse)
@@ -1091,7 +1107,8 @@ class FinefySwish(torch.nn.Module):
             # self.norm = GroupNormLatticeModule(lv_coarse.shape[1])
         ls_coarse.set_values(lv_coarse)
         lv_1, ls_1 = self.fine(lv_coarse, ls_coarse, ls_fine)
-        lv_1=self.swish(lv_1)
+        # lv_1=self.swish(lv_1)
+        lv_1=self.act(lv_1)
         ls_1.set_values(lv_1)
 
         return lv_1, ls_1
@@ -1174,14 +1191,15 @@ class TwoConv(torch.nn.Module):
         # self.conv1=GnReluConv(in_channels, out_channels, dilations[0], biases[0], with_dropout=False)
         # self.conv2=GnReluConv(in_channels, out_channels, dilations[1], biases[1], with_dropout=with_dropout)
 
-        self.conv1=ConvSwish(in_channels, out_channels, dilations[0], biases[0], with_dropout=False)
-        self.conv2=ConvSwish(in_channels, out_channels, dilations[1], biases[1], with_dropout=with_dropout)
+        self.conv1=ConvAct(in_channels, out_channels, dilations[0], biases[0], with_dropout=False)
+        self.conv2=ConvAct(in_channels, out_channels, dilations[1], biases[1], with_dropout=with_dropout)
 
         # self.conv1=GnReluDepthwiseConv(nr_filters, dilations[0], biases[0], with_dropout=False)
         # self.conv2=GnReluDepthwiseConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout)
 
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 
+        utils.apply_weight_init_fn(self, utils.swish_init) 
 
     def forward(self, lv, ls):
       
@@ -1227,6 +1245,50 @@ class ResnetBlock(torch.nn.Module):
         lv, ls=self.conv1(lv,ls)
         # print("conv 2")
         lv, ls=self.conv2(lv,ls)
+        # print("finished conv 2")
+        # lv=lv*self.residual_gate
+        lv+=identity
+        ls.set_values(lv)
+        return lv, ls
+
+#similar to convnext https://arxiv.org/pdf/2201.03545.pdf
+class ResnetBlock2(torch.nn.Module):
+
+    def __init__(self, in_channels, out_channels, dilations, biases, with_dropout):
+        super(ResnetBlock2, self).__init__()
+        
+        #again with bn-relu-conv
+        # self.conv1=GnReluConv(in_channels, out_channels, dilations[0], biases[0], with_dropout=False)
+        # self.conv2=GnReluConv(in_channels, out_channels, dilations[1], biases[1], with_dropout=with_dropout)
+
+        # self.conv1=ConvSwish(in_channels, out_channels, dilations[0], biases[0], with_dropout=False)
+        # self.conv2=ConvSwish(in_channels, out_channels, dilations[1], biases[1], with_dropout=with_dropout)
+
+        self.conv1=ConvLatticeIm2RowWNModule(in_channels=in_channels, out_channels=out_channels, neighbourhood_size=1, dilation=dilations[0], bias=biases[0])
+        self.norm=torch.nn.GroupNorm(1, out_channels) #all channel sinto one group (Layer norm)
+        self.conv2=ConvLatticeIm2RowWNModule(in_channels=out_channels, out_channels=out_channels, neighbourhood_size=1, dilation=dilations[1], bias=biases[1])
+        self.act = torch.nn.SiLU()
+
+        # self.conv1=GnReluDepthwiseConv(nr_filters, dilations[0], biases[0], with_dropout=False)
+        # self.conv2=GnReluDepthwiseConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout)
+
+        # self.residual_gate  = torch.nn.Parameter( torch.ones( 1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
+
+
+    def forward(self, lv, ls):
+      
+
+        identity=lv
+
+        ls.set_values(lv)
+
+        # print("conv 1")
+        lv, ls=self.conv1(lv,ls)
+        # print("conv 2")
+        lv=self.norm(lv)
+        ls.set_values(lv)
+        lv, ls=self.conv2(lv,ls)
+        lv=self.act(lv)
         # print("finished conv 2")
         # lv=lv*self.residual_gate
         lv+=identity
