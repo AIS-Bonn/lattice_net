@@ -534,7 +534,7 @@ def swish_init(m, is_linear, scale=1):
 
         # print("conv lattice weight is ", m.weight.shape)
         n1 = m.in_channels
-        n2 = m.nr_filters
+        n2 = m.out_channels
         filter_extent=m.filter_extent
         # print("filter_extent", filter_extent)
         # print("n1", n1)

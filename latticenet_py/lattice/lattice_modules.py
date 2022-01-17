@@ -172,19 +172,27 @@ class ConvLatticeModule(torch.nn.Module):
 
 
 class ConvLatticeIm2RowModule(torch.nn.Module):
-    def __init__(self, nr_filters, neighbourhood_size, dilation=1, bias=True ):
+    def __init__(self, in_channels, out_channels, neighbourhood_size, dilation=1, bias=True ):
     # def __init__(self, nr_filters, neighbourhood_size, dilation=1):
         super(ConvLatticeIm2RowModule, self).__init__()
         self.first_time=True
         self.weight=None
         self.bias=None
         self.neighbourhood_size=neighbourhood_size
-        self.nr_filters=nr_filters
+        # self.nr_filters=nr_filters
+        self.in_channels=in_channels
+        self.out_channels=out_channels
         self.dilation=dilation
         self.use_bias=bias
+        self.filter_extent=Lattice.get_expected_filter_extent(neighbourhood_size)
 
-        filter_extent=Lattice.get_expected_filter_extent(1)
-        # self.weight = torch.nn.Parameter( torch.empty( filter_extent * 10, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
+
+        #create parameters    
+        self.weight = torch.nn.Parameter( torch.empty( self.filter_extent * self.in_channels, self.out_channels ).to("cuda") ) #works for ConvIm2RowLattice
+        if self.use_bias:
+            self.bias = torch.nn.Parameter( torch.empty( self.out_channels ).to("cuda") )
+        self.reset_parameters()
+
 
     #as per https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py#L49
     def reset_parameters(self):
@@ -209,23 +217,26 @@ class ConvLatticeIm2RowModule(torch.nn.Module):
 
         lattice_structure.set_values(lattice_values)
         filter_extent=lattice_structure.get_filter_extent(self.neighbourhood_size)
-        dilation=1
+        assert self.in_channels==lattice_structure.val_dim(), f"In channels doesn't match the val_dim of the lattice. In channels is {self.in_channels}, while val dim is {lattice_structure.val_dim()}"
 
-        if(self.first_time):
-            self.first_time=False
-            val_dim=lattice_structure.val_dim()
-            self.in_channels=val_dim
-            self.filter_extent=filter_extent
-            self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
-            if self.use_bias:
-                self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
-            with torch.no_grad():
-                self.reset_parameters()
+        # dilation=1
+
+
+        # if(self.first_time):
+        #     self.first_time=False
+        #     val_dim=lattice_structure.val_dim()
+        #     self.in_channels=val_dim
+        #     self.filter_extent=filter_extent
+        #     self.weight = torch.nn.Parameter( torch.empty( filter_extent * val_dim, self.nr_filters ).to("cuda") ) #works for ConvIm2RowLattice
+        #     if self.use_bias:
+        #         self.bias = torch.nn.Parameter( torch.empty( self.nr_filters ).to("cuda") )
+        #     with torch.no_grad():
+        #         self.reset_parameters()
 
         # lv, ls_wrap=ConvIm2RowLattice.apply(lattice_values, lattice_structure, self.weight, self.dilation )
         # ls=ls_wrap.lattice
 
-        lattice_rowified=Im2RowLattice.apply(lattice_values, lattice_structure, filter_extent, dilation, self.nr_filters)
+        lattice_rowified=Im2RowLattice.apply(lattice_values, lattice_structure, filter_extent, self.dilation, self.out_channels)
         lv= lattice_rowified.mm(self.weight)
 
         lattice_structure_new=lattice_structure.clone_lattice() #we create a new lattice because after doing convolution on this lattice, the val dim may change
@@ -375,8 +386,9 @@ class GatherLatticeModule(torch.nn.Module):
 #the last attempt to make a fast slice without having a gigantic feature vector for each point. Rather from the features of the vertices, we regress directly the class probabilities
 #the idea is to not do it with a gather but rather with a special slicing function that also gets as input some learnable weights
 class SliceFastCUDALatticeModule(torch.nn.Module):
-    def __init__(self, nr_classes, dropout_prob, experiment):
+    def __init__(self, in_channels, nr_classes, dropout_prob, experiment):
         super(SliceFastCUDALatticeModule, self).__init__()
+        self.in_channels=in_channels
         self.nr_classes=nr_classes
         self.bottleneck=None
         self.stepdown=torch.nn.ModuleList([])
@@ -392,26 +404,46 @@ class SliceFastCUDALatticeModule(torch.nn.Module):
 
 
         self.experiment=experiment
+
+        #create parameters
+        cur_nr_channels=in_channels
+        for i in range(2):
+            nr_channels_out= int( in_channels/np.power(2,i) ) 
+            if nr_channels_out  < self.bottleneck_size:
+                sys.exit("We used to many linear layers an now the values are lower than the bottlenck size. Which means that the bottleneck would actually do an expansion...")
+            print("adding stepdown with output of ", nr_channels_out)
+            self.stepdown.append( GnRelu1x1(cur_nr_channels, nr_channels_out , False)  )
+            cur_nr_channels=nr_channels_out
+                # self.stepdown.append( Gn1x1Gelu(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
+        # if self.bottleneck is None:
+        print("adding bottleneck with output of ", self.bottleneck_size)
+        self.bottleneck=GnRelu1x1(cur_nr_channels, self.bottleneck_size, False)            
+
     def forward(self, lv, ls, positions, splatting_indices, splatting_weights):
 
         ls.set_values(lv)
+
+        assert self.in_channels==ls.val_dim(), f"In channels doesn't match the val_dim of the lattice. In channels is {self.in_channels}, while val dim is {ls.val_dim()}"
 
         nr_positions=positions.shape[0]
         pos_dim=positions.shape[1]
         val_dim=lv.shape[1]
 
-        #slowly reduce the features 
-        if len(self.stepdown) is 0:
-            for i in range(2):
-                nr_channels_out= int( val_dim/np.power(2,i) ) 
-                if nr_channels_out  < self.bottleneck_size:
-                    sys.exit("We used to many linear layers an now the values are lower than the bottlenck size. Which means that the bottleneck would actually do an expansion...")
-                print("adding stepdown with output of ", nr_channels_out)
-                self.stepdown.append( GnRelu1x1(nr_channels_out , False)  )
-                # self.stepdown.append( Gn1x1Gelu(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
-        if self.bottleneck is None:
-            print("adding bottleneck with output of ", self.bottleneck_size)
-            self.bottleneck=GnRelu1x1(self.bottleneck_size, False)            
+        # #slowly reduce the features 
+        # if len(self.stepdown) is 0:
+        #     for i in range(2):
+        #         nr_channels_out= int( val_dim/np.power(2,i) ) 
+        #         if nr_channels_out  < self.bottleneck_size:
+        #             sys.exit("We used to many linear layers an now the values are lower than the bottlenck size. Which means that the bottleneck would actually do an expansion...")
+        #         print("adding stepdown with output of ", nr_channels_out)
+        #         self.stepdown.append( GnRelu1x1(nr_channels_out , False)  )
+        #         # self.stepdown.append( Gn1x1Gelu(nr_channels_out , False, self.with_debug_output, self.with_error_checking)  )
+        # if self.bottleneck is None:
+        #     print("adding bottleneck with output of ", self.bottleneck_size)
+        #     self.bottleneck=GnRelu1x1(self.bottleneck_size, False)            
+
+
+
         # apply the stepdowns
         for i in range(2):
             if i == 0:
@@ -549,6 +581,11 @@ class PointNetModule(torch.nn.Module):
         self.layers=torch.nn.ModuleList([])
         self.swish=torch.nn.SiLU()
 
+
+        # print("last conv pointnet has in channels ", nr_output_channels_per_layer[-1] )
+        self.last_conv=ConvLatticeIm2RowModule(in_channels=nr_output_channels_per_layer[-1]*2, out_channels=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=True) #disable the bias becuse it is followed by a gn
+
+
     #called the first time we do a forwad pass to initialize all the modules
     def init(self, distributed):
         if (self.first_time):
@@ -568,8 +605,8 @@ class PointNetModule(torch.nn.Module):
                 utils.apply_weight_init_fn(self, utils.swish_init) ##we put it here because the conv lattice wil have it;s weights initialized alzily when you do the frist forward pass
 
                 # self.last_conv=ConvLatticeModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=False) #disable the bias becuse it is followed by a gn
-                print("poitnnet last conv has output channels output ", self.nr_outputs_last_layer)
-                self.last_conv=ConvLatticeIm2RowModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=True) #disable the bias becuse it is followed by a gn
+                # print("poitnnet last conv has output channels output ", self.nr_outputs_last_layer)
+                # print("poitnnet last conv has input ", nr_input_channels)
                 # self.last_conv=ConvLatticeIm2RowWNModule(nr_filters=self.nr_outputs_last_layer, neighbourhood_size=1, dilation=1, bias=True) #disable the bias becuse it is followed by a gn
 
 
@@ -578,6 +615,7 @@ class PointNetModule(torch.nn.Module):
         # init()
         if (self.first_time):
             self.init(distributed)
+        # exit(1)
             
 
 
@@ -668,24 +706,25 @@ class Conv1x1(torch.nn.Module):
         return lv
 
 class GnRelu1x1(torch.nn.Module):
-    def __init__(self, out_channels, bias):
+    def __init__(self, in_channels, out_channels, bias):
         super(GnRelu1x1, self).__init__()
-        self.out_channels=out_channels
-        self.norm= None
+        # self.out_channels=out_channels
+        self.norm= GroupNormLatticeModule(in_channels)
         self.relu = torch.nn.ReLU(inplace=False)
-        self.linear=None
-        self.use_bias=bias
+        self.linear=  torch.nn.Linear(in_channels, out_channels, bias=bias).to("cuda") 
+        torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_in', nonlinearity='relu')
+
     def forward(self, lv, ls):
 
         ls.set_values(lv)
 
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
-        if self.norm is None:
-            self.norm = GroupNormLatticeModule(lv.shape[1])
-            self.linear= torch.nn.Linear(lv.shape[1], self.out_channels, bias=self.use_bias).to("cuda") 
-            with torch.no_grad():
+        # if self.norm is None:
+            # self.norm = GroupNormLatticeModule(lv.shape[1])
+            # self.linear= torch.nn.Linear(lv.shape[1], self.out_channels, bias=self.use_bias).to("cuda") 
+            # with torch.no_grad():
                 #https://towardsdatascience.com/understand-kaiming-initialization-and-implementation-detail-in-pytorch-f7aa967e9138
-                torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_in', nonlinearity='relu')
+                # torch.nn.init.kaiming_normal_(self.linear.weight, mode='fan_in', nonlinearity='relu')
 
         lv, ls=self.norm(lv,ls)
         lv=self.relu(lv)
@@ -769,12 +808,11 @@ class GnReluDepthwiseConv(torch.nn.Module):
 
 
 class GnReluConv(torch.nn.Module):
-    def __init__(self, nr_filters, dilation, bias, with_dropout):
+    def __init__(self, in_channels, out_channels, dilation, bias, with_dropout):
         super(GnReluConv, self).__init__()
-        self.nr_filters=nr_filters
         # self.conv=ConvLatticeModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias)
-        self.conv=ConvLatticeIm2RowModule(nr_filters=nr_filters, neighbourhood_size=1, dilation=dilation, bias=bias)
-        self.norm= None
+        self.conv=ConvLatticeIm2RowModule(in_channels=in_channels, out_channels=out_channels, neighbourhood_size=1, dilation=dilation, bias=bias)
+        self.norm= GroupNormLatticeModule(in_channels)
         self.relu = torch.nn.ReLU(inplace=False)
         self.with_dropout=with_dropout
         if with_dropout:
@@ -785,8 +823,6 @@ class GnReluConv(torch.nn.Module):
         ls.set_values(lv)
 
         #similar to densenet and resnet: bn, relu, conv https://arxiv.org/pdf/1603.05027.pdf
-        if self.norm is None:
-            self.norm = GroupNormLatticeModule(lv.shape[1])
         lv, ls=self.norm(lv,ls)
         lv=self.relu(lv)
         # lv=gelu(lv)
@@ -998,12 +1034,12 @@ class GnFinefy(torch.nn.Module):
 #similar to https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
 class ResnetBlock(torch.nn.Module):
 
-    def __init__(self, nr_filters, dilations, biases, with_dropout):
+    def __init__(self, in_channels, out_channels, dilations, biases, with_dropout):
         super(ResnetBlock, self).__init__()
         
         #again with bn-relu-conv
-        self.conv1=GnReluConv(nr_filters, dilations[0], biases[0], with_dropout=False)
-        self.conv2=GnReluConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout)
+        self.conv1=GnReluConv(in_channels, out_channels, dilations[0], biases[0], with_dropout=False)
+        self.conv2=GnReluConv(in_channels, out_channels, dilations[1], biases[1], with_dropout=with_dropout)
 
         # self.conv1=GnReluDepthwiseConv(nr_filters, dilations[0], biases[0], with_dropout=False)
         # self.conv2=GnReluDepthwiseConv(nr_filters, dilations[1], biases[1], with_dropout=with_dropout)
@@ -1032,12 +1068,12 @@ class ResnetBlock(torch.nn.Module):
 class BottleneckBlock(torch.nn.Module):
     '''Pre-activation version of the original Bottleneck module.'''
 
-    def __init__(self, out_channels, biases):
+    def __init__(self, in_channels, out_channels, biases):
         super(BottleneckBlock, self).__init__()
         self.downsample = 4
-        self.contract=GnRelu1x1(int(out_channels/self.downsample), biases[0])
-        self.conv=GnReluConv(int(out_channels/self.downsample), 1, biases[1], with_dropout=False)
-        self.expand=GnRelu1x1(out_channels, biases[2])
+        self.contract=GnRelu1x1(in_channels=in_channels, out_channels=int(out_channels/self.downsample), bias=biases[0])
+        self.conv=GnReluConv(in_channels=int(out_channels/self.downsample), out_channels=int(out_channels/self.downsample),  dilation=1, bias=biases[1], with_dropout=False)
+        self.expand=GnRelu1x1(in_channels=int(out_channels/self.downsample),  out_channels=out_channels, bias=biases[2])
         # self.residual_gate  = torch.nn.Parameter( torch.ones( 1 ).to("cuda") ) #gate for the skip connection https://openreview.net/pdf?id=Sywh5KYex
 
     def forward(self, lv, ls):
