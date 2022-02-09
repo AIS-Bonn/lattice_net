@@ -54,6 +54,7 @@ public:
     std::shared_ptr<Lattice> convolve_im2row_standalone(torch::Tensor& filter_bank, const int dilation, std::shared_ptr<Lattice> lattice_neighbours, const bool flip_neighbours);
     // std::shared_ptr<Lattice> depthwise_convolve(torch::Tensor& filter_bank, const int dilation, std::shared_ptr<Lattice> lattice_neighbours, const bool use_center_vertex, const bool flip_neighbours);
     torch::Tensor im2row(std::shared_ptr<Lattice> lattice_neighbours, const int filter_extent, const int dilation, const bool flip_neighbours);
+    torch::Tensor im2rowindices(std::shared_ptr<Lattice> lattice_neighbours, const int filter_extent, const int dilation, const bool flip_neighbours);
 
     std::shared_ptr<Lattice> create_coarse_verts();  //creates another lattice which would be the result of splatting the positions/2. The values of the new coarse lattice are set to 0
     std::shared_ptr<Lattice> create_coarse_verts_naive(torch::Tensor& positions_raw); //the previous one causes some positions to end up in empty space for some reason, so instead we use this to create vertices around all the positions, will be slower but possibly more correct

@@ -575,6 +575,40 @@ std::shared_ptr<Lattice> Lattice::convolve_im2row_standalone(torch::Tensor& filt
 
 // }
 
+torch::Tensor Lattice::im2rowindices(std::shared_ptr<Lattice> lattice_neighbours, const int filter_extent, const int dilation, const bool flip_neighbours){
+
+    if (!lattice_neighbours){
+        lattice_neighbours=shared_from_this();
+    }
+
+    CHECK(filter_extent == get_filter_extent(1) ) << "Filters should convolve over all the neighbours in the 1 hop plus the center vertex lattice. So the filter extent should be " << get_filter_extent(1) << ". However it is" << filter_extent;
+
+
+    
+    //this lattice should be coarser (so a higher lvl) or finer(lower lvl) or at least at the same lvl as the lattice neigbhours. But the differnce should be at most 1 level
+    CHECK(std::abs(m_lvl-lattice_neighbours->m_lvl)<=1) << "the difference in levels between query and neigbhours lattice should be only 1 or zero, so the query should be corser by 1 level or finer by 1 lvl with respect to the neighbours. Or if they are at the same level then nothing needs to be done. However the current lattice lvl is " << m_lvl << " and the neighbours lvl is " << lattice_neighbours->m_lvl;
+
+    // VLOG(3) <<"starting convolved im2row_standlaone. The current lattice has nr_vertices_lattices" << nr_lattice_vertices();
+    CHECK(nr_lattice_vertices()!=0) << "Why does this current lattice have zero nr_filled?";
+    int nr_vertices=nr_lattice_vertices();
+    int cur_values_size=m_hash_table->m_values_tensor.size(0);
+    // CHECK(nr_vertices==cur_values_size) << "the nr of lattice vertices should be the same as the values tensor has rows. However the nr lattice vertices is " << nr_vertices << " and values has nr of rows " << cur_values_size;
+
+
+    // TIME_START("create_lattice_rowified");
+    // if( !m_lattice_rowified.defined() || m_lattice_rowified.size(0)!=nr_vertices || m_lattice_rowified.size(1)!=filter_extent*m_val_dim  ){
+    Tensor lattice_rowified=torch::zeros({nr_vertices, filter_extent* lattice_neighbours->val_dim() }, torch::dtype(torch::kInt32).device(torch::kCUDA, 0) );
+    // }else{
+        // m_lattice_rowified.fill_(0);
+    // }
+
+
+    m_impl->im2rowindices(nr_vertices, this->pos_dim(), lattice_neighbours->val_dim(), dilation, lattice_rowified.data_ptr<int>(), filter_extent, *(m_hash_table->m_impl), *(lattice_neighbours->m_hash_table->m_impl), m_lvl, lattice_neighbours->m_lvl, flip_neighbours, false);
+
+    return lattice_rowified;
+
+}
+
 torch::Tensor Lattice::im2row(std::shared_ptr<Lattice> lattice_neighbours, const int filter_extent, const int dilation, const bool flip_neighbours){
 
     if (!lattice_neighbours){
