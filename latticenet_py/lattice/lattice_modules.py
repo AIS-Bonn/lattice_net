@@ -10,13 +10,13 @@ import numpy as np
 import time
 import math
 import torch_scatter
-# from latticenet_py.lattice.lattice_py import LatticePy
+#from latticenet_py.lattice.lattice_py import LatticePy
 from latticenet_py.lattice.lattice_funcs import *
 
 
-# from utils.utils import *
-import utils.utils as utils
-from utils.utils import LinearWN
+#from utils.utils import *
+import latticenet_py.utils.utils as utils
+from latticenet_py.utils.utils import LinearWN
 
 
 
