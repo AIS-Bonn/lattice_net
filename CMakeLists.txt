@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 2.8 FATAL_ERROR) # we need at least 3.11 because we use the FetchContent feature to manage dependencies and at least 3.14 because we use FetchContent_MakeAvailable
+# cmake_minimum_required(VERSION 2.8 FATAL_ERROR) # we need at least 3.11 because we use the FetchContent feature to manage dependencies and at least 3.14 because we use FetchContent_MakeAvailable
+cmake_minimum_required(VERSION 2.8...3.22)
 
 project(lattice_net)
 
@@ -32,7 +33,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 # find_package(OpenCV REQUIRED)
 find_package(EasyPBR REQUIRED)
-find_package(DataLoaders REQUIRED)
+# find_package(DataLoaders REQUIRED)
 find_package(Torch REQUIRED)
 find_package(CUDA REQUIRED)
 add_subdirectory(${EASYPBR_SRC_PATH}/deps/pybind11  [EXCLUDE_FROM_ALL])
@@ -88,7 +89,7 @@ configure_file(${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/jitify_op
 install(FILES "${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/jitify_options.hpp" DESTINATION ${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/)
 # set(CUDA_NVCC_FLAGS "-gencode arch=compute_30 -code=sm_30" CACHE STRING "nvcc flags" FORCE)
 #disabling a certain nvcc warning is done through https://stackoverflow.com/questions/14831051/how-to-disable-a-specific-nvcc-compiler-warnings
-set(CUDA_NVCC_FLAGS "-arch=sm_60 -Xcudafe "--diag_suppress=integer_sign_change" " CACHE STRING "nvcc flags" FORCE)
+set(CUDA_NVCC_FLAGS "-arch=sm_60 -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored  --expt-relaxed-constexpr " CACHE STRING "nvcc flags" FORCE)
 # message("NVCC flags are ", ${CUDA_NVCC_FLAGS})
 # set(CUDA_VERBOSE_BUILD ON CACHE BOOL "nvcc verbose" FORCE) 
 # cuda_add_library(latticenet_cu  SHARED  ${CMAKE_SOURCE_DIR}/src/Lattice.cxx
