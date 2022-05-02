@@ -1,3 +1,3 @@
 #define JITIFY_OPTIONS  \
 -I/media/rosu/Data/phd/c_ws/src/lattice_net/include \
--I/opt/pytorch/torch/include;/opt/pytorch/torch/include/torch/csrc/api/include
+-I/usr/local/lib/python3.6/dist-packages/torch/include;/usr/local/lib/python3.6/dist-packages/torch/include/torch/csrc/api/include

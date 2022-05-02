@@ -8,11 +8,11 @@ project(lattice_net)
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -O3") 
-set(PYTORCH_PATH "/opt/pytorch")
-set(PYTORCH_PATH_2 "/opt/conda/envs/lattice/lib/python3.6/site-packages/torch")
+# set(PYTORCH_PATH "/opt/pytorch")
+# set(PYTORCH_PATH_2 "/opt/conda/envs/lattice/lib/python3.6/site-packages/torch")
 # set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "/opt/ros/melodic/\;${PYTORCH_PATH}"
 #set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${PYTORCH_PATH}:${PYTORCH_PATH_2}")
-set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${PYTORCH_PATH};${PYTORCH_PATH_2}")
+# set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${PYTORCH_PATH};${PYTORCH_PATH_2}")
 set(CMAKE_CXX_STANDARD 17) #we need c++17 because this solves alignment issues with eigen http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1409
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -34,11 +34,19 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 # find_package(OpenCV REQUIRED)
 find_package(EasyPBR REQUIRED)
 # find_package(DataLoaders REQUIRED)
-find_package(Torch REQUIRED)
+# find_package(Torch REQUIRED)
 find_package(CUDA REQUIRED)
 add_subdirectory(${EASYPBR_SRC_PATH}/deps/pybind11  [EXCLUDE_FROM_ALL])
 # add_subdirectory(${PROJECT_SOURCE_DIR}/deps/pybind11)
 # find_package(catkin REQUIRED COMPONENTS roscpp std_msgs cv_bridge pcl_ros image_transport )
+#compile with pytorch
+# get and append paths for finding dep
+execute_process( #do it like this https://github.com/facebookresearch/hanabi_SAD/blob/6e4ed590f5912fcb99633f4c224778a3ba78879b/rela/CMakeLists.txt#L10
+  COMMAND python -c "import torch; import os; print(os.path.dirname(torch.__file__), end='')"
+  OUTPUT_VARIABLE TorchPath
+)
+list(APPEND CMAKE_PREFIX_PATH ${TorchPath})
+find_package(Torch REQUIRED)
 
 
 ###   INCLUDES   #########################################################
@@ -89,7 +97,8 @@ configure_file(${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/jitify_op
 install(FILES "${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/jitify_options.hpp" DESTINATION ${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/)
 # set(CUDA_NVCC_FLAGS "-gencode arch=compute_30 -code=sm_30" CACHE STRING "nvcc flags" FORCE)
 #disabling a certain nvcc warning is done through https://stackoverflow.com/questions/14831051/how-to-disable-a-specific-nvcc-compiler-warnings
-set(CUDA_NVCC_FLAGS "-arch=sm_60 -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored  --expt-relaxed-constexpr " CACHE STRING "nvcc flags" FORCE)
+# set(CUDA_NVCC_FLAGS "-arch=sm_60 -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored  --expt-relaxed-constexpr --display_error_number " CACHE STRING "nvcc flags" FORCE)
+set(CUDA_NVCC_FLAGS "-arch=sm_60 -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored  --expt-relaxed-constexpr")
 # message("NVCC flags are ", ${CUDA_NVCC_FLAGS})
 # set(CUDA_VERBOSE_BUILD ON CACHE BOOL "nvcc verbose" FORCE) 
 # cuda_add_library(latticenet_cu  SHARED  ${CMAKE_SOURCE_DIR}/src/Lattice.cxx
