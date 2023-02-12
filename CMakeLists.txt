@@ -1,5 +1,5 @@
-# cmake_minimum_required(VERSION 2.8 FATAL_ERROR) # we need at least 3.11 because we use the FetchContent feature to manage dependencies and at least 3.14 because we use FetchContent_MakeAvailable
-cmake_minimum_required(VERSION 2.8...3.22)
+#cmake 3.12 seems to have a problem finisng BLAS
+cmake_minimum_required(VERSION 3.13...3.22)
 
 project(lattice_net)
 
@@ -98,7 +98,7 @@ install(FILES "${PROJECT_SOURCE_DIR}/include/lattice_net/jitify_helper/jitify_op
 # set(CUDA_NVCC_FLAGS "-gencode arch=compute_30 -code=sm_30" CACHE STRING "nvcc flags" FORCE)
 #disabling a certain nvcc warning is done through https://stackoverflow.com/questions/14831051/how-to-disable-a-specific-nvcc-compiler-warnings
 # set(CUDA_NVCC_FLAGS "-arch=sm_60 -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored  --expt-relaxed-constexpr --display_error_number " CACHE STRING "nvcc flags" FORCE)
-set(CUDA_NVCC_FLAGS "-arch=sm_60 -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored  --expt-relaxed-constexpr")
+# set(CUDA_NVCC_FLAGS "-arch=sm_60 -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored  --expt-relaxed-constexpr")
 # message("NVCC flags are ", ${CUDA_NVCC_FLAGS})
 # set(CUDA_VERBOSE_BUILD ON CACHE BOOL "nvcc verbose" FORCE) 
 # cuda_add_library(latticenet_cu  SHARED  ${CMAKE_SOURCE_DIR}/src/Lattice.cxx

@@ -44,6 +44,17 @@ RUN sudo locale-gen
 #-------------------------------------------------------------------------------
 
 
+#also needed cmake 3.13 and above for pytorch
+#CMAKE above 3.19  https://askubuntu.com/a/8652941
+# https://gitlab.kitware.com/cmake/cmake/-/issues/22245
+RUN sudo apt-get update
+RUN sudo apt-get install software-properties-common wget
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+RUN sudo apt-add-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main"
+RUN sudo apt update
+RUN sudo apt install -y cmake
+
+
 #python3
 COPY cleanup.sh ./
 RUN chmod +x ./cleanup.sh
@@ -55,6 +66,16 @@ RUN sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.6
 
 #packages that were previously installed by ros but now we need the expliticly
 RUN sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get -y install libopencv-dev libboost-all-dev libpcl-dev
+
+
+# RUN wget http://mirrors.edge.kernel.org/ubuntu/pool/universe/e/eigen3/libeigen3-dev_3.3.7-3_all.deb
+# RUN sudo dpkg -i libeigen3-dev_3.3.7-3_all.deb
+# RUN rm libeigen3-dev_3.3.7-3_all.deb
+#update to eigen 3.4 https://ubuntu.pkgs.org/22.04/ubuntu-universe-amd64/libeigen3-dev_3.4.0-2ubuntu2_all.deb.html
+COPY data/libeigen3-dev_3.4.0-2ubuntu2_all.deb ./
+RUN sudo dpkg -i libeigen3-dev_3.4.0-2ubuntu2_all.deb
+
+
 
 # #ROS and install also catkin for python3
 # COPY cleanup.sh ./
@@ -75,10 +96,6 @@ RUN sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get -y instal
 
 #GRAPHICS STUFF TODO
 RUN sudo apt-get update && sudo apt-get install -y --no-install-recommends libglfw3-dev && sh "./cleanup.sh"
-
-RUN wget http://mirrors.edge.kernel.org/ubuntu/pool/universe/e/eigen3/libeigen3-dev_3.3.7-3_all.deb
-RUN sudo dpkg -i libeigen3-dev_3.3.7-3_all.deb
-RUN rm libeigen3-dev_3.3.7-3_all.deb
 
 
 
@@ -140,7 +157,8 @@ ENV BUILD_TORCH ON
 ENV BUILD_CAFFE2_OPS OFF
 ENV BUILD_CAFFE2_MOBILE OFF
 ENV MAX_JOBS 4
-RUN MAX_JOBS=8 USE_NINJA=1 BUILD_TEST=0 BUILD_JNI=0 TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0+PTX" python3 setup.py install 
+# https://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/
+RUN MAX_JOBS=8 USE_NINJA=1 BUILD_TEST=0 BUILD_JNI=0 TORCH_CUDA_ARCH_LIST="5.2;5.3;6.0;6.1;6.2;7.0;7.5;8.0+PTX" python3 setup.py install 
 WORKDIR /
 # #need to make it own by myself and not by root because otherwise when we run python it will not access it
 WORKDIR /
@@ -151,13 +169,13 @@ RUN git checkout tags/v0.8.2
 RUN git submodule sync
 RUN git submodule update --init --recursive 
 # ENV CMAKE_PREFIX_PATH /opt/conda/envs/pt
-RUN MAX_JOBS=8 USE_NINJA=1 BUILD_TEST=0 BUILD_JNI=0 TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0+PTX" python3 setup.py install
+RUN MAX_JOBS=8 USE_NINJA=1 BUILD_TEST=0 BUILD_JNI=0 TORCH_CUDA_ARCH_LIST="5.2;5.3;6.0;6.1;6.2;7.0;7.5;8.0+PTX" python3 setup.py install
 WORKDIR /
 
 #torch scatter in order to have scatter_max which is useful for a pointnet architecture. It needs the cuda_arch list in order to find nvidia drivers and build the gpu part of the torch-scatter https://github.com/rusty1s/pytorch_scatter/pull/79
 #FORCE_CUDA may be needed for cases like this when the cuda runtime is not exposed during docker build but is actually needed https://github.com/facebookresearch/maskrcnn-benchmark/issues/167
 ARG CUDA_HOME="/usr/local/cuda"
-ARG TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0 8.0+PTX"
+ARG TORCH_CUDA_ARCH_LIST="5.2 5.3 6.0 6.1 6.2 7.0 8.0+PTX"
 ARG TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
 ARG CPATH="/usr/local/cuda/include" 
 RUN git clone --recursive https://github.com/rusty1s/pytorch_scatter /opt/torch_scatter
@@ -172,7 +190,9 @@ WORKDIR /
 RUN sudo apt-get update && sudo apt-get -y install python3-pip python3-tk python3-pyqt5 python3-crypto python3-gnupg python3-dbg && sh "./cleanup.sh"
 RUN sudo python3 -m pip install --upgrade pip
 RUN sudo apt-get update && sudo python3 -m pip install ipdb numpy jupyter h5py scipy ipython pillow matplotlib opencv-python wheel trollius rospkg asyncio netifaces visdom torchnet sympy tqdm dlutils sklearn scikit-image twine natsort termcolor && sh "./cleanup.sh"
-RUN sudo python3 -m pip install --upgrade setuptools setuptools-git  && sh "./cleanup.sh" 
+RUN sudo python3 -m pip install --upgrade setuptools setuptools-git  && sh "./cleanup.sh"
+#downgrade PIL to solve this issue https://github.com/RaduAlexandru/lattice_net/issues/1 
+RUN sudo python3 -m pip install 'pillow<9' 
 
 
 

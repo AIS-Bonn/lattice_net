@@ -21,7 +21,7 @@ from latticenet_py.lattice.models import *
 from latticenet_py.callbacks.callback import *
 from latticenet_py.callbacks.viewer_callback import *
 from latticenet_py.callbacks.visdom_callback import *
-from latticenet_py.callbacks.tensorboard_callback import *
+# from latticenet_py.callbacks.tensorboard_callback import *
 from latticenet_py.callbacks.state_callback import *
 from latticenet_py.callbacks.phase import *
 
@@ -96,8 +96,8 @@ def run():
     cb_list = []
     if(train_params.with_visdom()):
         cb_list.append(VisdomCallback(experiment_name))
-    if(train_params.with_tensorboard()):
-        cb_list.append(TensorboardCallback(experiment_name))
+    # if(train_params.with_tensorboard()):
+        # cb_list.append(TensorboardCallback(experiment_name))
     if(train_params.with_viewer()):
         cb_list.append(ViewerCallback())
     cb_list.append(StateCallback())
