@@ -145,7 +145,9 @@ WORKDIR /
 #RUN git clone --verbose --recursive https://github.com/pytorch/pytorch  /opt/pytorch
 RUN git clone  https://github.com/pytorch/pytorch  /opt/pytorch
 RUN sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pip python3-setuptools && sh "./cleanup.sh"
-RUN pip3 install numpy pyyaml mkl mkl-include typing dataclasses
+# RUN pip3 install numpy pyyaml mkl mkl-include typing dataclasses
+RUN sudo python3 -m pip install wheel
+RUN sudo python3 -m pip install numpy pyyaml mkl mkl-include typing dataclasses typing-extensions 
 WORKDIR /opt/pytorch
 RUN git checkout tags/v1.7.1
 RUN git submodule sync
@@ -163,7 +165,6 @@ WORKDIR /
 # #need to make it own by myself and not by root because otherwise when we run python it will not access it
 WORKDIR /
 RUN git clone --recursive https://github.com/pytorch/vision /opt/vision
-RUN pip3 install typing-extensions 
 WORKDIR /opt/vision
 RUN git checkout tags/v0.8.2
 RUN git submodule sync
