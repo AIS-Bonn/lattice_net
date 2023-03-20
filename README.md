@@ -3,7 +3,7 @@
 ### [Project Page](https://www.ais.uni-bonn.de/videos/RSS_2020_Rosu/) | [Video](https://www.youtube.com/watch?v=503Z5Vw9a90) | [Paper](https://www.ais.uni-bonn.de/videos/RSS_2020_Rosu/RSS_2020_Rosu.pdf)
 
 [LatticeNet: Fast Point Cloud Segmentation Using Permutohedral Lattices](https://www.ais.uni-bonn.de/videos/RSS_2020_Rosu/)  
- [Radu Alexandru Rosu](https://www.ais.uni-bonn.de/%7Erosu/) <sup>1</sup>,
+ [Radu Alexandru Rosu](https://radualexandru.github.io/) <sup>1</sup>,
  [Peer Sch&uuml;tt]() <sup>1</sup>,
  [Jan Quenzel](https://www.ais.uni-bonn.de/%7Ejquenzel/) <sup>1</sup>,
  [Sven Behnke](https://www.ais.uni-bonn.de/behnke/) <sup>1</sup>
